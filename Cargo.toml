@@ -1,0 +1,12 @@
+[package]
+name="rustlin"
+version = "0.0.1"
+authors = ["Thomas Epperson"]
+edition="2018"
+
+[dependencies]
+futures="0.3.19"
+
+[dependencies.tokio]
+version = "1.15.0"
+features = ["rt-multi-thread", "net", "time", "macros", "signal", "sync"]
