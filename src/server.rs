@@ -26,7 +26,7 @@ async fn process_client(mut socket: tokio::net::TcpStream) -> Result<u8, ClientE
 pub async fn setup_game_server() -> Result<tokio::sync::oneshot::Sender<u32>, Box<dyn Error>> {
     println!("server: Starting the game server");
 	let (update_tx, mut update_rx) = tokio::sync::oneshot::channel::<u32>();
-    let update_listener = TcpListener::bind("216.166.78.131:2000").await?;
+    let update_listener = TcpListener::bind("0.0.0.0:2000").await?;
 
     tokio::spawn(async move {
         loop {
