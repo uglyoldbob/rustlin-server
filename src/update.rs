@@ -37,14 +37,15 @@ async fn process_update_client(mut socket: tokio::net::TcpStream) -> Result<u8, 
 		socket.write_u32_le(1).await?;
 		let number_players = 0;
 		socket.write_u16_le(number_players).await?;
-		let mystery = socket.read_u32().await?;
-		println!("Mystery value is {}", mystery);
 	}
 	else
 	{
 		println!("update: client is using an invalid timestamp");
 		return Err(UpdateError);
 	}
+
+	let restime = socket.read_u32().await?;	//loaded from restime.dat
+	println!(" Client restime is {}", restime);
 	
     Ok(0)
 }
