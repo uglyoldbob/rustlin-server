@@ -14,8 +14,23 @@ struct Packet {
 	data: Vec<u8>,
 }
 
-fn change_key(k: u64) -> u64 {
-    0
+fn change_key(k: u64, v: u32) -> u64 {
+    let d : u32 = u32::from_be(v);
+    let mut little : u32 = u32::from_be((k & 0xFFFFFFFF).try_into().unwrap());
+    println!("little is {:x?}", little);
+    let mut little64 = little as u64;
+    
+    little64 += 0x287effc3;
+    println!("little64 is {:x?}", little64);
+    little64 &= 0xffffffff;
+
+    little = little64.try_into().unwrap();
+    little = u32::from_be(little);
+    //little = u32::from_be(little);
+    println!("little is {:x?}", little);
+    let mut nk = (k ^ ((d as u64)<<32)) & 0xFFFFFFFF00000000;
+    nk |= little as u64;
+    nk
 }
 
 fn key_init(k: u32) -> u64 {
@@ -129,7 +144,6 @@ mod tests {
         let required: u64 = 0x24700c1a554e71f5;
         println!("key init val is {:x?} {:x?}", key_init_val, required);
         assert_eq!(key_init_val, required);
-        assert_eq!(2+2,4);
     }
 
     #[test]
@@ -144,8 +158,14 @@ mod tests {
         let mut packet = Packet::new();
         packet.add_vec(&data);
         let d = packet.decrypt(key).buf();
-        println!("Test decryption {:x?} {:x?}", d, required);
+        let cd = packet.peek_u32();
         assert_eq!(d, required);
+        println!("Key change data is {:x?} ", cd);
+        assert_eq!(cd, 0xe4003347);
+        let new_key = change_key(key, cd);
+        let required_new_key : u64 =  0x63430cfe184ef01d;
+        println!("key change {:x?} {:x?} {:x?}", key, new_key, required_new_key);
+        assert_eq!(new_key, required_new_key);
     }
 
      #[test]
