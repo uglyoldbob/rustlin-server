@@ -1,3 +1,4 @@
+use futures::FutureExt;
 use tokio::net::TcpListener;
 use std::error::Error;
 
@@ -10,8 +11,14 @@ use std::vec::Vec;
 
 use rand::Rng;
 
-struct Packet {
-	data: Vec<u8>,
+use crate::client_data::*;
+use crate::ServerMessage;
+
+/// The 'ClientPacket' type. Represents packets sent by the client
+enum ClientPacket {
+    Version(u16,u32,u8,u32),
+    Login(String,String,u32,u32,u32,u32,u32,u32,u32),
+    Unknown,
 }
 
 fn change_key(k: u64, v: u32) -> u64 {
@@ -40,12 +47,44 @@ fn key_init(k: u32) -> u64 {
     u64::from_ne_bytes(keyvec.try_into().unwrap())		
 }
 
+struct Packet {
+	data: Vec<u8>,
+    read: usize,
+}
+
 impl Packet {
     fn new() -> Packet {
         Packet {
 			data: Vec::new(),
+            read: 0,
 		}
 	}
+    fn convert(mut self) -> ClientPacket {
+        let opcode: u8 = self.pull_u8();
+        match opcode {
+            12 => {
+                ClientPacket::Login(self.pull_string(),
+                    self.pull_string(),
+                    self.pull_u32(),
+                    self.pull_u32(),
+                    self.pull_u32(),
+                    self.pull_u32(),
+                    self.pull_u32(),
+                    self.pull_u32(),
+                    self.pull_u32())
+
+            }
+            71 => {
+                let val1: u16 = self.pull_u16();
+                let val2: u32 = self.pull_u32();
+                let val3: u8 = self.pull_u8();
+                let val4: u32 = self.pull_u32();
+                println!("client: found a client version packet");
+                ClientPacket::Version(val1,val2,val3,val4)
+            }
+            _ => ClientPacket::Unknown
+        }
+    }
 	fn len(&self) -> u16 {
 		self.data.len().try_into().unwrap()
 	}
@@ -69,7 +108,38 @@ impl Packet {
 		self.data.append(&mut d.to_le_bytes().to_vec());
 		self
 	}
-    fn peek_u32(self) -> u32 {
+    fn pull_u8(&mut self) -> u8 {
+        let val: u8 = self.data[self.read];
+        self.read += 1;
+        val
+    }
+    fn pull_u16(&mut self) -> u16 {
+        let mut val : u16 = (self.data[self.read+1] as u16) << 8;
+        val |= self.data[self.read] as u16;
+        self.read += 2;
+        val
+    }
+    fn pull_u32(&mut self) -> u32 {
+         let mut val : u32 = self.data[self.read+3] as u32;
+        val = (val<<8) | (self.data[self.read+2] as u32);
+        val = (val<<8) | (self.data[self.read+1] as u32);
+        val = (val<<8) | (self.data[self.read] as u32);
+        self.read += 4;
+        val
+    }
+    fn pull_string(&mut self) -> String {
+        let mut v: String = "".to_string();
+        //a do while loop
+        while {
+            let digit = self.pull_u8();
+            if digit != 0 {
+                v.push(digit as char);
+            }
+            digit != 0
+        } {}
+        v
+    }
+    fn peek_u32(&self) -> u32 {
         let v = Vec::from([self.data[0], self.data[1], self.data[2], self.data[3]]);
         u32::from_ne_bytes(v.try_into().unwrap())
     }
@@ -176,7 +246,6 @@ struct ServerPacketReceiver {
 
 impl ServerPacketReceiver {
 	fn new(r: tokio::net::tcp::OwnedReadHalf, key: u32) -> ServerPacketReceiver {
-		//TODO: properly generate the starting key from the seed
 		ServerPacketReceiver {
 			reader: r,
 			decryption_key: key_init(key),
@@ -194,7 +263,8 @@ impl ServerPacketReceiver {
 		self.reader.read_exact(&mut contents).await?;
 		packet.add_vec(&contents);
 		packet.decrypt(self.decryption_key);
-		//TODO: mutate the decryption key
+        let kcv = packet.peek_u32();
+        self.decryption_key = change_key(self.decryption_key, kcv);
 		Ok(packet)
 	}
 }
@@ -216,7 +286,13 @@ impl ServerPacketSender {
 		self.encryption_key = Some(d);
 	}
 	
-	async fn send_packet(&mut self, data: Packet) -> Result<(), ClientError> {
+	async fn send_packet(&mut self, mut data: Packet) -> Result<(), ClientError> {
+        let kcv = data.peek_u32();
+        println!("client: send packet {:x?}", data.buf());
+        if let Some(key) = self.encryption_key {
+            data.encrypt(key);
+            self.encryption_key = Some(change_key(key, kcv));
+        }
 		self.writer.write_u16_le(data.len()+2).await?;
 		self.writer.write(&data.buf()).await?;
 		Ok(())
@@ -237,25 +313,67 @@ impl From<std::io::Error> for ClientError {
     }
 }
 
-async fn process_client(socket: tokio::net::TcpStream) -> Result<u8, ClientError> {
+async fn process_packet(p: Packet, s: &mut ServerPacketSender) -> Result<(), ClientError> {
+    let c = p.convert();
+    Ok(
+    match c {
+        ClientPacket::Version(a,b,c,d) => {
+            println!("client: version {} {} {} {}", a, b, c, d);
+            let mut response: Packet = Packet::new();
+                response.add_u8(10)
+                .add_u8(0)
+                .add_u8(2) 
+                .add_u32(2) //server version
+                .add_u32(0) //cache version
+                .add_u32(0) //auth version
+                .add_u32(0) //npc version
+                .add_u32(0) //start time
+                .add_u8(1) //new accounts
+                .add_u8(1) //english only
+                .add_u8(0); //country
+            s.send_packet(response).await?;
+        }
+        ClientPacket::Login(u,p,v1,v2,v3,v4,v5,v6,v7) => {
+            println!("client: login attempt for {} {} {} {} {} {} {} {}", u, v1, v2, v3, v4, v5, v6, v7);
+        }
+        ClientPacket::Unknown => {
+            println!("client: received unknown packet");
+        }
+    })
+}
+
+async fn process_client(socket: tokio::net::TcpStream, cd: ClientData) -> Result<u8, ClientError> {
 	let (reader, writer) = socket.into_split();
 	let mut packet_writer = ServerPacketSender::new(writer);
 
 	let encryption_key : u32 = rand::thread_rng().gen();
 	let mut packet_reader = ServerPacketReceiver::new(reader, encryption_key);
 
+    let mut brd_rx : tokio::sync::broadcast::Receiver<ServerMessage> = cd.get_broadcast_rx();
+    let server_tx = cd.server_tx;
+
 	let mut key_packet = Packet::new();
 	key_packet.add_u8(65)
 		.add_u32(encryption_key);
 	packet_writer.send_packet(key_packet).await?;
 	packet_writer.set_encrption_key(packet_reader.get_key());
-	let packet = packet_reader.read_packet().await?;
-	println!("Packet received is {:x?}", packet.buf());
+    loop {
+        futures::select! {
+            packet = packet_reader.read_packet().fuse() => {
+                let p = packet.unwrap();
+        	    println!("client: Packet received is {:x?}", p.buf());
+                process_packet(p, &mut packet_writer).await;
+            }
+            msg = brd_rx.recv().fuse() => {
+                println!("client: Received broadcast message from server");
+            }
+        }
+    }
 
     Ok(0)
 }
 
-pub async fn setup_game_server() -> Result<tokio::sync::oneshot::Sender<u32>, Box<dyn Error>> {
+pub async fn setup_game_server(cd: ClientData) -> Result<tokio::sync::oneshot::Sender<u32>, Box<dyn Error>> {
     println!("server: Starting the game server");
 	let (update_tx, mut update_rx) = tokio::sync::oneshot::channel::<u32>();
     let update_listener = TcpListener::bind("0.0.0.0:2000").await?;
@@ -266,8 +384,9 @@ pub async fn setup_game_server() -> Result<tokio::sync::oneshot::Sender<u32>, Bo
                 res = update_listener.accept() => {
                     let (socket, addr) = res.unwrap();
                     println!("server: Received a client from {}", addr);
+                    let cd2 = cd.clone();
                     tokio::spawn(async move {
-                        if let Err(e) = process_client(socket).await {
+                        if let Err(e) = process_client(socket, cd2).await {
                             println!("server: Client {} errored {}", addr, e);
                         }
                     });
