@@ -13,12 +13,18 @@ use server_message::*;
 mod client_data;
 use client_data::*;
 
+use std::fs;
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     println!("server: Game server is starting");
 
     let (clients, mut clients_rx) = tokio::sync::mpsc::unbounded_channel::<ClientMessage>();
     let (broadcast, mut clients_rx_broadcast) = tokio::sync::broadcast::channel::<ServerMessage>(100);
+	
+	let settings_file = fs::read_to_string("./settings.ini")?;
+	let mut settings = configparser::ini::Ini::new();
+    settings.read(settings_file)?;
 
     let cd: ClientData = ClientData::new(broadcast, clients);
 

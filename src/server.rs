@@ -18,6 +18,8 @@ use crate::ServerMessage;
 enum ClientPacket {
     Version(u16,u32,u8,u32),
     Login(String,String,u32,u32,u32,u32,u32,u32,u32),
+	CharacterSelect(String),
+	NewsDone,
     Unknown,
 }
 
@@ -74,6 +76,7 @@ impl Packet {
                     self.pull_u32())
 
             }
+			43 => ClientPacket::NewsDone,
             71 => {
                 let val1: u16 = self.pull_u16();
                 let val2: u32 = self.pull_u32();
@@ -82,6 +85,7 @@ impl Packet {
                 println!("client: found a client version packet");
                 ClientPacket::Version(val1,val2,val3,val4)
             }
+			83 => ClientPacket::CharacterSelect(self.pull_string()),
             _ => ClientPacket::Unknown
         }
     }
@@ -106,6 +110,13 @@ impl Packet {
 	}
 	fn add_u32(&mut self, d: u32) -> &mut Packet {
 		self.data.append(&mut d.to_le_bytes().to_vec());
+		self
+	}
+	fn add_string(&mut self, d: String) -> &mut Packet {
+		for n in d.bytes() {
+			self.add_u8(n);
+		}
+		self.add_u8(0);
 		self
 	}
     fn pull_u8(&mut self) -> u8 {
@@ -287,6 +298,9 @@ impl ServerPacketSender {
 	}
 	
 	async fn send_packet(&mut self, mut data: Packet) -> Result<(), ClientError> {
+		while (data.buf().len() < 4) {
+			data.add_u8(0);
+		}
         let kcv = data.peek_u32();
         println!("client: send packet {:x?}", data.buf());
         if let Some(key) = self.encryption_key {
@@ -335,7 +349,53 @@ async fn process_packet(p: Packet, s: &mut ServerPacketSender) -> Result<(), Cli
         }
         ClientPacket::Login(u,p,v1,v2,v3,v4,v5,v6,v7) => {
             println!("client: login attempt for {} {} {} {} {} {} {} {}", u, v1, v2, v3, v4, v5, v6, v7);
+			let mut response = Packet::new();
+			response.add_u8(21)
+				.add_u8(0)	//TODO put in real value
+				.add_u32(0)
+				.add_string("".to_string())
+				.add_u8(0)
+				.add_u16(0);
+			s.send_packet(response).await?;
+			
+			response = Packet::new();
+			response.add_u8(90).add_string("This is the news".to_string());
+			s.send_packet(response).await?;
         }
+		ClientPacket::NewsDone => {
+			//send number of characters the player has
+			let mut response = Packet::new();
+			response.add_u8(113)
+				.add_u8(1) //number of characters
+				.add_u8(8); //number of slots
+			s.send_packet(response).await?;
+			for _ in 0..1 {
+				response = Packet::new();
+				response.add_u8(99)
+					.add_string("whatever".to_string())	//character name
+					.add_string("whocares".to_string())	//pledge name
+					.add_u8(1) //character type
+					.add_u8(2) //gender
+					.add_u16(3) //alignment
+					.add_u16(4) //hp
+					.add_u16(5) //mp
+					.add_u8(6) //ac
+					.add_u8(7) //level
+					.add_u8(8) //strength
+					.add_u8(9) //dexterity
+					.add_u8(10) //constitution
+					.add_u8(11) //wisdom
+					.add_u8(12) //charisma
+					.add_u8(13) //intelligence
+					.add_u8(14) //?
+					.add_u32(15); //?
+				s.send_packet(response).await?;
+			}
+		}
+		ClientPacket::CharacterSelect(c) => {
+			println!("client: login with {}", c);
+			
+		}
         ClientPacket::Unknown => {
             println!("client: received unknown packet");
         }
