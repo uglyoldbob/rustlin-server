@@ -18,9 +18,197 @@ use crate::ServerMessage;
 enum ClientPacket {
     Version(u16,u32,u8,u32),
     Login(String,String,u32,u32,u32,u32,u32,u32,u32),
-	CharacterSelect(String),
+	CharacterSelect{name: String},
 	NewsDone,
     Unknown,
+}
+
+/// Represents packets sent to the client, from the server
+enum ServerPacket {
+	ServerVersion {
+		id: u8,
+		version: u32,
+		time: u32,
+		new_accounts: u8,
+		english: u8,
+		country: u8,
+	},
+	LoginResult{ code: u8 },
+	News(String),
+	NumberCharacters(u8,u8),
+	LoginCharacterDetails {
+		name: String,
+		pledge: String,
+		ctype: u8,
+		gender: u8,
+		alignment: u16,
+		hp: u16,
+		mp: u16,
+		ac: u8,
+		level: u8,
+		strength: u8,
+		dexterity: u8,
+		constitution: u8,
+		wisdom: u8,
+		charisma: u8,
+		intelligence: u8,
+	},
+	StartGame(u32),
+	CharacterDetails {
+		id: u32,
+		level: u8,
+		xp: u32,
+		strength: u8,
+		dexterity: u8,
+		constitution: u8,
+		wisdom: u8,
+		charisma: u8,
+		intelligence: u8,
+		curr_hp: u16,
+		max_hp: u16,
+		curr_mp: u16,
+		max_mp: u16,
+		ac: u8,
+		time: u32,
+		food: u8,
+		weight: u8,
+		alignment: u16,
+		fire_resist: u8,
+		water_resist: u8,
+		wind_resist: u8,
+		earth_resist: u8
+	},
+	MapId(u16, u8),
+	Unknown,
+	PutObject{
+		x: u16,
+		y: u16,
+		id: u32,
+		icon: u16,
+		status: u8,
+		direction:u8,
+		light:u8,
+		speed:u8,
+		xp:u32,
+		alignment:u16,
+		name:String,
+		title:String,
+		status2:u8,
+		pledgeid: u32,
+		pledgename: String,
+		unknown: String,
+		v1: u8,
+		hp_bar: u8,
+		v2:u8,
+		v3:u8,
+	},
+}
+
+impl ServerPacket {
+	fn build(self) -> Packet {
+		let mut p = Packet::new();
+		match self {
+			ServerPacket::ServerVersion{id,version,time,new_accounts,english,country} => {
+				p.add_u8(10)
+					.add_u8(0)
+					.add_u8(id) 
+					.add_u32(version)
+					.add_u32(version)
+					.add_u32(version)
+					.add_u32(version)
+					.add_u32(time)
+					.add_u8(new_accounts)
+					.add_u8(english)
+					.add_u8(country);
+			}
+			ServerPacket::LoginResult{code} => {
+				p.add_u8(21).add_u8(code).add_u32(0);
+			}
+			ServerPacket::News(news) => {
+				p.add_u8(90).add_string(news);
+			}
+			ServerPacket::NumberCharacters(num,max) => {
+				p.add_u8(113)
+				.add_u8(num) //number of characters
+				.add_u8(max); //number of slots
+			}
+			ServerPacket::LoginCharacterDetails{
+				name, pledge, ctype, gender, alignment,
+				hp,	mp,	ac,	level,	strength,
+				dexterity, constitution,
+				wisdom,	charisma, intelligence } => {
+					p.add_u8(99)
+					.add_string(name)
+					.add_string(pledge)
+					.add_u8(ctype)
+					.add_u8(gender)
+					.add_u16(alignment)
+					.add_u16(hp)
+					.add_u16(mp)
+					.add_u8(ac)
+					.add_u8(level)
+					.add_u8(strength)
+					.add_u8(dexterity)
+					.add_u8(constitution)
+					.add_u8(wisdom)
+					.add_u8(charisma)
+					.add_u8(intelligence)
+					.add_u8(14) //TODO
+					.add_u32(15); //TODO
+			}
+			ServerPacket::CharacterDetails{
+				id, level, xp, strength, dexterity,
+				constitution, wisdom, charisma, intelligence,
+				curr_hp, max_hp, curr_mp, max_mp, ac, time,
+				food, weight, alignment, fire_resist,
+				water_resist, wind_resist, earth_resist	} => {
+					p.add_u8(69)
+					.add_u32(id)
+					.add_u8(level)
+					.add_u32(xp)
+					.add_u8(strength)
+					.add_u8(intelligence)
+					.add_u8(wisdom)
+					.add_u8(dexterity)
+					.add_u8(constitution)
+					.add_u8(charisma)
+					.add_u16(curr_hp)
+					.add_u16(max_hp)
+					.add_u16(curr_mp)
+					.add_u16(max_mp)
+					.add_u8(ac)
+					.add_u32(time)
+					.add_u8(food)
+					.add_u8(weight)
+					.add_u16(alignment)
+					.add_u8(fire_resist)
+					.add_u8(water_resist)
+					.add_u8(wind_resist)
+					.add_u8(earth_resist);
+			}
+			ServerPacket::StartGame(i) => {
+				p.add_u8(63).add_u8(3).add_u32(i);
+			}
+			ServerPacket::Unknown => {
+				p.add_u8(107).add_u8(0x14).add_u8(0x69); //TODO these values are magic
+			}
+			ServerPacket::MapId(map, underwater) => {
+				p.add_u8(76).add_u16(map).add_u8(underwater);
+			}
+			ServerPacket::PutObject{x,y,id,icon,status,direction,
+				light,speed,xp,alignment,name,title,status2,
+				pledgeid,pledgename,unknown,v1,hp_bar,v2,v3} => {
+				p.add_u8(64).add_u16(x).add_u16(y).add_u32(id)
+				 .add_u16(icon).add_u8(status).add_u8(direction)
+				 .add_u8(light).add_u8(speed).add_u32(xp)
+				 .add_u16(alignment).add_string(name).add_string(title)
+				 .add_u8(status).add_u32(pledgeid).add_string(pledgename)
+				 .add_string(unknown).add_u8(v1).add_u8(hp_bar).add_u8(v2)
+				 .add_u8(v3);
+			}
+		}
+		p
+	}
 }
 
 fn change_key(k: u64, v: u32) -> u64 {
@@ -85,7 +273,7 @@ impl Packet {
                 println!("client: found a client version packet");
                 ClientPacket::Version(val1,val2,val3,val4)
             }
-			83 => ClientPacket::CharacterSelect(self.pull_string()),
+			83 => ClientPacket::CharacterSelect{name: self.pull_string()},
             _ => ClientPacket::Unknown
         }
     }
@@ -298,7 +486,7 @@ impl ServerPacketSender {
 	}
 	
 	async fn send_packet(&mut self, mut data: Packet) -> Result<(), ClientError> {
-		while (data.buf().len() < 4) {
+		while data.buf().len() < 4 {
 			data.add_u8(0);
 		}
         let kcv = data.peek_u32();
@@ -333,68 +521,83 @@ async fn process_packet(p: Packet, s: &mut ServerPacketSender) -> Result<(), Cli
     match c {
         ClientPacket::Version(a,b,c,d) => {
             println!("client: version {} {} {} {}", a, b, c, d);
-            let mut response: Packet = Packet::new();
-                response.add_u8(10)
-                .add_u8(0)
-                .add_u8(2) 
-                .add_u32(2) //server version
-                .add_u32(0) //cache version
-                .add_u32(0) //auth version
-                .add_u32(0) //npc version
-                .add_u32(0) //start time
-                .add_u8(1) //new accounts
-                .add_u8(1) //english only
-                .add_u8(0); //country
+            let mut response: Packet = ServerPacket::ServerVersion{
+				id: 2,
+				version: 2,
+				time: 3,
+				new_accounts: 1,
+				english: 1,
+				country: 0,
+			}.build();
             s.send_packet(response).await?;
         }
         ClientPacket::Login(u,p,v1,v2,v3,v4,v5,v6,v7) => {
             println!("client: login attempt for {} {} {} {} {} {} {} {}", u, v1, v2, v3, v4, v5, v6, v7);
-			let mut response = Packet::new();
-			response.add_u8(21)
-				.add_u8(0)	//TODO put in real value
-				.add_u32(0)
-				.add_string("".to_string())
-				.add_u8(0)
-				.add_u16(0);
+			let mut response = ServerPacket::LoginResult{
+				code: 0 }.build();//TODO put in real value, this means login success
 			s.send_packet(response).await?;
 			
-			response = Packet::new();
-			response.add_u8(90).add_string("This is the news".to_string());
+			response = ServerPacket::News("This is the news".to_string()).build();
 			s.send_packet(response).await?;
         }
 		ClientPacket::NewsDone => {
 			//send number of characters the player has
-			let mut response = Packet::new();
-			response.add_u8(113)
-				.add_u8(1) //number of characters
-				.add_u8(8); //number of slots
+			let mut response = ServerPacket::NumberCharacters(1,8).build();
 			s.send_packet(response).await?;
+			
 			for _ in 0..1 {
-				response = Packet::new();
-				response.add_u8(99)
-					.add_string("whatever".to_string())	//character name
-					.add_string("whocares".to_string())	//pledge name
-					.add_u8(1) //character type
-					.add_u8(2) //gender
-					.add_u16(3) //alignment
-					.add_u16(4) //hp
-					.add_u16(5) //mp
-					.add_u8(6) //ac
-					.add_u8(7) //level
-					.add_u8(8) //strength
-					.add_u8(9) //dexterity
-					.add_u8(10) //constitution
-					.add_u8(11) //wisdom
-					.add_u8(12) //charisma
-					.add_u8(13) //intelligence
-					.add_u8(14) //?
-					.add_u32(15); //?
+				response = ServerPacket::LoginCharacterDetails{
+					name: "whatever".to_string(),
+					pledge: "whocares".to_string(),
+					ctype: 1,
+					gender: 2,
+					alignment: 32767,
+					hp: 1234,
+					mp: 95,
+					ac: 248,
+					level: 51,
+					strength: 12,
+					dexterity: 12,
+					constitution: 12,
+					wisdom: 12,
+					charisma: 12,
+					intelligence: 12,
+				}.build();
 				s.send_packet(response).await?;
 			}
 		}
-		ClientPacket::CharacterSelect(c) => {
-			println!("client: login with {}", c);
+		ClientPacket::CharacterSelect{name} => {
+			println!("client: login with {}", name);
+			let mut response = ServerPacket::StartGame(0).build();
+			s.send_packet(response).await?;
 			
+			response = ServerPacket::Unknown.build();
+			s.send_packet(response).await?;
+			
+			response = ServerPacket::CharacterDetails{
+				id: 1, level: 5, xp: 1234, strength: 12, dexterity: 12,
+				constitution: 12, wisdom: 12, charisma: 12, intelligence: 12,
+				curr_hp: 123, max_hp: 985, curr_mp: 34, max_mp: 345, time: 1, ac: 253,
+				food: 100, weight: 23, alignment: 32675, fire_resist: 0,
+				water_resist: 0, wind_resist: 0, earth_resist: 0}.build();
+			s.send_packet(response).await?;
+			
+			s.send_packet(ServerPacket::MapId(4,0).build()).await?;
+			
+			s.send_packet(ServerPacket::PutObject{
+				x: 32767,y:32767,id:1,icon:1,status:0,direction:0,
+				light:5,speed:50,xp:1234,alignment:32767,name:"testing".to_string(),
+				title:"i am groot".to_string(),status2:0,
+				pledgeid:0,pledgename:"avengers".to_string(),unknown:"potato".to_string(),
+				v1:0,hp_bar:100,v2:0,v3:0}.build()).await?;
+			
+			//TODO send spmr packet?
+			
+			//TODO send title packet
+			
+			//TODO send weather packet
+			
+			//TODO send owncharstatus packet
 		}
         ClientPacket::Unknown => {
             println!("client: received unknown packet");
