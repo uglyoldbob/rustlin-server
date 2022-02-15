@@ -20,8 +20,16 @@ enum ClientPacket {
     Login(String,String,u32,u32,u32,u32,u32,u32,u32),
 	CharacterSelect{name: String},
 	NewsDone,
+	KeepAlive,
+	GameInitDone,
+	WindowActivate(u8),
+	Save,
+	Move{x:u16,y:u16,heading:u8},
+	ChangeDirection(u8),
     Unknown,
 }
+
+//TODO create enums for the option values
 
 /// Represents packets sent to the client, from the server
 enum ServerPacket {
@@ -44,7 +52,7 @@ enum ServerPacket {
 		alignment: u16,
 		hp: u16,
 		mp: u16,
-		ac: u8,
+		ac: i8,
 		level: u8,
 		strength: u8,
 		dexterity: u8,
@@ -68,10 +76,10 @@ enum ServerPacket {
 		max_hp: u16,
 		curr_mp: u16,
 		max_mp: u16,
-		ac: u8,
+		ac: i8,
 		time: u32,
-		food: u8,
-		weight: u8,
+		food: f32,
+		weight: f32,
 		alignment: u16,
 		fire_resist: u8,
 		water_resist: u8,
@@ -79,7 +87,6 @@ enum ServerPacket {
 		earth_resist: u8
 	},
 	MapId(u16, u8),
-	Unknown,
 	PutObject{
 		x: u16,
 		y: u16,
@@ -102,6 +109,8 @@ enum ServerPacket {
 		v2:u8,
 		v3:u8,
 	},
+	CharSpMrBonus{sp:u8,mr:u8},
+	Weather(u8),
 }
 
 impl ServerPacket {
@@ -145,7 +154,7 @@ impl ServerPacket {
 					.add_u16(alignment)
 					.add_u16(hp)
 					.add_u16(mp)
-					.add_u8(ac)
+					.add_i8(ac)
 					.add_u8(level)
 					.add_u8(strength)
 					.add_u8(dexterity)
@@ -176,10 +185,10 @@ impl ServerPacket {
 					.add_u16(max_hp)
 					.add_u16(curr_mp)
 					.add_u16(max_mp)
-					.add_u8(ac)
+					.add_i8(ac)
 					.add_u32(time)
-					.add_u8(food)
-					.add_u8(weight)
+					.add_u8((food*29.0).round() as u8)
+					.add_u8((weight*29.0).round() as u8)
 					.add_u16(alignment)
 					.add_u8(fire_resist)
 					.add_u8(water_resist)
@@ -188,9 +197,6 @@ impl ServerPacket {
 			}
 			ServerPacket::StartGame(i) => {
 				p.add_u8(63).add_u8(3).add_u32(i);
-			}
-			ServerPacket::Unknown => {
-				p.add_u8(107).add_u8(0x14).add_u8(0x69); //TODO these values are magic
 			}
 			ServerPacket::MapId(map, underwater) => {
 				p.add_u8(76).add_u16(map).add_u8(underwater);
@@ -202,9 +208,16 @@ impl ServerPacket {
 				 .add_u16(icon).add_u8(status).add_u8(direction)
 				 .add_u8(light).add_u8(speed).add_u32(xp)
 				 .add_u16(alignment).add_string(name).add_string(title)
-				 .add_u8(status).add_u32(pledgeid).add_string(pledgename)
+				 .add_u8(status2).add_u32(pledgeid).add_string(pledgename)
 				 .add_string(unknown).add_u8(v1).add_u8(hp_bar).add_u8(v2)
 				 .add_u8(v3);
+			}
+			ServerPacket::CharSpMrBonus{sp,mr} =>
+			{
+				p.add_u8(80).add_u8(sp).add_u8(mr);
+			}
+			ServerPacket::Weather(w) => {
+				p.add_u8(83).add_u8(w);
 			}
 		}
 		p
@@ -242,6 +255,11 @@ struct Packet {
     read: usize,
 }
 
+union u8_converter{
+	u: u8,
+	i: i8,
+}
+
 impl Packet {
     fn new() -> Packet {
         Packet {
@@ -265,6 +283,7 @@ impl Packet {
 
             }
 			43 => ClientPacket::NewsDone,
+			57 => ClientPacket::KeepAlive,
             71 => {
                 let val1: u16 = self.pull_u16();
                 let val2: u32 = self.pull_u32();
@@ -273,7 +292,16 @@ impl Packet {
                 println!("client: found a client version packet");
                 ClientPacket::Version(val1,val2,val3,val4)
             }
+			74 => ClientPacket::ChangeDirection(self.pull_u8()),
 			83 => ClientPacket::CharacterSelect{name: self.pull_string()},
+			88 => ClientPacket::Move{x:self.pull_u16(),y:self.pull_u16(),heading:self.pull_u8()},
+			92 => ClientPacket::GameInitDone,
+			97 => {
+				let v1 = self.pull_u8();
+				let v2 = self.pull_u8();
+				ClientPacket::WindowActivate(v2)
+			}
+			111 => ClientPacket::Save,
             _ => ClientPacket::Unknown
         }
     }
@@ -290,6 +318,12 @@ impl Packet {
 	}
 	fn add_u8(&mut self, d: u8) -> &mut Packet {
 		self.data.push(d);
+		self
+	}
+	fn add_i8(&mut self, d: i8) -> &mut Packet {
+		let a: u8_converter = u8_converter{ i: d};
+		let a: u8 = unsafe{a.u};
+		self.data.push(a);
 		self
 	}
 	fn add_u16(&mut self, d: u16) -> &mut Packet {
@@ -554,7 +588,7 @@ async fn process_packet(p: Packet, s: &mut ServerPacketSender) -> Result<(), Cli
 					alignment: 32767,
 					hp: 1234,
 					mp: 95,
-					ac: 248,
+					ac: -12,
 					level: 51,
 					strength: 12,
 					dexterity: 12,
@@ -571,15 +605,12 @@ async fn process_packet(p: Packet, s: &mut ServerPacketSender) -> Result<(), Cli
 			let mut response = ServerPacket::StartGame(0).build();
 			s.send_packet(response).await?;
 			
-			response = ServerPacket::Unknown.build();
-			s.send_packet(response).await?;
-			
 			response = ServerPacket::CharacterDetails{
 				id: 1, level: 5, xp: 1234, strength: 12, dexterity: 12,
-				constitution: 12, wisdom: 12, charisma: 12, intelligence: 12,
-				curr_hp: 123, max_hp: 985, curr_mp: 34, max_mp: 345, time: 1, ac: 253,
-				food: 100, weight: 23, alignment: 32675, fire_resist: 0,
-				water_resist: 0, wind_resist: 0, earth_resist: 0}.build();
+				constitution: 13, wisdom: 14, charisma: 15, intelligence: 16,
+				curr_hp: 123, max_hp: 985, curr_mp: 34, max_mp: 345, time: 1, ac: -13,
+				food: 1.0, weight: 0.5, alignment: 32675, fire_resist: 0,
+				water_resist: 1, wind_resist: 2, earth_resist: 3}.build();
 			s.send_packet(response).await?;
 			
 			s.send_packet(ServerPacket::MapId(4,0).build()).await?;
@@ -588,16 +619,24 @@ async fn process_packet(p: Packet, s: &mut ServerPacketSender) -> Result<(), Cli
 				x: 32767,y:32767,id:1,icon:1,status:0,direction:0,
 				light:5,speed:50,xp:1234,alignment:32767,name:"testing".to_string(),
 				title:"i am groot".to_string(),status2:0,
-				pledgeid:0,pledgename:"avengers".to_string(),unknown:"potato".to_string(),
+				pledgeid:0,pledgename:"avengers".to_string(),unknown:"".to_string(),
 				v1:0,hp_bar:100,v2:0,v3:0}.build()).await?;
 			
-			//TODO send spmr packet?
+			s.send_packet(ServerPacket::CharSpMrBonus{sp:0,mr:0}.build()).await?;
 			
-			//TODO send title packet
-			
-			//TODO send weather packet
+			s.send_packet(ServerPacket::Weather(0).build()).await?;
 			
 			//TODO send owncharstatus packet
+		}
+		ClientPacket::KeepAlive => {}
+		ClientPacket::GameInitDone => {}
+		ClientPacket::WindowActivate(v2) => {}
+		ClientPacket::Save => {}
+		ClientPacket::Move{x,y,heading} => {
+			println!("client: moving to {} {} {}", x, y, heading);
+		}
+		ClientPacket::ChangeDirection(d) => {
+			println!("client: change direction to {}", d);
 		}
         ClientPacket::Unknown => {
             println!("client: received unknown packet");
@@ -623,9 +662,9 @@ async fn process_client(socket: tokio::net::TcpStream, cd: ClientData) -> Result
     loop {
         futures::select! {
             packet = packet_reader.read_packet().fuse() => {
-                let p = packet.unwrap();
+                let p = packet?;
         	    println!("client: Packet received is {:x?}", p.buf());
-                process_packet(p, &mut packet_writer).await;
+                process_packet(p, &mut packet_writer).await?;
             }
             msg = brd_rx.recv().fuse() => {
                 println!("client: Received broadcast message from server");
