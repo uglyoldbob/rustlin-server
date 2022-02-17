@@ -1,6 +1,8 @@
+use crate::ServerMessage;
+
+/// This enum represents the messages sent from a client
 pub enum ClientMessage {
-    Stuff,
-    Junk,
+	Register(tokio::sync::mpsc::UnboundedSender<ServerMessage>),
 }
 
 

@@ -13,6 +13,7 @@ use rand::Rng;
 
 use crate::client_data::*;
 use crate::ServerMessage;
+use crate::ClientMessage;
 
 /// The 'ClientPacket' type. Represents packets sent by the client
 enum ClientPacket {
@@ -515,7 +516,7 @@ impl ServerPacketSender {
 		}
 	}
 	
-	fn set_encrption_key(&mut self, d: u64) {
+	fn set_encryption_key(&mut self, d: u64) {
 		self.encryption_key = Some(d);
 	}
 	
@@ -653,12 +654,15 @@ async fn process_client(socket: tokio::net::TcpStream, cd: ClientData) -> Result
 
     let mut brd_rx : tokio::sync::broadcast::Receiver<ServerMessage> = cd.get_broadcast_rx();
     let server_tx = cd.server_tx;
+	
+	let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<ServerMessage>();
+	server_tx.send(ClientMessage::Register(tx));
 
 	let mut key_packet = Packet::new();
 	key_packet.add_u8(65)
 		.add_u32(encryption_key);
 	packet_writer.send_packet(key_packet).await?;
-	packet_writer.set_encrption_key(packet_reader.get_key());
+	packet_writer.set_encryption_key(packet_reader.get_key());
     loop {
         futures::select! {
             packet = packet_reader.read_packet().fuse() => {
