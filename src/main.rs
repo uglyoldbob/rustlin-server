@@ -43,9 +43,16 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 res = clients_rx.recv() => {
                     println!("server: received a message from a client");
 					match res.unwrap() {
-						ClientMessage::Register(rx) => {
+						ClientMessage::Register(tx) => {
 							println!("Received a register request from a client");
-							
+						    let new_id = client_ids.new_entry();
+                            println!("The new client id is {}", new_id);
+                            clients.insert(new_id, tx.clone());
+                            let resp = clients.get(&new_id).unwrap().send(ServerMessage::AssignId(new_id));
+                            match resp {
+                                Err(e) => println!("The error is {}", e),
+                                Ok(v) => println!("It is ok"),
+                            }
 						}
 					}
                 }

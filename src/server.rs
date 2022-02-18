@@ -550,6 +550,18 @@ impl From<std::io::Error> for ClientError {
     }
 }
 
+impl From<tokio::sync::broadcast::error::RecvError> for ClientError {
+    fn from(_: tokio::sync::broadcast::error::RecvError) -> ClientError {
+        ClientError{}
+    }
+}
+
+impl From<tokio::sync::mpsc::error::SendError<ClientMessage>> for ClientError {
+    fn from(_: tokio::sync::mpsc::error::SendError<ClientMessage>) -> ClientError {
+        ClientError{}
+    }
+}
+
 async fn process_packet(p: Packet, s: &mut ServerPacketSender) -> Result<(), ClientError> {
     let c = p.convert();
     Ok(
@@ -656,7 +668,23 @@ async fn process_client(socket: tokio::net::TcpStream, cd: ClientData) -> Result
     let server_tx = cd.server_tx;
 	
 	let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<ServerMessage>();
-	server_tx.send(ClientMessage::Register(tx));
+	server_tx.send(ClientMessage::Register(tx.clone()))?;
+    
+    let mut client_id: u32 = 0;
+
+    println!("client: Waiting to receive the id");
+    loop {
+        let msg = rx.recv().await;
+        match msg.unwrap() {
+            ServerMessage::AssignId(i) => {
+                println!("client: assigned id of {} to self", i);
+                client_id = i;
+                break;
+            }
+            _ => {}
+        }
+    }
+    println!("client: received the id");
 
 	let mut key_packet = Packet::new();
 	key_packet.add_u8(65)
@@ -672,6 +700,12 @@ async fn process_client(socket: tokio::net::TcpStream, cd: ClientData) -> Result
             }
             msg = brd_rx.recv().fuse() => {
                 println!("client: Received broadcast message from server");
+                let p = msg.unwrap();
+                match (p) {
+                    ServerMessage::AssignId(i) => {
+                        println!("client: Received an assign id message {}", i);
+                    }
+                }
             }
         }
     }
