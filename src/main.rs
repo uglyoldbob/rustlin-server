@@ -23,8 +23,8 @@ use crate::clients::ClientList;
 async fn main() -> Result<(), Box<dyn Error>> {
     println!("server: Game server is starting");
 
-    let (clients, mut clients_rx) = tokio::sync::mpsc::unbounded_channel::<ClientMessage>();
-    let (broadcast, mut clients_rx_broadcast) = tokio::sync::broadcast::channel::<ServerMessage>(100);
+    let (clients, mut clients_rx) = tokio::sync::mpsc::channel::<ClientMessage>(100);
+    let (broadcast, _) = tokio::sync::broadcast::channel::<ServerMessage>(100);
 	
 	let settings_file = fs::read_to_string("./settings.ini")?;
 	let mut settings = configparser::ini::Ini::new();
@@ -41,18 +41,22 @@ async fn main() -> Result<(), Box<dyn Error>> {
     loop {
             tokio::select! {
                 res = clients_rx.recv() => {
-                    println!("server: received a message from a client");
 					match res.unwrap() {
 						ClientMessage::Register(tx) => {
-							println!("Received a register request from a client");
 						    let new_id = client_ids.new_entry();
-                            println!("The new client id is {}", new_id);
                             clients.insert(new_id, tx.clone());
                             let resp = clients.get(&new_id).unwrap().send(ServerMessage::AssignId(new_id));
-                            match resp {
-                                Err(e) => println!("The error is {}", e),
-                                Ok(v) => println!("It is ok"),
-                            }
+							match resp {
+								Err(_) => {
+									clients.remove(&new_id);
+								}
+								Ok(()) => println!("server: New client {} just registered", new_id),
+							}
+						}
+						ClientMessage::Unregister(i) => {
+							println!("server: client {} is unregistering", i);
+							clients.remove(&i);
+							client_ids.remove_entry(i);
 						}
 					}
                 }

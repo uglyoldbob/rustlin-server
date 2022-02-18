@@ -256,7 +256,7 @@ struct Packet {
     read: usize,
 }
 
-union u8_converter{
+union U8Converter{
 	u: u8,
 	i: i8,
 }
@@ -322,7 +322,7 @@ impl Packet {
 		self
 	}
 	fn add_i8(&mut self, d: i8) -> &mut Packet {
-		let a: u8_converter = u8_converter{ i: d};
+		let a: U8Converter = U8Converter{ i: d};
 		let a: u8 = unsafe{a.u};
 		self.data.push(a);
 		self
@@ -657,35 +657,13 @@ async fn process_packet(p: Packet, s: &mut ServerPacketSender) -> Result<(), Cli
     })
 }
 
-async fn process_client(socket: tokio::net::TcpStream, cd: ClientData) -> Result<u8, ClientError> {
-	let (reader, writer) = socket.into_split();
-	let mut packet_writer = ServerPacketSender::new(writer);
-
+async fn client_event_loop(mut packet_writer : ServerPacketSender, 
+	mut brd_rx : tokio::sync::broadcast::Receiver<ServerMessage>,
+	reader: tokio::net::tcp::OwnedReadHalf,
+	mut rx : tokio::sync::mpsc::UnboundedReceiver<ServerMessage>) -> Result<u8, ClientError> {
 	let encryption_key : u32 = rand::thread_rng().gen();
 	let mut packet_reader = ServerPacketReceiver::new(reader, encryption_key);
-
-    let mut brd_rx : tokio::sync::broadcast::Receiver<ServerMessage> = cd.get_broadcast_rx();
-    let server_tx = cd.server_tx;
 	
-	let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<ServerMessage>();
-	server_tx.send(ClientMessage::Register(tx.clone()))?;
-    
-    let mut client_id: u32 = 0;
-
-    println!("client: Waiting to receive the id");
-    loop {
-        let msg = rx.recv().await;
-        match msg.unwrap() {
-            ServerMessage::AssignId(i) => {
-                println!("client: assigned id of {} to self", i);
-                client_id = i;
-                break;
-            }
-            _ => {}
-        }
-    }
-    println!("client: received the id");
-
 	let mut key_packet = Packet::new();
 	key_packet.add_u8(65)
 		.add_u32(encryption_key);
@@ -701,7 +679,7 @@ async fn process_client(socket: tokio::net::TcpStream, cd: ClientData) -> Result
             msg = brd_rx.recv().fuse() => {
                 println!("client: Received broadcast message from server");
                 let p = msg.unwrap();
-                match (p) {
+                match p {
                     ServerMessage::AssignId(i) => {
                         println!("client: Received an assign id message {}", i);
                     }
@@ -709,6 +687,41 @@ async fn process_client(socket: tokio::net::TcpStream, cd: ClientData) -> Result
             }
         }
     }
+	//TODO send disconnect packet if applicable
+	Ok(0)
+}
+
+async fn process_client(socket: tokio::net::TcpStream, cd: ClientData) -> Result<u8, ClientError> {
+	let (reader, writer) = socket.into_split();
+	let mut packet_writer = ServerPacketSender::new(writer);
+
+	
+    let mut brd_rx : tokio::sync::broadcast::Receiver<ServerMessage> = cd.get_broadcast_rx();
+    let server_tx = cd.server_tx;
+	
+	let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<ServerMessage>();
+	server_tx.send(ClientMessage::Register(tx)).await?;
+    
+    let mut client_id: u32 = 0;
+
+    println!("client: Waiting to receive the id");
+    loop {
+        let msg = rx.recv().await;
+        match msg.unwrap() {
+            ServerMessage::AssignId(i) => {
+                println!("client: assigned id of {} to self", i);
+                client_id = i;
+                break;
+            }
+            _ => {}
+        }
+    }
+	
+	if let Err(_) = client_event_loop(packet_writer, brd_rx, reader, rx).await {
+		println!("test: Client errored");
+	}
+	
+	server_tx.send(ClientMessage::Unregister(client_id)).await?;
 
     Ok(0)
 }
