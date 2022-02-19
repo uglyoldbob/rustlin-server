@@ -27,7 +27,15 @@ enum ClientPacket {
 	Save,
 	Move{x:u16,y:u16,heading:u8},
 	ChangeDirection(u8),
-    Unknown,
+	Chat(String),
+	YellChat(String),
+	PartyChat(String),
+	PledgeChat(String),
+	WhisperChat(String, String),
+	GlobalChat(String),
+	CommandChat(String),
+	SpecialCommandChat(String),
+    Unknown(Vec<u8>),
 }
 
 //TODO create enums for the option values
@@ -302,8 +310,27 @@ impl Packet {
 				let v2 = self.pull_u8();
 				ClientPacket::WindowActivate(v2)
 			}
+			104 => {
+				let t = self.pull_u8();
+				let m = self.pull_string();
+				match t {
+					0 => {
+						match m.chars().take(1).last().unwrap() {
+							'!' => ClientPacket::YellChat(m[1..].to_string()),
+							'-' => ClientPacket::CommandChat(m[1..].to_string()),
+							'.' => ClientPacket::SpecialCommandChat(m[1..].to_string()),
+							_ => ClientPacket::Chat(m),
+						}
+					}
+					4 => ClientPacket::PledgeChat(m),	//@
+					11 => ClientPacket::PartyChat(m),	//#
+					13 => ClientPacket::Unknown(self.buf()), //%
+					15 => ClientPacket::Unknown(self.buf()), //~
+					_ => ClientPacket::Unknown(self.buf()),
+				}
+			}
 			111 => ClientPacket::Save,
-            _ => ClientPacket::Unknown
+            _ => ClientPacket::Unknown(self.buf())
         }
     }
 	fn len(&self) -> u16 {
@@ -525,7 +552,7 @@ impl ServerPacketSender {
 			data.add_u8(0);
 		}
         let kcv = data.peek_u32();
-        println!("client: send packet {:x?}", data.buf());
+
         if let Some(key) = self.encryption_key {
             data.encrypt(key);
             self.encryption_key = Some(change_key(key, kcv));
@@ -629,7 +656,7 @@ async fn process_packet(p: Packet, s: &mut ServerPacketSender) -> Result<(), Cli
 			s.send_packet(ServerPacket::MapId(4,0).build()).await?;
 			
 			s.send_packet(ServerPacket::PutObject{
-				x: 32767,y:32767,id:1,icon:1,status:0,direction:0,
+				x: 33024,y:32780,id:1,icon:1,status:0,direction:0,
 				light:5,speed:50,xp:1234,alignment:32767,name:"testing".to_string(),
 				title:"i am groot".to_string(),status2:0,
 				pledgeid:0,pledgename:"avengers".to_string(),unknown:"".to_string(),
@@ -651,8 +678,40 @@ async fn process_packet(p: Packet, s: &mut ServerPacketSender) -> Result<(), Cli
 		ClientPacket::ChangeDirection(d) => {
 			println!("client: change direction to {}", d);
 		}
-        ClientPacket::Unknown => {
-            println!("client: received unknown packet");
+		ClientPacket::Chat(m) => {
+			println!("client: chat {}", m);
+		}
+		ClientPacket::YellChat(m) => {
+			println!("client: yell chat");
+		}
+		ClientPacket::PartyChat(m) => {
+			println!("client: party chat");
+		}
+		ClientPacket::PledgeChat(m) => {
+			println!("client: pledge chat");
+		}
+		ClientPacket::WhisperChat(n, m) => {
+			println!("client: whisper chat");
+		}
+		ClientPacket::GlobalChat(m) => {
+			println!("client: global chat");
+		}
+		ClientPacket::CommandChat(m) => {
+			println!("client: command chat {}", m);
+			let mut words = m.split_whitespace();
+			let first_word = words.next();
+			if let Some(m) = first_word {
+				match m {
+					"asdf" => { println!("A command called asdf"); }
+					_ => { println!("An unknown command {}", m); }
+				}
+			}
+		}
+		ClientPacket::SpecialCommandChat(m) => {
+			println!("client: special command chat {}", m);
+		}
+        ClientPacket::Unknown(d) => {
+            println!("client: received unknown packet {:x?}", d);
         }
     })
 }
@@ -673,11 +732,9 @@ async fn client_event_loop(mut packet_writer : ServerPacketSender,
         futures::select! {
             packet = packet_reader.read_packet().fuse() => {
                 let p = packet?;
-        	    println!("client: Packet received is {:x?}", p.buf());
                 process_packet(p, &mut packet_writer).await?;
             }
             msg = brd_rx.recv().fuse() => {
-                println!("client: Received broadcast message from server");
                 let p = msg.unwrap();
                 match p {
                     ServerMessage::AssignId(i) => {
@@ -702,7 +759,7 @@ async fn process_client(socket: tokio::net::TcpStream, cd: ClientData) -> Result
 	let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<ServerMessage>();
 	server_tx.send(ClientMessage::Register(tx)).await?;
     
-    let mut client_id: u32 = 0;
+    let mut client_id: u32;
 
     println!("client: Waiting to receive the id");
     loop {
