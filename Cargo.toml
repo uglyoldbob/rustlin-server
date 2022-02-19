@@ -14,3 +14,8 @@ regex = "1.5.4"
 [dependencies.tokio]
 version = "1.15.0"
 features = ["rt-multi-thread", "net", "time", "macros", "signal", "sync", "io-util"]
+
+[profile.release]
+opt-level = "z"
+lto=true
+codegen-units=1
