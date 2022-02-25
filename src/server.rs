@@ -120,6 +120,14 @@ enum ServerPacket {
 	},
 	CharSpMrBonus{sp:u8,mr:u8},
 	Weather(u8),
+	SystemMessage(String),
+	NpcShout(String),
+	RegularChat{id: u32, msg: String},	///msg = "player name: message"
+	YellChat{id: u32, msg: String, x: u16, y: u16}, ///msg = "<player name> message"
+	WhisperChat{name: String, msg: String},
+	GlobalChat(String), ///msg = "[player name] message"
+	PledgeChat(String),
+	PartyChat(String),
 }
 
 impl ServerPacket {
@@ -227,6 +235,30 @@ impl ServerPacket {
 			}
 			ServerPacket::Weather(w) => {
 				p.add_u8(83).add_u8(w);
+			}
+			ServerPacket::SystemMessage(m) => {
+				p.add_u8(105).add_u8(9).add_string(m);
+			}
+			ServerPacket::NpcShout(m) => {
+				p.add_u8(42).add_u8(2).add_u32(0).add_string(m).add_u16(1).add_u16(2);
+			}
+			ServerPacket::RegularChat{id, msg} => {
+				p.add_u8(8).add_u8(0).add_u32(id).add_string(msg);
+			}
+			ServerPacket::YellChat{id, msg, x, y} => {
+				p.add_u8(8).add_u8(2).add_u32(id).add_string(msg).add_u16(x).add_u16(y);
+			}
+			ServerPacket::GlobalChat(msg) => {
+				p.add_u8(105).add_u8(3).add_string(msg);
+			}
+			ServerPacket::PledgeChat(msg) => {
+				p.add_u8(105).add_u8(4).add_string(msg);
+			}
+			ServerPacket::PartyChat(msg) => {
+				p.add_u8(105).add_u8(11).add_string(msg);
+			}
+			ServerPacket::WhisperChat{name, msg} => {
+				p.add_u8(91).add_string(name).add_string(msg);
 			}
 		}
 		p
@@ -589,7 +621,11 @@ impl From<tokio::sync::mpsc::error::SendError<ClientMessage>> for ClientError {
     }
 }
 
-async fn process_packet(p: Packet, s: &mut ServerPacketSender) -> Result<(), ClientError> {
+async fn process_packet(
+	p: Packet, 
+	s: &mut ServerPacketSender,
+	server_tx: &tokio::sync::mpsc::Sender<ClientMessage>,
+	id: u32) -> Result<(), ClientError> {
     let c = p.convert();
     Ok(
     match c {
@@ -680,6 +716,7 @@ async fn process_packet(p: Packet, s: &mut ServerPacketSender) -> Result<(), Cli
 		}
 		ClientPacket::Chat(m) => {
 			println!("client: chat {}", m);
+			&server_tx.send(ClientMessage::RegularChat{id: id, msg: m}).await?;
 		}
 		ClientPacket::YellChat(m) => {
 			println!("client: yell chat");
@@ -703,6 +740,17 @@ async fn process_packet(p: Packet, s: &mut ServerPacketSender) -> Result<(), Cli
 			if let Some(m) = first_word {
 				match m {
 					"asdf" => { println!("A command called asdf"); }
+					"chat" => {
+						s.send_packet(ServerPacket::SystemMessage("This is a test of the system message".to_string()).build()).await?;
+						s.send_packet(ServerPacket::NpcShout("NPC Shout test".to_string()).build()).await?;
+						
+						s.send_packet(ServerPacket::RegularChat{id: 0, msg: "regular chat".to_string()}.build()).await?;
+						s.send_packet(ServerPacket::YellChat{id: 0, msg: "yelling".to_string(), x: 32768, y: 32768}.build()).await?;
+						s.send_packet(ServerPacket::GlobalChat("global chat".to_string()).build()).await?;
+						s.send_packet(ServerPacket::PledgeChat("pledge chat".to_string()).build()).await?;
+						s.send_packet(ServerPacket::PartyChat("party chat".to_string()).build()).await?;
+						s.send_packet(ServerPacket::WhisperChat{name: "test".to_string(), msg: "whisper message".to_string()}.build()).await?;
+					}
 					_ => { println!("An unknown command {}", m); }
 				}
 			}
@@ -719,7 +767,9 @@ async fn process_packet(p: Packet, s: &mut ServerPacketSender) -> Result<(), Cli
 async fn client_event_loop(mut packet_writer : ServerPacketSender, 
 	mut brd_rx : tokio::sync::broadcast::Receiver<ServerMessage>,
 	reader: tokio::net::tcp::OwnedReadHalf,
-	mut rx : tokio::sync::mpsc::UnboundedReceiver<ServerMessage>) -> Result<u8, ClientError> {
+	mut rx : tokio::sync::mpsc::UnboundedReceiver<ServerMessage>,
+	server_tx: &tokio::sync::mpsc::Sender<ClientMessage>,
+	id: u32) -> Result<u8, ClientError> {
 	let encryption_key : u32 = rand::thread_rng().gen();
 	let mut packet_reader = ServerPacketReceiver::new(reader, encryption_key);
 	
@@ -732,7 +782,7 @@ async fn client_event_loop(mut packet_writer : ServerPacketSender,
         futures::select! {
             packet = packet_reader.read_packet().fuse() => {
                 let p = packet?;
-                process_packet(p, &mut packet_writer).await?;
+                process_packet(p, &mut packet_writer, server_tx, id).await?;
             }
             msg = brd_rx.recv().fuse() => {
                 let p = msg.unwrap();
@@ -740,8 +790,58 @@ async fn client_event_loop(mut packet_writer : ServerPacketSender,
                     ServerMessage::AssignId(i) => {
                         println!("client: Received an assign id message {}", i);
                     }
+					ServerMessage::SystemMessage(m) => {
+						packet_writer.send_packet(ServerPacket::SystemMessage(m).build()).await?;
+					}
+					ServerMessage::NpcShout(m) => {
+						packet_writer.send_packet(ServerPacket::NpcShout(m).build()).await?;
+					}
+					ServerMessage::RegularChat{id, msg} => {
+						packet_writer.send_packet(ServerPacket::RegularChat{id: id, msg: msg}.build()).await?;
+					}
+					ServerMessage::YellChat{id, msg, x, y} => {
+						packet_writer.send_packet(ServerPacket::YellChat{id: id, msg: msg, x: x, y: y}.build()).await?;
+					}
+					ServerMessage::GlobalChat(m) => {
+						packet_writer.send_packet(ServerPacket::GlobalChat(m).build()).await?;
+					}
+					ServerMessage::PledgeChat(m) => {
+						packet_writer.send_packet(ServerPacket::PledgeChat(m).build()).await?;
+					}
+					ServerMessage::PartyChat(m) => {
+						packet_writer.send_packet(ServerPacket::PartyChat(m).build()).await?;
+					}
                 }
             }
+			msg = rx.recv().fuse() => {
+				let p = msg.unwrap();
+                match p {
+                    ServerMessage::AssignId(i) => {
+                        println!("client: Received an assign id message {}", i);
+                    }
+					ServerMessage::SystemMessage(m) => {
+						packet_writer.send_packet(ServerPacket::SystemMessage(m).build()).await?;
+					}
+					ServerMessage::NpcShout(m) => {
+						packet_writer.send_packet(ServerPacket::NpcShout(m).build()).await?;
+					}
+					ServerMessage::RegularChat{id, msg} => {
+						packet_writer.send_packet(ServerPacket::RegularChat{id: id, msg: msg}.build()).await?;
+					}
+					ServerMessage::YellChat{id, msg, x, y} => {
+						packet_writer.send_packet(ServerPacket::YellChat{id: id, msg: msg, x: x, y: y}.build()).await?;
+					}
+					ServerMessage::GlobalChat(m) => {
+						packet_writer.send_packet(ServerPacket::GlobalChat(m).build()).await?;
+					}
+					ServerMessage::PledgeChat(m) => {
+						packet_writer.send_packet(ServerPacket::PledgeChat(m).build()).await?;
+					}
+					ServerMessage::PartyChat(m) => {
+						packet_writer.send_packet(ServerPacket::PartyChat(m).build()).await?;
+					}
+                }
+			}
         }
     }
 	//TODO send disconnect packet if applicable
@@ -757,7 +857,7 @@ async fn process_client(socket: tokio::net::TcpStream, cd: ClientData) -> Result
     let server_tx = cd.server_tx;
 	
 	let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<ServerMessage>();
-	server_tx.send(ClientMessage::Register(tx)).await?;
+	&server_tx.send(ClientMessage::Register(tx)).await?;
     
     let mut client_id: u32;
 
@@ -774,7 +874,7 @@ async fn process_client(socket: tokio::net::TcpStream, cd: ClientData) -> Result
         }
     }
 	
-	if let Err(_) = client_event_loop(packet_writer, brd_rx, reader, rx).await {
+	if let Err(_) = client_event_loop(packet_writer, brd_rx, reader, rx, &server_tx, client_id).await {
 		println!("test: Client errored");
 	}
 	
