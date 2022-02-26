@@ -1,5 +1,5 @@
-use crate::server_message::*;
 use crate::client_message::*;
+use crate::server_message::*;
 
 pub struct ClientData {
     global_tx: tokio::sync::broadcast::Sender<ServerMessage>,
@@ -16,8 +16,10 @@ impl Clone for ClientData {
 }
 
 impl ClientData {
-    pub fn new(gtx: tokio::sync::broadcast::Sender<ServerMessage>,
-               stx: tokio::sync::mpsc::Sender<ClientMessage>) -> ClientData {
+    pub fn new(
+        gtx: tokio::sync::broadcast::Sender<ServerMessage>,
+        stx: tokio::sync::mpsc::Sender<ClientMessage>,
+    ) -> ClientData {
         ClientData {
             global_tx: gtx,
             server_tx: stx,
@@ -28,4 +30,3 @@ impl ClientData {
         self.global_tx.subscribe()
     }
 }
-

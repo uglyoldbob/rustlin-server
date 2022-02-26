@@ -1,21 +1,20 @@
 use std::collections::HashSet;
 
 pub struct ClientList {
-	list: HashSet<u32>,
-	index: u32,
+    list: HashSet<u32>,
+    index: u32,
 }
 
 impl ClientList {
-	pub fn new() -> ClientList {
-		ClientList{
-			list: HashSet::new(),
-			index: 0,
-		}
-	}
+    pub fn new() -> ClientList {
+        ClientList {
+            list: HashSet::new(),
+            index: 0,
+        }
+    }
 
     pub fn new_entry(&mut self) -> u32 {
-        while self.list.contains(&self.index)
-        {
+        while self.list.contains(&self.index) {
             self.index = self.index.wrapping_add(1);
         }
         let t = self.index;
@@ -44,4 +43,3 @@ mod tests {
         }
     }
 }
- 
