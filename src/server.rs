@@ -129,18 +129,18 @@ enum ServerPacket {
     NpcShout(String),
     RegularChat {
         id: u32,
+        ///msg = "player name: message"
         msg: String,
     },
-    ///msg = "player name: message"
     YellChat {
         id: u32,
         msg: String,
         x: u16,
         y: u16,
     },
-    ///msg = "<player name> message"
     WhisperChat {
         name: String,
+        ///msg = "<player name> message"
         msg: String,
     },
     GlobalChat(String),
@@ -727,6 +727,12 @@ impl From<tokio::sync::mpsc::error::SendError<ClientMessage>> for ClientError {
     }
 }
 
+impl From<mysql_async::Error> for ClientError {
+    fn from(_: mysql_async::Error) -> ClientError {
+        ClientError {}
+    }
+}
+
 async fn process_packet(
     p: Packet,
     s: &mut ServerPacketSender,
@@ -822,8 +828,8 @@ async fn process_packet(
 
             s.send_packet(
                 ServerPacket::PutObject {
-                    x: 33024,
-                    y: 32780,
+                    x: 33334,
+                    y: 32605,
                     id: 1,
                     icon: 1,
                     status: 0,
@@ -960,6 +966,7 @@ async fn client_event_loop(
     mut rx: tokio::sync::mpsc::UnboundedReceiver<ServerMessage>,
     server_tx: &tokio::sync::mpsc::Sender<ClientMessage>,
     id: u32,
+    mysql: mysql_async::Conn,
 ) -> Result<u8, ClientError> {
     let encryption_key: u32 = rand::thread_rng().gen();
     let mut packet_reader = ServerPacketReceiver::new(reader, encryption_key);
@@ -1043,12 +1050,14 @@ async fn process_client(socket: tokio::net::TcpStream, cd: ClientData) -> Result
     let mut packet_writer = ServerPacketSender::new(writer);
 
     let mut brd_rx: tokio::sync::broadcast::Receiver<ServerMessage> = cd.get_broadcast_rx();
-    let server_tx = cd.server_tx;
+    let server_tx = &cd.server_tx;
 
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<ServerMessage>();
     &server_tx.send(ClientMessage::Register(tx)).await?;
 
     let mut client_id: u32;
+
+    let mysql = cd.get_mysql().await?;
 
     println!("client: Waiting to receive the id");
     loop {
@@ -1063,8 +1072,16 @@ async fn process_client(socket: tokio::net::TcpStream, cd: ClientData) -> Result
         }
     }
 
-    if let Err(_) =
-        client_event_loop(packet_writer, brd_rx, reader, rx, &server_tx, client_id).await
+    if let Err(_) = client_event_loop(
+        packet_writer,
+        brd_rx,
+        reader,
+        rx,
+        &server_tx,
+        client_id,
+        mysql,
+    )
+    .await
     {
         println!("test: Client errored");
     }

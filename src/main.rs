@@ -41,7 +41,28 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let mut settings = configparser::ini::Ini::new();
     settings.read(settings_file)?;
 
-    let cd: ClientData = ClientData::new(broadcast.clone(), clients);
+    let mysql_pw = settings
+        .get("database", "password")
+        .unwrap_or("invalid".to_string());
+    let mysql_user = settings
+        .get("database", "username")
+        .unwrap_or("invalid".to_string());
+    let mysql_dbname = settings
+        .get("database", "name")
+        .unwrap_or("none".to_string());
+    let mysql_url = settings
+        .get("database", "url")
+        .unwrap_or("invalid".to_string());
+    let mysql_conn_s = format!(
+        "mysql://{}:{}@{}/{}",
+        mysql_user, mysql_pw, mysql_url, mysql_dbname
+    );
+    let mysql_opt = mysql_async::Opts::from_url(mysql_conn_s.as_str()).unwrap();
+    let mysql_pool = mysql_async::Pool::new(mysql_opt);
+    println!("Trying to connecto to database");
+    let mut mysql_conn = mysql_pool.get_conn().await?;
+
+    let cd: ClientData = ClientData::new(broadcast.clone(), clients, mysql_pool);
 
     let update_tx = update::setup_update_server().await?;
     let server_tx = server::setup_game_server(cd).await?;
@@ -88,10 +109,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     }
                 }
             }
-            a = test1(testvar).fuse() => {
-            }
-            a = test2(testvar).fuse() => {
-            }
             _ = tokio::signal::ctrl_c().fuse() => {
                 break;
             }
@@ -105,6 +122,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
             e
         );
     }
+
+    mysql_conn.disconnect().await?;
+
     if let Err(e) = server_tx.send(0) {
         println!("server: Failed to signal the server to shutdown {}", e);
     }
