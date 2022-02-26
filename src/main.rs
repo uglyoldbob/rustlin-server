@@ -18,6 +18,7 @@ use std::collections::HashMap;
 use std::fs;
 
 mod clients;
+mod user;
 use crate::clients::ClientList;
 
 async fn test1(mut c: u32) -> String {

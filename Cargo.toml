@@ -10,6 +10,8 @@ rand="0.8.4"
 mysql_async="0.29.0"
 configparser = "3.0.0"
 regex = "1.5.4"
+chrono="0.4.19"
+rust-crypto="0.2.36"
 
 [dependencies.tokio]
 version = "1.15.0"

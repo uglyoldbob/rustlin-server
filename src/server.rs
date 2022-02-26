@@ -12,6 +12,7 @@ use std::vec::Vec;
 use rand::Rng;
 
 use crate::client_data::*;
+use crate::user::*;
 use crate::ClientMessage;
 use crate::ServerMessage;
 
@@ -738,6 +739,7 @@ async fn process_packet(
     s: &mut ServerPacketSender,
     server_tx: &tokio::sync::mpsc::Sender<ClientMessage>,
     id: u32,
+    mysql: &mut mysql_async::Conn,
 ) -> Result<(), ClientError> {
     let c = p.convert();
     Ok(match c {
@@ -757,13 +759,31 @@ async fn process_packet(
         ClientPacket::Login(u, p, v1, v2, v3, v4, v5, v6, v7) => {
             println!(
                 "client: login attempt for {} {} {} {} {} {} {} {}",
-                u, v1, v2, v3, v4, v5, v6, v7
+                &u, v1, v2, v3, v4, v5, v6, v7
             );
-            let mut response = ServerPacket::LoginResult { code: 0 }.build(); //TODO put in real value, this means login success
-            s.send_packet(response).await?;
-
-            response = ServerPacket::News("This is the news".to_string()).build();
-            s.send_packet(response).await?;
+            //TODO get login details from database
+            let user = get_user_details(u.clone(), mysql).await;
+            match user {
+                Some(us) => {
+                    println!("User {} exists", u);
+                    us.print();
+					let password_success = us.check_login("lineage".to_string(), p);
+					println!("User pw test {}", hash_password("testtest".to_string(), "lineage".to_string(), "password".to_string()));
+					println!("User login check is {}", password_success);
+					if password_success {
+						s.send_packet(ServerPacket::LoginResult { code: 0 }.build()).await?;
+						s.send_packet(ServerPacket::News("This is the news".to_string()).build()).await?;
+					}
+					else
+					{
+						s.send_packet(ServerPacket::LoginResult { code: 8 }.build()).await?;
+					}
+                }
+                None => {
+                    println!("User {} does not exist!", u);
+					s.send_packet(ServerPacket::LoginResult { code: 8 }.build()).await?;
+                }
+            }
         }
         ClientPacket::NewsDone => {
             //send number of characters the player has
@@ -828,8 +848,8 @@ async fn process_packet(
 
             s.send_packet(
                 ServerPacket::PutObject {
-                    x: 33334,
-                    y: 32605,
+                    x: 33430,
+                    y: 32815,
                     id: 1,
                     icon: 1,
                     status: 0,
@@ -966,7 +986,7 @@ async fn client_event_loop(
     mut rx: tokio::sync::mpsc::UnboundedReceiver<ServerMessage>,
     server_tx: &tokio::sync::mpsc::Sender<ClientMessage>,
     id: u32,
-    mysql: mysql_async::Conn,
+    mut mysql: mysql_async::Conn,
 ) -> Result<u8, ClientError> {
     let encryption_key: u32 = rand::thread_rng().gen();
     let mut packet_reader = ServerPacketReceiver::new(reader, encryption_key);
@@ -979,7 +999,7 @@ async fn client_event_loop(
         futures::select! {
             packet = packet_reader.read_packet().fuse() => {
                 let p = packet?;
-                process_packet(p, &mut packet_writer, server_tx, id).await?;
+                process_packet(p, &mut packet_writer, server_tx, id, &mut mysql).await?;
             }
             msg = brd_rx.recv().fuse() => {
                 let p = msg.unwrap();
