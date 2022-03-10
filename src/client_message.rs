@@ -21,4 +21,21 @@ pub enum ClientMessage {
     PledgeChat(u32, String),
     PartyChat(u32, String),
     WhisperChat(u32, String, String),
+	///Id and account name that was successfully logged in
+	LoggedIn(u32, String),
+	NewCharacter {
+		id: u32,
+		name: String,
+		class: u8,
+		gender: u8,
+		strength: u8,
+		dexterity: u8,
+		constitution: u8,
+		wisdom: u8,
+		charisma: u8,
+		intelligence: u8,
+	},
+	DeleteCharacter {
+		id: u32,
+		name: String },
 }

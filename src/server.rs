@@ -36,6 +36,23 @@ enum ClientPacket {
     GlobalChat(String),
     CommandChat(String),
     SpecialCommandChat(String),
+	ChangePassword {
+		account: String,
+		oldpass: String,
+		newpass: String,
+	},
+	NewCharacter {
+		name: String,
+		class: u8,
+		gender: u8,
+		strength: u8,
+		dexterity: u8,
+		constitution: u8,
+		wisdom: u8,
+		charisma: u8,
+		intelligence: u8,
+	},
+	DeleteCharacter(String),
     Unknown(Vec<u8>),
 }
 
@@ -55,6 +72,26 @@ enum ServerPacket {
         code: u8,
     },
     News(String),
+	CharacterCreationStatus(u8),
+	NewCharacterDetails{
+		name: String,
+		pledge: String,
+		class: u8,
+		gender: u8,
+		alignment: i16,
+		hp: u16,
+		mp: u16,
+		ac: i8,
+		level: u8,
+		strength: u8,
+		dexterity: u8,
+		constitution: u8,
+		wisdom: u8,
+		charisma: u8,
+		intelligence: u8,
+	},
+	DeleteCharacterOk,
+	DeleteCharacterWait,
     NumberCharacters(u8, u8),
     LoginCharacterDetails {
         name: String,
@@ -180,6 +217,38 @@ impl ServerPacket {
             ServerPacket::News(news) => {
                 p.add_u8(90).add_string(news);
             }
+			///TODO verify this
+			ServerPacket::CharacterCreationStatus(v) => {
+				p.add_u8(106).add_u8(v).add_u32(0).add_u32(0);
+			}
+			ServerPacket::NewCharacterDetails{ name,
+				pledge,
+				class,
+				gender,
+				alignment,
+				hp,
+				mp,
+				ac,
+				level,
+				strength,
+				dexterity,
+				constitution,
+				wisdom,
+				charisma,
+				intelligence,
+			} => {
+				p.add_u8(98).add_string(name).add_string(pledge).add_u8(class)
+				 .add_u8(gender).add_i16(alignment).add_u16(hp).add_u16(mp)
+				 .add_i8(ac).add_u8(level).add_u8(strength).add_u8(dexterity)
+				 .add_u8(constitution).add_u8(wisdom).add_u8(charisma)
+				 .add_u8(intelligence).add_u8(1).add_u8(2).add_u32(3);
+			}
+			ServerPacket::DeleteCharacterOk => {
+				p.add_u8(33).add_u8(0x05);
+			}
+			ServerPacket::DeleteCharacterWait => {
+				p.add_u8(33).add_u8(0x51);
+			}
             ServerPacket::NumberCharacters(num, max) => {
                 p.add_u8(113)
                     .add_u8(num) //number of characters
@@ -400,6 +469,11 @@ union U8Converter {
     i: i8,
 }
 
+union U16Converter {
+	u: u16,
+	i: i16,
+}
+
 impl Packet {
     fn new() -> Packet {
         Packet {
@@ -421,6 +495,7 @@ impl Packet {
                 self.pull_u32(),
                 self.pull_u32(),
             ),
+			34 => ClientPacket::DeleteCharacter(self.pull_string()),
             43 => ClientPacket::NewsDone,
             57 => ClientPacket::KeepAlive,
             71 => {
@@ -431,6 +506,19 @@ impl Packet {
                 println!("client: found a client version packet");
                 ClientPacket::Version(val1, val2, val3, val4)
             }
+			72 => {
+				ClientPacket::NewCharacter{
+					name: self.pull_string(),
+					class: self.pull_u8(),
+					gender: self.pull_u8(),
+					strength: self.pull_u8(),
+					dexterity: self.pull_u8(),
+					constitution: self.pull_u8(),
+					wisdom: self.pull_u8(),
+					charisma: self.pull_u8(),
+					intelligence: self.pull_u8(),
+				}
+			}
             74 => ClientPacket::ChangeDirection(self.pull_u8()),
             83 => ClientPacket::CharacterSelect {
                 name: self.pull_string(),
@@ -446,6 +534,11 @@ impl Packet {
                 let v2 = self.pull_u8();
                 ClientPacket::WindowActivate(v2)
             }
+			100 => ClientPacket::ChangePassword {
+				account: self.pull_string(),
+				oldpass: self.pull_string(),
+				newpass: self.pull_string(),
+			},
             104 => {
                 let t = self.pull_u8();
                 let m = self.pull_string();
@@ -492,6 +585,12 @@ impl Packet {
         self.data.append(&mut d.to_le_bytes().to_vec());
         self
     }
+	fn add_i16(&mut self, d: i16) -> &mut Packet {
+		let a: U16Converter = U16Converter { i: d };
+		let a: u16 = unsafe { a.u };
+		self.add_u16(a);
+		self
+	}
     fn add_u32(&mut self, d: u32) -> &mut Packet {
         self.data.append(&mut d.to_le_bytes().to_vec());
         self
@@ -773,6 +872,8 @@ async fn process_packet(
 					if password_success {
 						s.send_packet(ServerPacket::LoginResult { code: 0 }.build()).await?;
 						s.send_packet(ServerPacket::News("This is the news".to_string()).build()).await?;
+						&server_tx
+							.send(ClientMessage::LoggedIn(id, u)).await?;
 					}
 					else
 					{
@@ -812,6 +913,28 @@ async fn process_packet(
                 s.send_packet(response).await?;
             }
         }
+		ClientPacket::NewCharacter{name, class, gender, strength,
+			dexterity, constitution, wisdom, charisma, intelligence} => {
+			&server_tx
+                .send(ClientMessage::NewCharacter { id: id,
+					name: name,
+					class: class,
+					gender: gender,
+					strength: strength,
+					dexterity: dexterity,
+					constitution: constitution,
+					wisdom: wisdom,
+					charisma: charisma,
+					intelligence: intelligence,
+					})
+                .await?;
+		}
+		ClientPacket::DeleteCharacter(n) => {
+			&server_tx.send(ClientMessage::DeleteCharacter{id: id, name: n}).await?;
+			//TODO determine if character level is 30 or higher
+			//TODO send DeleteCharacterWait if level is 30 or higher
+			s.send_packet(ServerPacket::DeleteCharacterOk.build()).await?;
+		}
         ClientPacket::CharacterSelect { name } => {
             println!("client: login with {}", name);
             let mut response = ServerPacket::StartGame(0).build();
@@ -973,10 +1096,117 @@ async fn process_packet(
         ClientPacket::SpecialCommandChat(m) => {
             println!("client: special command chat {}", m);
         }
+		ClientPacket::ChangePassword {account,oldpass,newpass} => {
+			let user = get_user_details(account.clone(), mysql).await;
+            match user {
+                Some(us) => {
+                    println!("User {} exists", account);
+                    us.print();
+					let password_success = us.check_login("lineage".to_string(), oldpass);
+					println!("User login check is {}", password_success);
+					if password_success {
+						println!("User wants to change password and entered correct details");
+						s.send_packet(ServerPacket::LoginResult { code: 0x30 }.build()).await?;
+					}
+					else
+					{
+						let mut p = Packet::new();
+						s.send_packet(ServerPacket::LoginResult { code: 8 }.build()).await?;
+					}
+				}
+				_ => {
+					let mut p = Packet::new();
+						s.send_packet(ServerPacket::LoginResult { code: 8 }.build()).await?;
+				}
+			}
+		}
         ClientPacket::Unknown(d) => {
             println!("client: received unknown packet {:x?}", d);
         }
     })
+}
+
+async fn handle_server_message(p: ServerMessage,
+	packet_writer: &mut ServerPacketSender, )  -> Result<u8, ClientError> {
+	match p {
+		ServerMessage::AssignId(i) => {
+		}
+		ServerMessage::SystemMessage(m) => {
+			packet_writer.send_packet(ServerPacket::SystemMessage(m).build()).await?;
+		}
+		ServerMessage::NpcShout(m) => {
+			packet_writer.send_packet(ServerPacket::NpcShout(m).build()).await?;
+		}
+		ServerMessage::RegularChat{id, msg} => {
+			packet_writer.send_packet(ServerPacket::RegularChat{id: id, msg: msg}.build()).await?;
+		}
+		ServerMessage::YellChat{id, msg, x, y} => {
+			packet_writer.send_packet(ServerPacket::YellChat{id: id, msg: msg, x: x, y: y}.build()).await?;
+		}
+		ServerMessage::GlobalChat(m) => {
+			packet_writer.send_packet(ServerPacket::GlobalChat(m).build()).await?;
+		}
+		ServerMessage::PledgeChat(m) => {
+			packet_writer.send_packet(ServerPacket::PledgeChat(m).build()).await?;
+		}
+		ServerMessage::PartyChat(m) => {
+			packet_writer.send_packet(ServerPacket::PartyChat(m).build()).await?;
+		}
+		ServerMessage::CharacterCreateStatus(v) => {
+			match v {
+				0 => {
+					packet_writer.send_packet(ServerPacket::CharacterCreationStatus(2).build()).await?;
+				}
+				1 => {
+					packet_writer.send_packet(ServerPacket::CharacterCreationStatus(9).build()).await?;
+				}
+				2 => {
+					packet_writer.send_packet(ServerPacket::CharacterCreationStatus(6).build()).await?;
+				}
+				3 => {
+					packet_writer.send_packet(ServerPacket::CharacterCreationStatus(21).build()).await?;
+				}
+				_ => {
+					println!("wrong char creation status");
+				}
+			}
+		}
+		ServerMessage::NewCharacterDetails{ name,
+				pledge,
+				class,
+				gender,
+				alignment,
+				hp,
+				mp,
+				ac,
+				level,
+				strength,
+				dexterity,
+				constitution,
+				wisdom,
+				charisma,
+				intelligence,
+			} => {
+			packet_writer.send_packet(ServerPacket::NewCharacterDetails{
+				name: name,
+				pledge: pledge,
+				class: class,
+				gender: gender,
+				alignment: alignment,
+				hp: hp,
+				mp: mp,
+				ac: ac,
+				level: level,
+				strength: strength,
+				dexterity: dexterity,
+				constitution: constitution,
+				wisdom: wisdom,
+				charisma: charisma,
+				intelligence: intelligence,
+				}.build()).await?;
+		}
+	}
+	Ok(0)
 }
 
 async fn client_event_loop(
@@ -1003,61 +1233,11 @@ async fn client_event_loop(
             }
             msg = brd_rx.recv().fuse() => {
                 let p = msg.unwrap();
-                match p {
-                    ServerMessage::AssignId(i) => {
-                        println!("client: Received an assign id message {}", i);
-                    }
-                    ServerMessage::SystemMessage(m) => {
-                        packet_writer.send_packet(ServerPacket::SystemMessage(m).build()).await?;
-                    }
-                    ServerMessage::NpcShout(m) => {
-                        packet_writer.send_packet(ServerPacket::NpcShout(m).build()).await?;
-                    }
-                    ServerMessage::RegularChat{id, msg} => {
-                        packet_writer.send_packet(ServerPacket::RegularChat{id: id, msg: msg}.build()).await?;
-                    }
-                    ServerMessage::YellChat{id, msg, x, y} => {
-                        packet_writer.send_packet(ServerPacket::YellChat{id: id, msg: msg, x: x, y: y}.build()).await?;
-                    }
-                    ServerMessage::GlobalChat(m) => {
-                        packet_writer.send_packet(ServerPacket::GlobalChat(m).build()).await?;
-                    }
-                    ServerMessage::PledgeChat(m) => {
-                        packet_writer.send_packet(ServerPacket::PledgeChat(m).build()).await?;
-                    }
-                    ServerMessage::PartyChat(m) => {
-                        packet_writer.send_packet(ServerPacket::PartyChat(m).build()).await?;
-                    }
-                }
+                handle_server_message(p, &mut packet_writer).await;
             }
             msg = rx.recv().fuse() => {
                 let p = msg.unwrap();
-                match p {
-                    ServerMessage::AssignId(i) => {
-                        println!("client: Received an assign id message {}", i);
-                    }
-                    ServerMessage::SystemMessage(m) => {
-                        packet_writer.send_packet(ServerPacket::SystemMessage(m).build()).await?;
-                    }
-                    ServerMessage::NpcShout(m) => {
-                        packet_writer.send_packet(ServerPacket::NpcShout(m).build()).await?;
-                    }
-                    ServerMessage::RegularChat{id, msg} => {
-                        packet_writer.send_packet(ServerPacket::RegularChat{id: id, msg: msg}.build()).await?;
-                    }
-                    ServerMessage::YellChat{id, msg, x, y} => {
-                        packet_writer.send_packet(ServerPacket::YellChat{id: id, msg: msg, x: x, y: y}.build()).await?;
-                    }
-                    ServerMessage::GlobalChat(m) => {
-                        packet_writer.send_packet(ServerPacket::GlobalChat(m).build()).await?;
-                    }
-                    ServerMessage::PledgeChat(m) => {
-                        packet_writer.send_packet(ServerPacket::PledgeChat(m).build()).await?;
-                    }
-                    ServerMessage::PartyChat(m) => {
-                        packet_writer.send_packet(ServerPacket::PartyChat(m).build()).await?;
-                    }
-                }
+                handle_server_message(p, &mut packet_writer).await;
             }
         }
     }
