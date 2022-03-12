@@ -870,12 +870,12 @@ async fn process_packet(
                 "client: login attempt for {} {} {} {} {} {} {} {}",
                 &u, v1, v2, v3, v4, v5, v6, v7
             );
-            //TODO get login details from database
             let user = get_user_details(u.clone(), mysql).await;
             match user {
                 Some(us) => {
-                    println!("User {} exists", u);
+                    println!("User {} exists", u.clone());
                     us.print();
+                    //TODO un-hardcode the salt for the password hashing
 					let password_success = us.check_login("lineage".to_string(), p);
 					println!("User pw test {}", hash_password("testtest".to_string(), "lineage".to_string(), "password".to_string()));
 					println!("User login check is {}", password_success);
@@ -891,8 +891,22 @@ async fn process_packet(
 					}
                 }
                 None => {
-                    println!("User {} does not exist!", u);
-					s.send_packet(ServerPacket::LoginResult { code: 8 }.build()).await?;
+                    println!("User {} does not exist!", u.clone());
+                    //TODO actually determine if auto account creation is enabled
+                    if true {
+                        //TODO: put in accurate ip information
+                        //TODO un-hardcode the salt for the password hashing
+                        let newaccount = UserAccount::new(u.clone(), p, "127.0.0.1".to_string(), "lineage".to_string());
+                        newaccount.insert_into_db(mysql).await;
+                        s.send_packet(ServerPacket::LoginResult { code: 0 }.build()).await?;
+						s.send_packet(ServerPacket::News("This is the news".to_string()).build()).await?;
+						let _ = &server_tx
+							.send(ClientMessage::LoggedIn(id, u.clone())).await?;
+                    }
+                    else
+                    {
+                        s.send_packet(ServerPacket::LoginResult { code: 8 }.build()).await?;
+                    }
                 }
             }
         }
