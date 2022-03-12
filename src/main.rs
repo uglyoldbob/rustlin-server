@@ -23,16 +23,6 @@ mod user;
 use crate::clients::ClientList;
 use crate::player::Player;
 
-async fn test1(mut c: u32) -> String {
-    c = c + 1;
-    "asdf".to_string()
-}
-
-async fn test2(mut c: u32) -> String {
-    c = c * 2;
-    "asdffdsa".to_string()
-}
-
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     println!("server: Game server is starting");
@@ -63,7 +53,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let mysql_opt = mysql_async::Opts::from_url(mysql_conn_s.as_str()).unwrap();
     let mysql_pool = mysql_async::Pool::new(mysql_opt);
     println!("Trying to connecto to database");
-    let mut mysql_conn = mysql_pool.get_conn().await?;
+    let mysql_conn = mysql_pool.get_conn().await?;
 
     let cd: ClientData = ClientData::new(broadcast.clone(), clients, mysql_pool);
 
@@ -75,7 +65,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         HashMap::new();
 	let mut client_accounts: HashMap<u32, String> = HashMap::new();
 
-    let mut testvar: u32 = 5;
+    let mut testvar: u32;
 
     loop {
         futures::select! {
@@ -150,17 +140,29 @@ async fn main() -> Result<(), Box<dyn Error>> {
 						}
 					}
                     ClientMessage::RegularChat{id, msg} => {
-                        broadcast.send(ServerMessage::RegularChat{id:0, msg:msg});
+                        //TODO limit based on distance and map
+                        let amsg = format!("[{}] {}", "unknown", msg);
+                        let _ = broadcast.send(ServerMessage::RegularChat{id:0, msg:amsg});
                     }
                     ClientMessage::YellChat{id, msg, x, y} => {
+                        //TODO limit based on distance and map
+                        let amsg = format!("[{}] {}", "unknown", msg);
+                        let _ = broadcast.send(ServerMessage::YellChat{id:0, msg:amsg, x: y, y: y});
                     }
                     ClientMessage::GlobalChat(id, msg) => {
+                        let amsg = format!("[{}] {}", "unknown", msg);
+                        let _ = broadcast.send(ServerMessage::GlobalChat(amsg));
                     }
                     ClientMessage::PledgeChat(id, msg) => {
+                        let amsg = format!("[{}] {}", "unknown", msg);
+                        let _ = broadcast.send(ServerMessage::PledgeChat(amsg));
                     }
                     ClientMessage::PartyChat(id, msg) => {
+                        let amsg = format!("[{}] {}", "unknown", msg);
+                        let _ = broadcast.send(ServerMessage::PartyChat(amsg));
                     }
                     ClientMessage::WhisperChat(id, person, msg) => {
+                        let _ = broadcast.send(ServerMessage::WhisperChat("unknown".to_string(), msg));
                     }
                 }
             }
@@ -169,6 +171,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
             }
         }
     }
+	
+	let _ = broadcast.send(ServerMessage::Disconnect);
+	
+	thread::sleep(time::Duration::from_secs(5));
 
     println!("server: Server is shutting down");
     if let Err(e) = update_tx.send(0) {

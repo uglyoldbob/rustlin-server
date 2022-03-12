@@ -68,6 +68,7 @@ enum ServerPacket {
         english: u8,
         country: u8,
     },
+	Disconnect,
     LoginResult {
         code: u8,
     },
@@ -211,13 +212,17 @@ impl ServerPacket {
                     .add_u8(english)
                     .add_u8(country);
             }
+            //TODO sometimes the client crashes when sending this packet, after they click ok
+			ServerPacket::Disconnect => {
+				p.add_u8(18).add_u16(500).add_u32(0);
+			}
             ServerPacket::LoginResult { code } => {
                 p.add_u8(21).add_u8(code).add_u32(0);
             }
             ServerPacket::News(news) => {
                 p.add_u8(90).add_string(news);
             }
-			///TODO verify this
+			//TODO verify this
 			ServerPacket::CharacterCreationStatus(v) => {
 				p.add_u8(106).add_u8(v).add_u32(0).add_u32(0);
 			}
@@ -495,7 +500,12 @@ impl Packet {
                 self.pull_u32(),
                 self.pull_u32(),
             ),
+            13 => ClientPacket::WhisperChat(self.pull_string(), self.pull_string()),
 			34 => ClientPacket::DeleteCharacter(self.pull_string()),
+            40 => {
+                self.pull_u8();
+                ClientPacket::GlobalChat(self.pull_string())
+            }
             43 => ClientPacket::NewsDone,
             57 => ClientPacket::KeepAlive,
             71 => {
@@ -530,7 +540,7 @@ impl Packet {
             },
             92 => ClientPacket::GameInitDone,
             97 => {
-                let v1 = self.pull_u8();
+                self.pull_u8();
                 let v2 = self.pull_u8();
                 ClientPacket::WindowActivate(v2)
             }
@@ -844,7 +854,7 @@ async fn process_packet(
     Ok(match c {
         ClientPacket::Version(a, b, c, d) => {
             println!("client: version {} {} {} {}", a, b, c, d);
-            let mut response: Packet = ServerPacket::ServerVersion {
+            let response: Packet = ServerPacket::ServerVersion {
                 id: 2,
                 version: 2,
                 time: 3,
@@ -872,7 +882,7 @@ async fn process_packet(
 					if password_success {
 						s.send_packet(ServerPacket::LoginResult { code: 0 }.build()).await?;
 						s.send_packet(ServerPacket::News("This is the news".to_string()).build()).await?;
-						&server_tx
+						let _ = &server_tx
 							.send(ClientMessage::LoggedIn(id, u)).await?;
 					}
 					else
@@ -915,7 +925,7 @@ async fn process_packet(
         }
 		ClientPacket::NewCharacter{name, class, gender, strength,
 			dexterity, constitution, wisdom, charisma, intelligence} => {
-			&server_tx
+			let _ = &server_tx
                 .send(ClientMessage::NewCharacter { id: id,
 					name: name,
 					class: class,
@@ -930,7 +940,7 @@ async fn process_packet(
                 .await?;
 		}
 		ClientPacket::DeleteCharacter(n) => {
-			&server_tx.send(ClientMessage::DeleteCharacter{id: id, name: n}).await?;
+			let _ = &server_tx.send(ClientMessage::DeleteCharacter{id: id, name: n}).await?;
 			//TODO determine if character level is 30 or higher
 			//TODO send DeleteCharacterWait if level is 30 or higher
 			s.send_packet(ServerPacket::DeleteCharacterOk.build()).await?;
@@ -1005,7 +1015,9 @@ async fn process_packet(
         }
         ClientPacket::KeepAlive => {}
         ClientPacket::GameInitDone => {}
-        ClientPacket::WindowActivate(v2) => {}
+        ClientPacket::WindowActivate(v2) => {
+            println!("Client window activate {}", v2);
+        }
         ClientPacket::Save => {}
         ClientPacket::Move { x, y, heading } => {
             println!("client: moving to {} {} {}", x, y, heading);
@@ -1014,25 +1026,27 @@ async fn process_packet(
             println!("client: change direction to {}", d);
         }
         ClientPacket::Chat(m) => {
-            println!("client: chat {}", m);
-            &server_tx
+            let _ = &server_tx
                 .send(ClientMessage::RegularChat { id: id, msg: m })
                 .await?;
         }
         ClientPacket::YellChat(m) => {
-            println!("client: yell chat");
+            //TODO put in the correct coordinates for yelling
+			let _ = &server_tx.send(ClientMessage::YellChat{
+                id: id, msg: m, x: 32768, y: 32768,
+            }).await?;
         }
         ClientPacket::PartyChat(m) => {
-            println!("client: party chat");
+            let _ = &server_tx.send(ClientMessage::PartyChat(id, m)).await?;
         }
         ClientPacket::PledgeChat(m) => {
-            println!("client: pledge chat");
+            let _ = &server_tx.send(ClientMessage::PledgeChat(id,m)).await?;
         }
         ClientPacket::WhisperChat(n, m) => {
-            println!("client: whisper chat");
+            let _ = &server_tx.send(ClientMessage::WhisperChat(id, n, m)).await?;
         }
         ClientPacket::GlobalChat(m) => {
-            println!("client: global chat");
+            let _ = &server_tx.send(ClientMessage::GlobalChat(id, m)).await?;
         }
         ClientPacket::CommandChat(m) => {
             println!("client: command chat {}", m);
@@ -1043,6 +1057,9 @@ async fn process_packet(
                     "asdf" => {
                         println!("A command called asdf");
                     }
+					"quit" => {
+						s.send_packet(ServerPacket::Disconnect.build()).await?;
+					}
                     "chat" => {
                         s.send_packet(
                             ServerPacket::SystemMessage(
@@ -1131,6 +1148,9 @@ async fn handle_server_message(p: ServerMessage,
 	match p {
 		ServerMessage::AssignId(i) => {
 		}
+		ServerMessage::Disconnect => {
+			packet_writer.send_packet(ServerPacket::Disconnect.build()).await?;
+		}
 		ServerMessage::SystemMessage(m) => {
 			packet_writer.send_packet(ServerPacket::SystemMessage(m).build()).await?;
 		}
@@ -1140,6 +1160,15 @@ async fn handle_server_message(p: ServerMessage,
 		ServerMessage::RegularChat{id, msg} => {
 			packet_writer.send_packet(ServerPacket::RegularChat{id: id, msg: msg}.build()).await?;
 		}
+        ServerMessage::WhisperChat(name, msg) => {
+            packet_writer.send_packet(
+                ServerPacket::WhisperChat {
+                    name: name,
+                    msg: msg,
+                }
+                .build(),
+            ).await?;
+        }
 		ServerMessage::YellChat{id, msg, x, y} => {
 			packet_writer.send_packet(ServerPacket::YellChat{id: id, msg: msg, x: x, y: y}.build()).await?;
 		}
@@ -1233,11 +1262,13 @@ async fn client_event_loop(
             }
             msg = brd_rx.recv().fuse() => {
                 let p = msg.unwrap();
-                handle_server_message(p, &mut packet_writer).await;
+                handle_server_message(p, &mut packet_writer).await?;
             }
             msg = rx.recv().fuse() => {
-                let p = msg.unwrap();
-                handle_server_message(p, &mut packet_writer).await;
+                match msg {
+                    None => {}
+                    Some(p) => {handle_server_message(p, &mut packet_writer).await?;}
+                }
             }
         }
     }
@@ -1247,15 +1278,15 @@ async fn client_event_loop(
 
 async fn process_client(socket: tokio::net::TcpStream, cd: ClientData) -> Result<u8, ClientError> {
     let (reader, writer) = socket.into_split();
-    let mut packet_writer = ServerPacketSender::new(writer);
+    let packet_writer = ServerPacketSender::new(writer);
 
-    let mut brd_rx: tokio::sync::broadcast::Receiver<ServerMessage> = cd.get_broadcast_rx();
+    let brd_rx: tokio::sync::broadcast::Receiver<ServerMessage> = cd.get_broadcast_rx();
     let server_tx = &cd.server_tx;
 
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<ServerMessage>();
-    &server_tx.send(ClientMessage::Register(tx)).await?;
+    let _ = &server_tx.send(ClientMessage::Register(tx)).await?;
 
-    let mut client_id: u32;
+    let client_id: u32;
 
     let mysql = cd.get_mysql().await?;
 

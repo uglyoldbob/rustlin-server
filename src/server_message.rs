@@ -4,6 +4,7 @@ pub enum ServerMessage {
     AssignId(u32),
     SystemMessage(String),
 	CharacterCreateStatus(u8),
+	Disconnect,
 	NewCharacterDetails{
 		name: String,
 		pledge: String,
@@ -38,4 +39,6 @@ pub enum ServerMessage {
     ///msg = "[player name] message"
     PledgeChat(String),
     PartyChat(String),
+    ///name message
+    WhisperChat(String, String),
 }

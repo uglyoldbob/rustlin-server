@@ -20,6 +20,7 @@ pub enum ClientMessage {
     ///msg = "[player name] message"
     PledgeChat(u32, String),
     PartyChat(u32, String),
+    ///id, name message
     WhisperChat(u32, String, String),
 	///Id and account name that was successfully logged in
 	LoggedIn(u32, String),

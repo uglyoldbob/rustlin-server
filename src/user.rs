@@ -59,6 +59,11 @@ impl UserAccount {
 		let hash = hash_password(self.name.clone(), salt, pw);
 		hash == self.password
 	}
+	
+	pub fn insert_into_db(&self, mysql: &mut mysql_async::Conn) {
+	
+	}
+	
     pub fn print(&self) -> () {
         println!(
             "User details: {} {} {} {} {} {} {} {}",
