@@ -16,6 +16,9 @@ use crate::user::*;
 use crate::ClientMessage;
 use crate::ServerMessage;
 
+mod client;
+use crate::server::client::*;
+
 /// The 'ClientPacket' type. Represents packets sent by the client
 enum ClientPacket {
     Version(u16, u32, u8, u32),
@@ -464,7 +467,7 @@ fn key_init(k: u32) -> u64 {
     u64::from_ne_bytes(keyvec.try_into().unwrap())
 }
 
-struct Packet {
+pub struct Packet {
     data: Vec<u8>,
     read: usize,
 }
@@ -748,7 +751,7 @@ mod tests {
     }
 }
 
-struct ServerPacketReceiver {
+pub struct ServerPacketReceiver {
     reader: tokio::net::tcp::OwnedReadHalf,
     decryption_key: u64,
 }
@@ -778,7 +781,7 @@ impl ServerPacketReceiver {
     }
 }
 
-struct ServerPacketSender {
+pub struct ServerPacketSender {
     writer: tokio::net::tcp::OwnedWriteHalf,
     encryption_key: Option<u64>,
 }
@@ -812,7 +815,7 @@ impl ServerPacketSender {
 }
 
 #[derive(Debug, Clone)]
-struct ClientError;
+pub struct ClientError;
 impl fmt::Display for ClientError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "Client error")
@@ -843,453 +846,6 @@ impl From<mysql_async::Error> for ClientError {
     }
 }
 
-async fn process_packet(
-    p: Packet,
-    s: &mut ServerPacketSender,
-    server_tx: &tokio::sync::mpsc::Sender<ClientMessage>,
-    id: u32,
-    mysql: &mut mysql_async::Conn,
-) -> Result<(), ClientError> {
-    let c = p.convert();
-    Ok(match c {
-        ClientPacket::Version(a, b, c, d) => {
-            println!("client: version {} {} {} {}", a, b, c, d);
-            let response: Packet = ServerPacket::ServerVersion {
-                id: 2,
-                version: 2,
-                time: 3,
-                new_accounts: 1,
-                english: 1,
-                country: 0,
-            }
-            .build();
-            s.send_packet(response).await?;
-        }
-        ClientPacket::Login(u, p, v1, v2, v3, v4, v5, v6, v7) => {
-            println!(
-                "client: login attempt for {} {} {} {} {} {} {} {}",
-                &u, v1, v2, v3, v4, v5, v6, v7
-            );
-            let user = get_user_details(u.clone(), mysql).await;
-            match user {
-                Some(us) => {
-                    println!("User {} exists", u.clone());
-                    us.print();
-                    //TODO un-hardcode the salt for the password hashing
-					let password_success = us.check_login("lineage".to_string(), p);
-					println!("User pw test {}", hash_password("testtest".to_string(), "lineage".to_string(), "password".to_string()));
-					println!("User login check is {}", password_success);
-					if password_success {
-						s.send_packet(ServerPacket::LoginResult { code: 0 }.build()).await?;
-						s.send_packet(ServerPacket::News("This is the news".to_string()).build()).await?;
-						let _ = &server_tx
-							.send(ClientMessage::LoggedIn(id, u)).await?;
-					}
-					else
-					{
-						s.send_packet(ServerPacket::LoginResult { code: 8 }.build()).await?;
-					}
-                }
-                None => {
-                    println!("User {} does not exist!", u.clone());
-                    //TODO actually determine if auto account creation is enabled
-                    if true {
-                        //TODO: put in accurate ip information
-                        //TODO un-hardcode the salt for the password hashing
-                        let newaccount = UserAccount::new(u.clone(), p, "127.0.0.1".to_string(), "lineage".to_string());
-                        newaccount.insert_into_db(mysql).await;
-                        s.send_packet(ServerPacket::LoginResult { code: 0 }.build()).await?;
-						s.send_packet(ServerPacket::News("This is the news".to_string()).build()).await?;
-						let _ = &server_tx
-							.send(ClientMessage::LoggedIn(id, u.clone())).await?;
-                    }
-                    else
-                    {
-                        s.send_packet(ServerPacket::LoginResult { code: 8 }.build()).await?;
-                    }
-                }
-            }
-        }
-        ClientPacket::NewsDone => {
-            //send number of characters the player has
-            let mut response = ServerPacket::NumberCharacters(1, 8).build();
-            s.send_packet(response).await?;
-
-            for _ in 0..1 {
-                response = ServerPacket::LoginCharacterDetails {
-                    name: "whatever".to_string(),
-                    pledge: "whocares".to_string(),
-                    ctype: 1,
-                    gender: 2,
-                    alignment: 32767,
-                    hp: 1234,
-                    mp: 95,
-                    ac: -12,
-                    level: 51,
-                    strength: 12,
-                    dexterity: 12,
-                    constitution: 12,
-                    wisdom: 12,
-                    charisma: 12,
-                    intelligence: 12,
-                }
-                .build();
-                s.send_packet(response).await?;
-            }
-        }
-		ClientPacket::NewCharacter{name, class, gender, strength,
-			dexterity, constitution, wisdom, charisma, intelligence} => {
-			let _ = &server_tx
-                .send(ClientMessage::NewCharacter { id: id,
-					name: name,
-					class: class,
-					gender: gender,
-					strength: strength,
-					dexterity: dexterity,
-					constitution: constitution,
-					wisdom: wisdom,
-					charisma: charisma,
-					intelligence: intelligence,
-					})
-                .await?;
-		}
-		ClientPacket::DeleteCharacter(n) => {
-			let _ = &server_tx.send(ClientMessage::DeleteCharacter{id: id, name: n}).await?;
-			//TODO determine if character level is 30 or higher
-			//TODO send DeleteCharacterWait if level is 30 or higher
-			s.send_packet(ServerPacket::DeleteCharacterOk.build()).await?;
-		}
-        ClientPacket::CharacterSelect { name } => {
-            println!("client: login with {}", name);
-            let mut response = ServerPacket::StartGame(0).build();
-            s.send_packet(response).await?;
-
-            response = ServerPacket::CharacterDetails {
-                id: 1,
-                level: 5,
-                xp: 1234,
-                strength: 12,
-                dexterity: 12,
-                constitution: 13,
-                wisdom: 14,
-                charisma: 15,
-                intelligence: 16,
-                curr_hp: 123,
-                max_hp: 985,
-                curr_mp: 34,
-                max_mp: 345,
-                time: 1,
-                ac: -13,
-                food: 1.0,
-                weight: 0.5,
-                alignment: 32675,
-                fire_resist: 0,
-                water_resist: 1,
-                wind_resist: 2,
-                earth_resist: 3,
-            }
-            .build();
-            s.send_packet(response).await?;
-
-            s.send_packet(ServerPacket::MapId(4, 0).build()).await?;
-
-            s.send_packet(
-                ServerPacket::PutObject {
-                    x: 33430,
-                    y: 32815,
-                    id: 1,
-                    icon: 1,
-                    status: 0,
-                    direction: 0,
-                    light: 5,
-                    speed: 50,
-                    xp: 1234,
-                    alignment: 32767,
-                    name: "testing".to_string(),
-                    title: "i am groot".to_string(),
-                    status2: 0,
-                    pledgeid: 0,
-                    pledgename: "avengers".to_string(),
-                    unknown: "".to_string(),
-                    v1: 0,
-                    hp_bar: 100,
-                    v2: 0,
-                    v3: 0,
-                }
-                .build(),
-            )
-            .await?;
-
-            s.send_packet(ServerPacket::CharSpMrBonus { sp: 0, mr: 0 }.build())
-                .await?;
-
-            s.send_packet(ServerPacket::Weather(0).build()).await?;
-
-            //TODO send owncharstatus packet
-        }
-        ClientPacket::KeepAlive => {}
-        ClientPacket::GameInitDone => {}
-        ClientPacket::WindowActivate(v2) => {
-            println!("Client window activate {}", v2);
-        }
-        ClientPacket::Save => {}
-        ClientPacket::Move { x, y, heading } => {
-            println!("client: moving to {} {} {}", x, y, heading);
-        }
-        ClientPacket::ChangeDirection(d) => {
-            println!("client: change direction to {}", d);
-        }
-        ClientPacket::Chat(m) => {
-            let _ = &server_tx
-                .send(ClientMessage::RegularChat { id: id, msg: m })
-                .await?;
-        }
-        ClientPacket::YellChat(m) => {
-            //TODO put in the correct coordinates for yelling
-			let _ = &server_tx.send(ClientMessage::YellChat{
-                id: id, msg: m, x: 32768, y: 32768,
-            }).await?;
-        }
-        ClientPacket::PartyChat(m) => {
-            let _ = &server_tx.send(ClientMessage::PartyChat(id, m)).await?;
-        }
-        ClientPacket::PledgeChat(m) => {
-            let _ = &server_tx.send(ClientMessage::PledgeChat(id,m)).await?;
-        }
-        ClientPacket::WhisperChat(n, m) => {
-            let _ = &server_tx.send(ClientMessage::WhisperChat(id, n, m)).await?;
-        }
-        ClientPacket::GlobalChat(m) => {
-            let _ = &server_tx.send(ClientMessage::GlobalChat(id, m)).await?;
-        }
-        ClientPacket::CommandChat(m) => {
-            println!("client: command chat {}", m);
-            let mut words = m.split_whitespace();
-            let first_word = words.next();
-            if let Some(m) = first_word {
-                match m {
-                    "asdf" => {
-                        println!("A command called asdf");
-                    }
-					"quit" => {
-						s.send_packet(ServerPacket::Disconnect.build()).await?;
-					}
-                    "chat" => {
-                        s.send_packet(
-                            ServerPacket::SystemMessage(
-                                "This is a test of the system message".to_string(),
-                            )
-                            .build(),
-                        )
-                        .await?;
-                        s.send_packet(ServerPacket::NpcShout("NPC Shout test".to_string()).build())
-                            .await?;
-
-                        s.send_packet(
-                            ServerPacket::RegularChat {
-                                id: 0,
-                                msg: "regular chat".to_string(),
-                            }
-                            .build(),
-                        )
-                        .await?;
-                        s.send_packet(
-                            ServerPacket::YellChat {
-                                id: 0,
-                                msg: "yelling".to_string(),
-                                x: 32768,
-                                y: 32768,
-                            }
-                            .build(),
-                        )
-                        .await?;
-                        s.send_packet(ServerPacket::GlobalChat("global chat".to_string()).build())
-                            .await?;
-                        s.send_packet(ServerPacket::PledgeChat("pledge chat".to_string()).build())
-                            .await?;
-                        s.send_packet(ServerPacket::PartyChat("party chat".to_string()).build())
-                            .await?;
-                        s.send_packet(
-                            ServerPacket::WhisperChat {
-                                name: "test".to_string(),
-                                msg: "whisper message".to_string(),
-                            }
-                            .build(),
-                        )
-                        .await?;
-                    }
-                    _ => {
-                        println!("An unknown command {}", m);
-                    }
-                }
-            }
-        }
-        ClientPacket::SpecialCommandChat(m) => {
-            println!("client: special command chat {}", m);
-        }
-		ClientPacket::ChangePassword {account,oldpass,newpass} => {
-			let user = get_user_details(account.clone(), mysql).await;
-            match user {
-                Some(us) => {
-                    println!("User {} exists", account);
-                    us.print();
-					let password_success = us.check_login("lineage".to_string(), oldpass);
-					println!("User login check is {}", password_success);
-					if password_success {
-						println!("User wants to change password and entered correct details");
-						s.send_packet(ServerPacket::LoginResult { code: 0x30 }.build()).await?;
-					}
-					else
-					{
-						let mut p = Packet::new();
-						s.send_packet(ServerPacket::LoginResult { code: 8 }.build()).await?;
-					}
-				}
-				_ => {
-					let mut p = Packet::new();
-						s.send_packet(ServerPacket::LoginResult { code: 8 }.build()).await?;
-				}
-			}
-		}
-        ClientPacket::Unknown(d) => {
-            println!("client: received unknown packet {:x?}", d);
-        }
-    })
-}
-
-async fn handle_server_message(p: ServerMessage,
-	packet_writer: &mut ServerPacketSender, )  -> Result<u8, ClientError> {
-	match p {
-		ServerMessage::AssignId(i) => {
-		}
-		ServerMessage::Disconnect => {
-			packet_writer.send_packet(ServerPacket::Disconnect.build()).await?;
-		}
-		ServerMessage::SystemMessage(m) => {
-			packet_writer.send_packet(ServerPacket::SystemMessage(m).build()).await?;
-		}
-		ServerMessage::NpcShout(m) => {
-			packet_writer.send_packet(ServerPacket::NpcShout(m).build()).await?;
-		}
-		ServerMessage::RegularChat{id, msg} => {
-			packet_writer.send_packet(ServerPacket::RegularChat{id: id, msg: msg}.build()).await?;
-		}
-        ServerMessage::WhisperChat(name, msg) => {
-            packet_writer.send_packet(
-                ServerPacket::WhisperChat {
-                    name: name,
-                    msg: msg,
-                }
-                .build(),
-            ).await?;
-        }
-		ServerMessage::YellChat{id, msg, x, y} => {
-			packet_writer.send_packet(ServerPacket::YellChat{id: id, msg: msg, x: x, y: y}.build()).await?;
-		}
-		ServerMessage::GlobalChat(m) => {
-			packet_writer.send_packet(ServerPacket::GlobalChat(m).build()).await?;
-		}
-		ServerMessage::PledgeChat(m) => {
-			packet_writer.send_packet(ServerPacket::PledgeChat(m).build()).await?;
-		}
-		ServerMessage::PartyChat(m) => {
-			packet_writer.send_packet(ServerPacket::PartyChat(m).build()).await?;
-		}
-		ServerMessage::CharacterCreateStatus(v) => {
-			match v {
-				0 => {
-					packet_writer.send_packet(ServerPacket::CharacterCreationStatus(2).build()).await?;
-				}
-				1 => {
-					packet_writer.send_packet(ServerPacket::CharacterCreationStatus(9).build()).await?;
-				}
-				2 => {
-					packet_writer.send_packet(ServerPacket::CharacterCreationStatus(6).build()).await?;
-				}
-				3 => {
-					packet_writer.send_packet(ServerPacket::CharacterCreationStatus(21).build()).await?;
-				}
-				_ => {
-					println!("wrong char creation status");
-				}
-			}
-		}
-		ServerMessage::NewCharacterDetails{ name,
-				pledge,
-				class,
-				gender,
-				alignment,
-				hp,
-				mp,
-				ac,
-				level,
-				strength,
-				dexterity,
-				constitution,
-				wisdom,
-				charisma,
-				intelligence,
-			} => {
-			packet_writer.send_packet(ServerPacket::NewCharacterDetails{
-				name: name,
-				pledge: pledge,
-				class: class,
-				gender: gender,
-				alignment: alignment,
-				hp: hp,
-				mp: mp,
-				ac: ac,
-				level: level,
-				strength: strength,
-				dexterity: dexterity,
-				constitution: constitution,
-				wisdom: wisdom,
-				charisma: charisma,
-				intelligence: intelligence,
-				}.build()).await?;
-		}
-	}
-	Ok(0)
-}
-
-async fn client_event_loop(
-    mut packet_writer: ServerPacketSender,
-    mut brd_rx: tokio::sync::broadcast::Receiver<ServerMessage>,
-    reader: tokio::net::tcp::OwnedReadHalf,
-    mut rx: tokio::sync::mpsc::UnboundedReceiver<ServerMessage>,
-    server_tx: &tokio::sync::mpsc::Sender<ClientMessage>,
-    id: u32,
-    mut mysql: mysql_async::Conn,
-) -> Result<u8, ClientError> {
-    let encryption_key: u32 = rand::thread_rng().gen();
-    let mut packet_reader = ServerPacketReceiver::new(reader, encryption_key);
-
-    let mut key_packet = Packet::new();
-    key_packet.add_u8(65).add_u32(encryption_key);
-    packet_writer.send_packet(key_packet).await?;
-    packet_writer.set_encryption_key(packet_reader.get_key());
-    loop {
-        futures::select! {
-            packet = packet_reader.read_packet().fuse() => {
-                let p = packet?;
-                process_packet(p, &mut packet_writer, server_tx, id, &mut mysql).await?;
-            }
-            msg = brd_rx.recv().fuse() => {
-                let p = msg.unwrap();
-                handle_server_message(p, &mut packet_writer).await?;
-            }
-            msg = rx.recv().fuse() => {
-                match msg {
-                    None => {}
-                    Some(p) => {handle_server_message(p, &mut packet_writer).await?;}
-                }
-            }
-        }
-    }
-    //TODO send disconnect packet if applicable
-    Ok(0)
-}
-
 async fn process_client(socket: tokio::net::TcpStream, cd: ClientData) -> Result<u8, ClientError> {
     let (reader, writer) = socket.into_split();
     let packet_writer = ServerPacketSender::new(writer);
@@ -1317,16 +873,14 @@ async fn process_client(socket: tokio::net::TcpStream, cd: ClientData) -> Result
         }
     }
 
-    if let Err(_) = client_event_loop(
-        packet_writer,
+    let c = Client::new(packet_writer,
         brd_rx,
-        reader,
         rx,
         &server_tx,
         client_id,
-        mysql,
-    )
-    .await
+        mysql,);
+
+    if let Err(_) = c.event_loop(reader).await
     {
         println!("test: Client errored");
     }
