@@ -36,7 +36,8 @@ impl PackFiles {
 
     pub async fn load_png(&mut self, name: String) -> Option<Vec<u8>> {
         let hash = PackFiles::get_hash_index(name.clone());
-        self.sprites[hash as usize].raw_file_contents(name).await
+	let contents = self.sprites[hash as usize].raw_file_contents(name.clone()).await;
+	contents
     }
 
     pub async fn load(path: String) -> Result<Self, ()> {
@@ -130,7 +131,6 @@ pub async fn async_main(
                         let data = p.load_png(name2.clone()).await;
                         match data {
                             Some(d) => {
-                                println!("PNG DATA {:x?}", d);
                                 let _e = s.send(MessageFromAsync::Png(name, d.clone())).await;
                             }
                             None => {

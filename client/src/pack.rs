@@ -58,9 +58,20 @@ impl Pack {
                 }
                 let mut buffer = bytes::BytesMut::with_capacity(size as usize);
 
-                if let Err(_e) = f.read_buf(&mut buffer).await {
-                    return None;
-                }
+		let mut amount_read : u64 = 0;
+		loop {
+			let val = f.read_buf(&mut buffer).await;
+			if let Err(_e) = val {
+			    return None;
+			}
+			if let Ok(val) = val {
+				amount_read += val as u64;
+			}
+			if amount_read == size as u64 {
+				break;
+			}
+		}
+
                 Some(buffer.to_vec())
             } else {
                 None
