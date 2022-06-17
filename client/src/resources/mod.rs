@@ -1,5 +1,7 @@
 use crate::Font;
 use crate::Pack;
+use sdl2::render::Texture;
+use std::collections::HashMap;
 
 pub mod stringtable;
 use crate::resources::stringtable::*;
@@ -63,6 +65,18 @@ impl PackFiles {
             sprites: packs,
         })
     }
+}
+
+pub struct GameResources<'a> {
+	pub pngs: HashMap<u16,Texture<'a>>,
+}
+
+impl<'a> GameResources<'a> {
+	pub fn new() -> Self {
+		Self {
+			pngs: HashMap::new(),
+		}
+	}
 }
 
 pub struct Resources {
@@ -131,7 +145,7 @@ pub async fn async_main(
                         let data = p.load_png(name2.clone()).await;
                         match data {
                             Some(d) => {
-                                let _e = s.send(MessageFromAsync::Png(name, d.clone())).await;
+                                let _e = s.send(MessageFromAsync::Png(name, d)).await;
                             }
                             None => {
                                 println!("{} failed to load", name2);

@@ -2,6 +2,8 @@ use sdl2::event::Event;
 use sdl2::image::LoadTexture;
 use sdl2::keyboard::Keycode;
 use sdl2::pixels::Color;
+use sdl2::render::Texture;
+use std::collections::HashMap;
 use std::time::Duration;
 
 use std::fs;
@@ -86,7 +88,7 @@ pub fn main() {
     }
     let window = windowb.build().unwrap();
 
-    let mut canvas = window.into_canvas().build().unwrap();
+    let mut canvas = window.into_canvas().software().build().unwrap();
 
     canvas.set_draw_color(Color::RGB(0, 0, 0));
     canvas.clear();
@@ -96,6 +98,8 @@ pub fn main() {
 
     let flags = sdl2::image::InitFlag::all();
     let sdl2_image = sdl2::image::init(flags).unwrap();
+    
+    let mut game_resources = GameResources::new();
 
     'running: loop {
         while let Ok(msg) = r2.try_recv() {
@@ -137,7 +141,8 @@ pub fn main() {
                 MessageFromAsync::Png(name, data) => {
                     let png = texture_creator.load_texture_bytes(data);
                     match png {
-                        Ok(_a) => {
+                        Ok(a) => {
+			    game_resources.pngs.insert(*name, a);
                             println!("PNG {} success", name);
                         }
                         Err(e) => {
@@ -146,7 +151,7 @@ pub fn main() {
                     }
                 }
             }
-            mode.parse_message(&msg);
+            mode.parse_message(&msg, &mut game_resources);
         }
         for event in event_pump.poll_iter() {
             match event {
@@ -157,9 +162,9 @@ pub fn main() {
                 } => break 'running,
                 _ => {}
             }
-            mode.parse_event(event);
+            mode.parse_event(event, &mut game_resources);
         }
-        mode.draw(&mut canvas);
+        mode.draw(&mut canvas, &mut game_resources);
         canvas.present();
         let framerate = mode.framerate() as u64;
         ::std::thread::sleep(Duration::from_nanos(1_000_000_000u64 / framerate));
