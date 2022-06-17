@@ -20,8 +20,3 @@ features = ["rt-multi-thread", "net", "time", "macros", "signal", "sync", "io-ut
 [dependencies.common]
 version = "^0"
 path="../common"
-
-[profile.release]
-opt-level = "z"
-lto=true
-codegen-units=1

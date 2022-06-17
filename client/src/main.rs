@@ -1,3 +1,4 @@
+use crate::Loadable::Loaded;
 use sdl2::event::Event;
 use sdl2::image::LoadTexture;
 use sdl2::keyboard::Keycode;
@@ -48,26 +49,19 @@ pub fn main() {
     let resources = settings.get("general", "resources").unwrap();
 
     let rt = tokio::runtime::Runtime::new().unwrap();
-    let (s1, r1) = tokio::sync::mpsc::channel(100);
+    let (mut s1, r1) = tokio::sync::mpsc::channel(100);
     let (s2, mut r2) = tokio::sync::mpsc::channel(100);
     rt.spawn(async_main(r1, s2));
 
     let mut mode: Box<dyn GameMode> = Box::new(ExplorerMenu::new());
 
+    println!("Loading resources from {}", resources);
+
     s1.blocking_send(MessageToAsync::LoadResources(resources.clone()));
     s1.blocking_send(MessageToAsync::LoadTable("obscene-e.tbl".to_string()));
     s1.blocking_send(MessageToAsync::LoadFont("Font/eng.fnt".to_string()));
     s1.blocking_send(MessageToAsync::LoadSpriteTable);
-    s1.blocking_send(MessageToAsync::LoadPng(811));
     //load Font/SMALL.FNT
-
-    println!("Loading resources from {}", resources);
-    //TODO load from from Font/eng.fnt
-    //TODO des key init
-    //TODO load packs
-    //TODO load tiles
-
-    //let sprites = Sprites::load(".".to_string());
 
     //load program settings, including where to find resources
     let game_settings = settings::Settings {
@@ -142,7 +136,7 @@ pub fn main() {
                     let png = texture_creator.load_texture_bytes(data);
                     match png {
                         Ok(a) => {
-			    game_resources.pngs.insert(*name, a);
+			    game_resources.pngs.insert(*name, Loaded(a));
                             println!("PNG {} success", name);
                         }
                         Err(e) => {
@@ -164,7 +158,7 @@ pub fn main() {
             }
             mode.parse_event(event, &mut game_resources);
         }
-        mode.draw(&mut canvas, &mut game_resources);
+        mode.draw(&mut canvas, &mut game_resources, &mut s1);
         canvas.present();
         let framerate = mode.framerate() as u64;
         ::std::thread::sleep(Duration::from_nanos(1_000_000_000u64 / framerate));

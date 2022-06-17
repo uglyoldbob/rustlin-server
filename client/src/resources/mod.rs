@@ -67,8 +67,14 @@ impl PackFiles {
     }
 }
 
+pub enum Loadable<T> {
+	Unloaded,
+	Loading,
+	Loaded(T),
+}
+
 pub struct GameResources<'a> {
-	pub pngs: HashMap<u16,Texture<'a>>,
+	pub pngs: HashMap<u16,Loadable<Texture<'a>>>,
 }
 
 impl<'a> GameResources<'a> {

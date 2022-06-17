@@ -1,5 +1,7 @@
 use crate::GameResources;
+use crate::Loadable::*;
 use crate::MessageFromAsync;
+use crate::MessageToAsync;
 use sdl2::pixels::Color;
 use sdl2::rect::Rect;
 
@@ -7,7 +9,7 @@ use sdl2::rect::Rect;
 pub trait GameMode {
     fn parse_message(&mut self, m: &MessageFromAsync, r: &mut GameResources);
     fn parse_event(&mut self, e: sdl2::event::Event, r: &mut GameResources);
-    fn draw(&mut self, canvas: &mut sdl2::render::WindowCanvas, r: &mut GameResources);
+    fn draw(&mut self, canvas: &mut sdl2::render::WindowCanvas, r: &mut GameResources, send: &mut tokio::sync::mpsc::Sender::<MessageToAsync>);
     /// Framerate is specified in frames per second
     fn framerate(&self) -> u8;
 }
@@ -37,16 +39,25 @@ impl GameMode for ExplorerMenu {
         }
     }
 
-    fn draw(&mut self, canvas: &mut sdl2::render::WindowCanvas, r: &mut GameResources) {
+    fn draw(&mut self, canvas: &mut sdl2::render::WindowCanvas, r: &mut GameResources,
+	send: &mut tokio::sync::mpsc::Sender::<MessageToAsync>) {
         canvas.set_draw_color(Color::RGB(0,0,0));
 	canvas.clear();
 	if r.pngs.contains_key(&811) {
-		println!("draw 811.png");
-		let p = &r.pngs[&811];
-		let result = canvas.copy(p, None, None);
-		if let Err(e) = result {
-			println!("FAILED to draw {:?}", e);
+		match &r.pngs[&811] {
+			Unloaded => {
+				r.pngs.insert(811, Loading);
+				send.blocking_send(MessageToAsync::LoadPng(811));
+			}
+			Loading => {}
+			Loaded(t) => {
+				canvas.copy(t, None, None);
+			}
 		}
+	}
+	else {
+		r.pngs.insert(811, Loading);
+		send.blocking_send(MessageToAsync::LoadPng(811));
 	}
     }
 
