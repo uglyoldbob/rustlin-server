@@ -1,5 +1,5 @@
 [package]
-name="rustlin"
+name="rustlin-client"
 version="0.0.1"
 authors=["Thomas Epperson"]
 edition="2021"
@@ -19,7 +19,7 @@ version="0.35.2"
 features=["use_mac_framework", "image"]
 
 [[bin]]
-name="rustlin"
+name="rustlin-client"
 path="src/main.rs"
 
 [[bin]]

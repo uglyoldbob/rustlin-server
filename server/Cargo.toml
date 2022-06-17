@@ -1,5 +1,5 @@
 [package]
-name="rustlin"
+name="rustlin-server"
 version = "0.0.1"
 authors = ["Thomas Epperson"]
 edition="2018"
