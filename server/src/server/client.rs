@@ -1,9 +1,5 @@
 use crate::client_message::ClientMessage;
-use crate::server::ClientPacket;
-use crate::server::Packet;
-use crate::server::ServerPacket;
-use crate::server::ServerPacketReceiver;
-use crate::server::ServerPacketSender;
+use common::packet::*;
 use crate::server::ClientError;
 use crate::server_message::ServerMessage;
 use crate::user::*;
