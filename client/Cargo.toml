@@ -18,6 +18,10 @@ features=["full"]
 version="0.35.2"
 features=["use_mac_framework", "image"]
 
+[dependencies.common]
+version = "^0"
+path="../common"
+
 [[bin]]
 name="rustlin-client"
 path="src/main.rs"

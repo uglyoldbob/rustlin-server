@@ -1306,6 +1306,7 @@ name = "rustlin-client"
 version = "0.0.1"
 dependencies = [
  "bytes",
+ "common",
  "configparser",
  "des",
  "generic-array",
@@ -1318,6 +1319,7 @@ name = "rustlin-server"
 version = "0.0.1"
 dependencies = [
  "chrono",
+ "common",
  "configparser",
  "futures",
  "mysql_async",

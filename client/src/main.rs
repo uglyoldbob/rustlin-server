@@ -27,7 +27,7 @@ mod resources;
 use crate::resources::*;
 
 pub fn main() {
-    let settings_file = fs::read_to_string("./settings.ini");
+    let settings_file = fs::read_to_string("./client-settings.ini");
     let settings_con = match settings_file {
         Ok(con) => con,
         Err(_) => "".to_string(),

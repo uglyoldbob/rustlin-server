@@ -25,12 +25,13 @@ use crate::player::Player;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
+    common::do_stuff();
     println!("server: Game server is starting");
 
     let (clients, mut clients_rx) = tokio::sync::mpsc::channel::<ClientMessage>(100);
     let (broadcast, _) = tokio::sync::broadcast::channel::<ServerMessage>(100);
 
-    let settings_file = fs::read_to_string("./settings.ini")?;
+    let settings_file = fs::read_to_string("./server-settings.ini")?;
     let mut settings = configparser::ini::Ini::new();
     settings.read(settings_file)?;
 

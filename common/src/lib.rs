@@ -1,3 +1,7 @@
+pub fn do_stuff() {
+    println!("I am doing stuff");
+}
+
 #[cfg(test)]
 mod tests {
     #[test]
