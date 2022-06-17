@@ -1,0 +1,23 @@
+[package]
+name="rustlin"
+version = "0.0.1"
+authors = ["Thomas Epperson"]
+edition="2018"
+
+[dependencies]
+futures="0.3.19"
+rand="0.8.4"
+mysql_async="0.29.0"
+configparser = "3.0.0"
+regex = "1.5.4"
+chrono="0.4.19"
+rust-crypto="0.2.36"
+
+[dependencies.tokio]
+version = "1.15.0"
+features = ["rt-multi-thread", "net", "time", "macros", "signal", "sync", "io-util"]
+
+[profile.release]
+opt-level = "z"
+lto=true
+codegen-units=1
