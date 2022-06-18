@@ -37,6 +37,7 @@ impl Pack {
             contents: None,
         }
     }
+    
 
     fn get_file_index(&mut self, name: String) -> Option<usize> {
         for (i, n) in self.file_data.iter().enumerate() {
@@ -71,7 +72,6 @@ impl Pack {
 				break;
 			}
 		}
-
                 Some(buffer.to_vec())
             } else {
                 None

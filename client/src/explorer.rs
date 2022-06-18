@@ -144,6 +144,9 @@ pub fn main() {
                         }
                     }
                 }
+		MessageFromAsync::Img(name, data) => {
+		    println!("Loaded IMG {} {:x?}", name, data);
+		}
             }
             mode.parse_message(&msg, &mut game_resources);
         }

@@ -1,10 +1,51 @@
 use crate::Font;
 use crate::Pack;
+use sdl2::pixels::PixelFormatEnum;
 use sdl2::render::Texture;
+use sdl2::render::TextureCreator;
+use sdl2::surface::Surface;
 use std::collections::HashMap;
+use tokio::io::AsyncReadExt;
 
 pub mod stringtable;
 use crate::resources::stringtable::*;
+
+#[derive(Clone)]
+pub struct Img {
+	width: u16,
+	height: u16,
+	unknown: u16,
+	colorkey: u16,
+	data: Vec<u8>
+}
+
+impl Img {
+	async fn from_cursor(cursor: &mut std::io::Cursor<&Vec<u8>>) -> Option<Self> {
+		let width = cursor.read_u16_le().await.ok()?;
+		let height = cursor.read_u16_le().await.ok()?;
+		let unknown = cursor.read_u16_le().await.ok()?;
+		let colorkey = cursor.read_u16_le().await.ok()?;
+		println!("IMG is {} x {} {} {}", width, height, unknown, colorkey);
+
+		let mut data = Vec::new();
+		cursor.read_to_end(&mut data).await.ok()?;
+		Some(Self{
+			width: width,
+			height: height,
+			unknown: unknown,
+			colorkey: colorkey,
+			data: data,
+		})
+	}
+	
+	pub fn convert_img_data<'a, T>(&mut self, t: &'a TextureCreator<T>) -> Option<Texture<'a>> {
+	
+		let mut surface = Surface::from_data(self.data.as_mut_slice(), self.width as u32, self.height as u32, 2*self.width as u32, PixelFormatEnum::RGB555).unwrap();
+		//TODO set colorkey
+		Some(Texture::from_surface(&surface, t).unwrap())
+	}
+
+}
 
 pub enum MessageToAsync {
     LoadResources(String),
@@ -12,12 +53,14 @@ pub enum MessageToAsync {
     LoadSpriteTable,
     LoadTable(String),
     LoadPng(u16),
+    LoadImg(u16),
 }
 
 pub enum MessageFromAsync {
     ResourceStatus(bool),
     StringTable(String, StringTable),
     Png(u16, Vec<u8>),
+    Img(u16, Img),
 }
 
 struct PackFiles {
@@ -40,6 +83,33 @@ impl PackFiles {
         let hash = PackFiles::get_hash_index(name.clone());
 	let contents = self.sprites[hash as usize].raw_file_contents(name.clone()).await;
 	contents
+    }
+    
+    pub async fn load_img(&mut self, name: u16) -> Option<Img> {
+	let name1 = format!("{}e.img", name);
+	let hash = PackFiles::get_hash_index(name1.clone()) as usize;
+	let mut data = self.sprites[hash].raw_file_contents(name1.clone()).await;
+	if let None = data {
+		data = self.sprite.raw_file_contents(name1.clone()).await;
+		if let None = data {
+			let name1 = format!("{}.img", name);
+			let hash = PackFiles::get_hash_index(name1.clone()) as usize;
+			data = self.sprites[hash].raw_file_contents(name1.clone()).await;
+			if let None = data {
+				data = self.sprite.raw_file_contents(name1.clone()).await;
+			}
+		}
+	}
+	if let Some(d) = data {
+		println!("Found IMG {}", name);
+		let mut cursor = std::io::Cursor::new(&d);
+		let img = Img::from_cursor(&mut cursor).await;
+		return img;
+	}
+	else {
+		println!("Failed to load IMG{}", name);
+	}
+	None
     }
 
     pub async fn load(path: String) -> Result<Self, ()> {
@@ -75,12 +145,14 @@ pub enum Loadable<T> {
 
 pub struct GameResources<'a> {
 	pub pngs: HashMap<u16,Loadable<Texture<'a>>>,
+	pub imgs: HashMap<u16,Loadable<Texture<'a>>>,
 }
 
 impl<'a> GameResources<'a> {
 	pub fn new() -> Self {
 		Self {
 			pngs: HashMap::new(),
+			imgs: HashMap::new(),
 		}
 	}
 }
@@ -159,6 +231,19 @@ pub async fn async_main(
                         }
                     }
                 }
+		MessageToAsync::LoadImg(name) => {
+			if let Some(p) = &mut res.packs {
+				let data = p.load_img(name).await;
+				match data {
+				    Some(d) => {
+					let _e = s.send(MessageFromAsync::Img(name, d)).await;
+				    }
+				    None => {
+					println!("{} failed to load", name);
+				    }
+				}
+			}
+		}
             },
         }
     }

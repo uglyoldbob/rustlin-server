@@ -30,6 +30,7 @@ impl GameMode for ExplorerMenu {
             MessageFromAsync::ResourceStatus(_b) => {}
             MessageFromAsync::StringTable(_name, _data) => {}
             MessageFromAsync::Png(_name, _data) => {}
+	    MessageFromAsync::Img(_name, _data) => {}
         }
     }
 
@@ -43,11 +44,12 @@ impl GameMode for ExplorerMenu {
 	send: &mut tokio::sync::mpsc::Sender::<MessageToAsync>) {
         canvas.set_draw_color(Color::RGB(0,0,0));
 	canvas.clear();
-	if r.pngs.contains_key(&811) {
-		match &r.pngs[&811] {
+	let value = 811;
+	if r.pngs.contains_key(&value) {
+		match &r.pngs[&value] {
 			Unloaded => {
-				r.pngs.insert(811, Loading);
-				send.blocking_send(MessageToAsync::LoadPng(811));
+				r.pngs.insert(value, Loading);
+				send.blocking_send(MessageToAsync::LoadPng(value));
 			}
 			Loading => {}
 			Loaded(t) => {
@@ -56,8 +58,26 @@ impl GameMode for ExplorerMenu {
 		}
 	}
 	else {
-		r.pngs.insert(811, Loading);
-		send.blocking_send(MessageToAsync::LoadPng(811));
+		r.pngs.insert(value, Loading);
+		send.blocking_send(MessageToAsync::LoadPng(value));
+	}
+	
+	let value = 330;
+	if r.imgs.contains_key(&value) {
+		match &r.imgs[&value] {
+			Unloaded => {
+				r.imgs.insert(value, Loading);
+				send.blocking_send(MessageToAsync::LoadImg(value));
+			}
+			Loading => {}
+			Loaded(t) => {
+				canvas.copy(t, None, Rect::new(241,385,159,28));
+			}
+		}
+	}
+	else {
+		r.imgs.insert(value, Loading);
+		send.blocking_send(MessageToAsync::LoadImg(value));
 	}
     }
 
