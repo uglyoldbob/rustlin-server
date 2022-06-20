@@ -78,7 +78,7 @@ impl GameMode for ExplorerMenu {
                 }
                 Loading => {}
                 Loaded(t) => {
-                    canvas.copy(t, None, Rect::new(241, 385, 159, 28));
+                    canvas.copy(t.texture(), None, Rect::new(241, 385, t.width().into(), t.height().into()));
                 }
             }
         } else {
