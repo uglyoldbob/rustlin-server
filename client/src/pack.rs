@@ -1,6 +1,7 @@
 use crate::Exception;
 use des::cipher::BlockDecryptMut;
 use des::cipher::KeyInit;
+use std::collections::HashMap;
 use tokio::io::AsyncReadExt;
 use tokio::io::AsyncSeekExt;
 
@@ -9,13 +10,13 @@ use tokio::io::AsyncSeekExt;
 pub struct Pack {
     encrypted: bool,
     name: String,
-    file_data: Vec<FileEntry>,
+    file_data: HashMap<String,FileEntry>,
     contents: Option<tokio::fs::File>,
 }
 
+#[derive(Clone)]
 struct FileEntry {
     offset: u32,
-    name: String,
     size: u32,
 }
 
@@ -33,27 +34,22 @@ impl Pack {
         Self {
             encrypted: e,
             name: n,
-            file_data: Vec::new(),
+            file_data: HashMap::new(),
             contents: None,
         }
     }
     
 
-    fn get_file_index(&mut self, name: String) -> Option<usize> {
-        for (i, n) in self.file_data.iter().enumerate() {
-            if n.name == name {
-                return Some(i);
-            }
-        }
-        None
+    fn get_file_index(&self, name: String) -> Option<FileEntry> {
+        self.file_data.get(&name).cloned()
     }
 
     pub async fn raw_file_contents(&mut self, name: String) -> Option<Vec<u8>> {
-        let index = self.get_file_index(name.clone());
+	let index = self.get_file_index(name.clone());
         if let Some(f) = &mut self.contents {
             if let Some(i) = index {
-                let offset = self.file_data[i].offset;
-                let size = self.file_data[i].size;
+                let offset = i.offset;
+                let size = i.size;
                 if let Err(_e) = f.seek(std::io::SeekFrom::Start(offset as u64)).await {
                     return None;
                 }
@@ -122,9 +118,8 @@ impl Pack {
                 let mut name = String::from_utf8_lossy(&name[..]).into_owned();
                 name.make_ascii_lowercase();
                 name = name.trim_matches(char::from(0)).to_string();
-                self.file_data.push(FileEntry {
+                self.file_data.insert(name, FileEntry {
                     offset: offset,
-                    name: name,
                     size: size,
                 });
                 if offset as u64 + size as u64 > content_size as u64 {

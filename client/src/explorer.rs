@@ -145,7 +145,18 @@ pub fn main() {
                     }
                 }
 		MessageFromAsync::Img(name, data) => {
-		    println!("Loaded IMG {} {:x?}", name, data);
+		    println!("Loaded IMG {}", name);
+		    let mut data = (*data).clone();
+		    let img = data.convert_img_data(&texture_creator);
+		    match img {
+			Some (a) => {
+				game_resources.imgs.insert(*name, Loaded(a));
+				println!("IMG{} success", name);
+			}
+			None => {
+                            println!("IMG {} fail", name);
+                        }
+		    }
 		}
             }
             mode.parse_message(&msg, &mut game_resources);
