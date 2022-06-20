@@ -39,6 +39,23 @@ impl Pack {
         }
     }
     
+    pub fn file_extensions(&self) -> HashMap::<String, u32> {
+	let mut hm = HashMap::new();
+	for key in self.file_data.keys() {
+		let extension = key.split('.').nth(1);
+		if let Some(extension) = extension {
+			let extension = extension.to_string();
+			if hm.contains_key(&extension) {
+				let mut val = hm.get_mut(&extension).unwrap();
+				*val += 1;
+			}
+			else {
+				hm.insert(extension, 0);
+			}
+		}
+	}
+	hm
+    }
 
     fn get_file_index(&self, name: String) -> Option<FileEntry> {
         self.file_data.get(&name).cloned()
