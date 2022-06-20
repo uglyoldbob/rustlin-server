@@ -12,39 +12,44 @@ use crate::resources::stringtable::*;
 
 #[derive(Clone)]
 pub struct Img {
-	width: u16,
-	height: u16,
-	unknown: u16,
-	colorkey: u16,
-	data: Vec<u8>
+    width: u16,
+    height: u16,
+    unknown: u16,
+    colorkey: u16,
+    data: Vec<u8>,
 }
 
 impl Img {
-	async fn from_cursor(cursor: &mut std::io::Cursor<&Vec<u8>>) -> Option<Self> {
-		let width = cursor.read_u16_le().await.ok()?;
-		let height = cursor.read_u16_le().await.ok()?;
-		let unknown = cursor.read_u16_le().await.ok()?;
-		let colorkey = cursor.read_u16_le().await.ok()?;
-		println!("IMG is {} x {} {} {}", width, height, unknown, colorkey);
+    async fn from_cursor(cursor: &mut std::io::Cursor<&Vec<u8>>) -> Option<Self> {
+        let width = cursor.read_u16_le().await.ok()?;
+        let height = cursor.read_u16_le().await.ok()?;
+        let unknown = cursor.read_u16_le().await.ok()?;
+        let colorkey = cursor.read_u16_le().await.ok()?;
+        println!("IMG is {} x {} {} {}", width, height, unknown, colorkey);
 
-		let mut data = Vec::new();
-		cursor.read_to_end(&mut data).await.ok()?;
-		Some(Self{
-			width: width,
-			height: height,
-			unknown: unknown,
-			colorkey: colorkey,
-			data: data,
-		})
-	}
-	
-	pub fn convert_img_data<'a, T>(&mut self, t: &'a TextureCreator<T>) -> Option<Texture<'a>> {
-	
-		let mut surface = Surface::from_data(self.data.as_mut_slice(), self.width as u32, self.height as u32, 2*self.width as u32, PixelFormatEnum::RGB555).unwrap();
-		//TODO set colorkey
-		Some(Texture::from_surface(&surface, t).unwrap())
-	}
+        let mut data = Vec::new();
+        cursor.read_to_end(&mut data).await.ok()?;
+        Some(Self {
+            width: width,
+            height: height,
+            unknown: unknown,
+            colorkey: colorkey,
+            data: data,
+        })
+    }
 
+    pub fn convert_img_data<'a, T>(&mut self, t: &'a TextureCreator<T>) -> Option<Texture<'a>> {
+        let mut surface = Surface::from_data(
+            self.data.as_mut_slice(),
+            self.width as u32,
+            self.height as u32,
+            2 * self.width as u32,
+            PixelFormatEnum::RGB555,
+        )
+        .unwrap();
+        //TODO set colorkey
+        Some(Texture::from_surface(&surface, t).unwrap())
+    }
 }
 
 pub enum MessageToAsync {
@@ -81,73 +86,74 @@ impl PackFiles {
 
     pub async fn load_png(&mut self, name: String) -> Option<Vec<u8>> {
         let hash = PackFiles::get_hash_index(name.clone());
-	let contents = self.sprites[hash as usize].raw_file_contents(name.clone()).await;
-	contents
+        let contents = self.sprites[hash as usize]
+            .raw_file_contents(name.clone())
+            .await;
+        contents
     }
-    
+
     pub async fn load_img(&mut self, name: u16) -> Option<Img> {
-	let name1 = format!("{}e.img", name);
-	let hash = PackFiles::get_hash_index(name1.clone()) as usize;
-	let mut data = self.sprites[hash].raw_file_contents(name1.clone()).await;
-	if let None = data {
-		data = self.sprite.raw_file_contents(name1.clone()).await;
-		if let None = data {
-			let name1 = format!("{}.img", name);
-			let hash = PackFiles::get_hash_index(name1.clone()) as usize;
-			data = self.sprites[hash].raw_file_contents(name1.clone()).await;
-			if let None = data {
-				data = self.sprite.raw_file_contents(name1.clone()).await;
-			}
-		}
-	}
-	if let Some(d) = data {
-		println!("Found IMG {}", name);
-		let mut cursor = std::io::Cursor::new(&d);
-		let img = Img::from_cursor(&mut cursor).await;
-		return img;
-	}
-	else {
-		println!("Failed to load IMG{}", name);
-	}
-	None
+        let name1 = format!("{}e.img", name);
+        let hash = PackFiles::get_hash_index(name1.clone()) as usize;
+        let mut data = self.sprites[hash].raw_file_contents(name1.clone()).await;
+        if let None = data {
+            data = self.sprite.raw_file_contents(name1.clone()).await;
+            if let None = data {
+                let name1 = format!("{}.img", name);
+                let hash = PackFiles::get_hash_index(name1.clone()) as usize;
+                data = self.sprites[hash].raw_file_contents(name1.clone()).await;
+                if let None = data {
+                    data = self.sprite.raw_file_contents(name1.clone()).await;
+                }
+            }
+        }
+        if let Some(d) = data {
+            println!("Found IMG {}", name);
+            let mut cursor = std::io::Cursor::new(&d);
+            let img = Img::from_cursor(&mut cursor).await;
+            return img;
+        } else {
+            println!("Failed to load IMG{}", name);
+        }
+        None
     }
 
     pub async fn load(path: String) -> Result<Self, ()> {
-	let start = std::time::Instant::now();
+        let start = std::time::Instant::now();
         let mut packs: Vec<Pack> = Vec::new();
         for i in 0..16 {
             let mut pack = Pack::new(format!("{}/Sprite{:02}", path, i), false);
             let e = pack.load().await;
-	    for key in pack.file_extensions().keys() {
-		println!("Contains {}", key);
-	    }
-	    println!("Time elapsed is {:?}", start.elapsed());
+            for key in pack.file_extensions().keys() {
+                println!("Contains {}", key);
+            }
+            println!("Time elapsed is {:?}", start.elapsed());
             if let Err(_a) = e {
                 return Err(());
             }
             packs.push(pack);
         }
         let mut tile = Pack::new(format!("{}/Tile", path), false);
-	tile.load().await;
-	println!("TILE");
-	for key in tile.file_extensions().keys() {
-		println!("Contains {}", key);
-	    }
-	println!("Time elapsed is {:?}", start.elapsed());
+        tile.load().await;
+        println!("TILE");
+        for key in tile.file_extensions().keys() {
+            println!("Contains {}", key);
+        }
+        println!("Time elapsed is {:?}", start.elapsed());
         let mut text = Pack::new(format!("{}/Text", path), true);
         text.load().await;
-	println!("TEXT");
-	for key in text.file_extensions().keys() {
-		println!("Contains {}", key);
-	    }
-	println!("Time elapsed is {:?}", start.elapsed());
+        println!("TEXT");
+        for key in text.file_extensions().keys() {
+            println!("Contains {}", key);
+        }
+        println!("Time elapsed is {:?}", start.elapsed());
         let mut sprite = Pack::new(format!("{}/Sprite", path), false);
         sprite.load().await;
-	println!("SPRITE");
-	for key in sprite.file_extensions().keys() {
-		println!("Contains {}", key);
-	    }
-	println!("Time elapsed is {:?}", start.elapsed());
+        println!("SPRITE");
+        for key in sprite.file_extensions().keys() {
+            println!("Contains {}", key);
+        }
+        println!("Time elapsed is {:?}", start.elapsed());
         Ok(Self {
             tile: tile,
             text: text,
@@ -158,23 +164,23 @@ impl PackFiles {
 }
 
 pub enum Loadable<T> {
-	Unloaded,
-	Loading,
-	Loaded(T),
+    Unloaded,
+    Loading,
+    Loaded(T),
 }
 
 pub struct GameResources<'a> {
-	pub pngs: HashMap<u16,Loadable<Texture<'a>>>,
-	pub imgs: HashMap<u16,Loadable<Texture<'a>>>,
+    pub pngs: HashMap<u16, Loadable<Texture<'a>>>,
+    pub imgs: HashMap<u16, Loadable<Texture<'a>>>,
 }
 
 impl<'a> GameResources<'a> {
-	pub fn new() -> Self {
-		Self {
-			pngs: HashMap::new(),
-			imgs: HashMap::new(),
-		}
-	}
+    pub fn new() -> Self {
+        Self {
+            pngs: HashMap::new(),
+            imgs: HashMap::new(),
+        }
+    }
 }
 
 pub struct Resources {
@@ -251,19 +257,19 @@ pub async fn async_main(
                         }
                     }
                 }
-		MessageToAsync::LoadImg(name) => {
-			if let Some(p) = &mut res.packs {
-				let data = p.load_img(name).await;
-				match data {
-				    Some(d) => {
-					let _e = s.send(MessageFromAsync::Img(name, d)).await;
-				    }
-				    None => {
-					println!("{} failed to load", name);
-				    }
-				}
-			}
-		}
+                MessageToAsync::LoadImg(name) => {
+                    if let Some(p) = &mut res.packs {
+                        let data = p.load_img(name).await;
+                        match data {
+                            Some(d) => {
+                                let _e = s.send(MessageFromAsync::Img(name, d)).await;
+                            }
+                            None => {
+                                println!("{} failed to load", name);
+                            }
+                        }
+                    }
+                }
             },
         }
     }

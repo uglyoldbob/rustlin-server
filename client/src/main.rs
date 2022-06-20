@@ -92,7 +92,7 @@ pub fn main() {
 
     let flags = sdl2::image::InitFlag::all();
     let sdl2_image = sdl2::image::init(flags).unwrap();
-    
+
     let mut game_resources = GameResources::new();
 
     'running: loop {
@@ -136,7 +136,7 @@ pub fn main() {
                     let png = texture_creator.load_texture_bytes(data);
                     match png {
                         Ok(a) => {
-			    game_resources.pngs.insert(*name, Loaded(a));
+                            game_resources.pngs.insert(*name, Loaded(a));
                             println!("PNG {} success", name);
                         }
                         Err(e) => {
@@ -144,20 +144,20 @@ pub fn main() {
                         }
                     }
                 }
-		MessageFromAsync::Img(name, data) => {
-		    println!("Loaded IMG {}", name);
-		    let mut data = (*data).clone();
-		    let img = data.convert_img_data(&texture_creator);
-		    match img {
-			Some (a) => {
-				game_resources.imgs.insert(*name, Loaded(a));
-				println!("IMG{} success", name);
-			}
-			None => {
+                MessageFromAsync::Img(name, data) => {
+                    println!("Loaded IMG {}", name);
+                    let mut data = (*data).clone();
+                    let img = data.convert_img_data(&texture_creator);
+                    match img {
+                        Some(a) => {
+                            game_resources.imgs.insert(*name, Loaded(a));
+                            println!("IMG{} success", name);
+                        }
+                        None => {
                             println!("IMG {} fail", name);
                         }
-		    }
-		}
+                    }
+                }
             }
             mode.parse_message(&msg, &mut game_resources);
         }

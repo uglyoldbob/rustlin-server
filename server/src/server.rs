@@ -59,8 +59,6 @@ impl From<mysql_async::Error> for ClientError {
     }
 }
 
-
-
 async fn process_client(socket: tokio::net::TcpStream, cd: ClientData) -> Result<u8, ClientError> {
     let (reader, writer) = socket.into_split();
     let packet_writer = ServerPacketSender::new(writer);
@@ -88,15 +86,9 @@ async fn process_client(socket: tokio::net::TcpStream, cd: ClientData) -> Result
         }
     }
 
-    let c = Client::new(packet_writer,
-        brd_rx,
-        rx,
-        &server_tx,
-        client_id,
-        mysql,);
+    let c = Client::new(packet_writer, brd_rx, rx, &server_tx, client_id, mysql);
 
-    if let Err(_) = c.event_loop(reader).await
-    {
+    if let Err(_) = c.event_loop(reader).await {
         println!("test: Client errored");
     }
 

@@ -21,18 +21,23 @@ impl From<std::io::Error> for PacketError {
     }
 }
 
-
 /// The 'ClientPacket' type. Represents packets sent by the client
 pub enum ClientPacket {
     Version(u16, u32, u8, u32),
     Login(String, String, u32, u32, u32, u32, u32, u32, u32),
-    CharacterSelect { name: String },
+    CharacterSelect {
+        name: String,
+    },
     NewsDone,
     KeepAlive,
     GameInitDone,
     WindowActivate(u8),
     Save,
-    Move { x: u16, y: u16, heading: u8 },
+    Move {
+        x: u16,
+        y: u16,
+        heading: u8,
+    },
     ChangeDirection(u8),
     Chat(String),
     YellChat(String),
@@ -42,23 +47,23 @@ pub enum ClientPacket {
     GlobalChat(String),
     CommandChat(String),
     SpecialCommandChat(String),
-	ChangePassword {
-		account: String,
-		oldpass: String,
-		newpass: String,
-	},
-	NewCharacter {
-		name: String,
-		class: u8,
-		gender: u8,
-		strength: u8,
-		dexterity: u8,
-		constitution: u8,
-		wisdom: u8,
-		charisma: u8,
-		intelligence: u8,
-	},
-	DeleteCharacter(String),
+    ChangePassword {
+        account: String,
+        oldpass: String,
+        newpass: String,
+    },
+    NewCharacter {
+        name: String,
+        class: u8,
+        gender: u8,
+        strength: u8,
+        dexterity: u8,
+        constitution: u8,
+        wisdom: u8,
+        charisma: u8,
+        intelligence: u8,
+    },
+    DeleteCharacter(String),
     Unknown(Vec<u8>),
 }
 
@@ -74,31 +79,31 @@ pub enum ServerPacket {
         english: u8,
         country: u8,
     },
-	Disconnect,
+    Disconnect,
     LoginResult {
         code: u8,
     },
     News(String),
-	CharacterCreationStatus(u8),
-	NewCharacterDetails{
-		name: String,
-		pledge: String,
-		class: u8,
-		gender: u8,
-		alignment: i16,
-		hp: u16,
-		mp: u16,
-		ac: i8,
-		level: u8,
-		strength: u8,
-		dexterity: u8,
-		constitution: u8,
-		wisdom: u8,
-		charisma: u8,
-		intelligence: u8,
-	},
-	DeleteCharacterOk,
-	DeleteCharacterWait,
+    CharacterCreationStatus(u8),
+    NewCharacterDetails {
+        name: String,
+        pledge: String,
+        class: u8,
+        gender: u8,
+        alignment: i16,
+        hp: u16,
+        mp: u16,
+        ac: i8,
+        level: u8,
+        strength: u8,
+        dexterity: u8,
+        constitution: u8,
+        wisdom: u8,
+        charisma: u8,
+        intelligence: u8,
+    },
+    DeleteCharacterOk,
+    DeleteCharacterWait,
     NumberCharacters(u8, u8),
     LoginCharacterDetails {
         name: String,
@@ -219,47 +224,62 @@ impl ServerPacket {
                     .add_u8(country);
             }
             //TODO sometimes the client crashes when sending this packet, after they click ok
-			ServerPacket::Disconnect => {
-				p.add_u8(18).add_u16(500).add_u32(0);
-			}
+            ServerPacket::Disconnect => {
+                p.add_u8(18).add_u16(500).add_u32(0);
+            }
             ServerPacket::LoginResult { code } => {
                 p.add_u8(21).add_u8(code).add_u32(0);
             }
             ServerPacket::News(news) => {
                 p.add_u8(90).add_string(news);
             }
-			//TODO verify this
-			ServerPacket::CharacterCreationStatus(v) => {
-				p.add_u8(106).add_u8(v).add_u32(0).add_u32(0);
-			}
-			ServerPacket::NewCharacterDetails{ name,
-				pledge,
-				class,
-				gender,
-				alignment,
-				hp,
-				mp,
-				ac,
-				level,
-				strength,
-				dexterity,
-				constitution,
-				wisdom,
-				charisma,
-				intelligence,
-			} => {
-				p.add_u8(98).add_string(name).add_string(pledge).add_u8(class)
-				 .add_u8(gender).add_i16(alignment).add_u16(hp).add_u16(mp)
-				 .add_i8(ac).add_u8(level).add_u8(strength).add_u8(dexterity)
-				 .add_u8(constitution).add_u8(wisdom).add_u8(charisma)
-				 .add_u8(intelligence).add_u8(1).add_u8(2).add_u32(3);
-			}
-			ServerPacket::DeleteCharacterOk => {
-				p.add_u8(33).add_u8(0x05);
-			}
-			ServerPacket::DeleteCharacterWait => {
-				p.add_u8(33).add_u8(0x51);
-			}
+            //TODO verify this
+            ServerPacket::CharacterCreationStatus(v) => {
+                p.add_u8(106).add_u8(v).add_u32(0).add_u32(0);
+            }
+            ServerPacket::NewCharacterDetails {
+                name,
+                pledge,
+                class,
+                gender,
+                alignment,
+                hp,
+                mp,
+                ac,
+                level,
+                strength,
+                dexterity,
+                constitution,
+                wisdom,
+                charisma,
+                intelligence,
+            } => {
+                p.add_u8(98)
+                    .add_string(name)
+                    .add_string(pledge)
+                    .add_u8(class)
+                    .add_u8(gender)
+                    .add_i16(alignment)
+                    .add_u16(hp)
+                    .add_u16(mp)
+                    .add_i8(ac)
+                    .add_u8(level)
+                    .add_u8(strength)
+                    .add_u8(dexterity)
+                    .add_u8(constitution)
+                    .add_u8(wisdom)
+                    .add_u8(charisma)
+                    .add_u8(intelligence)
+                    .add_u8(1)
+                    .add_u8(2)
+                    .add_u32(3);
+            }
+            ServerPacket::DeleteCharacterOk => {
+                p.add_u8(33).add_u8(0x05);
+            }
+            ServerPacket::DeleteCharacterWait => {
+                p.add_u8(33).add_u8(0x51);
+            }
             ServerPacket::NumberCharacters(num, max) => {
                 p.add_u8(113)
                     .add_u8(num) //number of characters
@@ -481,8 +501,8 @@ union U8Converter {
 }
 
 union U16Converter {
-	u: u16,
-	i: i16,
+    u: u16,
+    i: i16,
 }
 
 impl Packet {
@@ -507,7 +527,7 @@ impl Packet {
                 self.pull_u32(),
             ),
             13 => ClientPacket::WhisperChat(self.pull_string(), self.pull_string()),
-			34 => ClientPacket::DeleteCharacter(self.pull_string()),
+            34 => ClientPacket::DeleteCharacter(self.pull_string()),
             40 => {
                 self.pull_u8();
                 ClientPacket::GlobalChat(self.pull_string())
@@ -522,19 +542,17 @@ impl Packet {
                 println!("client: found a client version packet");
                 ClientPacket::Version(val1, val2, val3, val4)
             }
-			72 => {
-				ClientPacket::NewCharacter{
-					name: self.pull_string(),
-					class: self.pull_u8(),
-					gender: self.pull_u8(),
-					strength: self.pull_u8(),
-					dexterity: self.pull_u8(),
-					constitution: self.pull_u8(),
-					wisdom: self.pull_u8(),
-					charisma: self.pull_u8(),
-					intelligence: self.pull_u8(),
-				}
-			}
+            72 => ClientPacket::NewCharacter {
+                name: self.pull_string(),
+                class: self.pull_u8(),
+                gender: self.pull_u8(),
+                strength: self.pull_u8(),
+                dexterity: self.pull_u8(),
+                constitution: self.pull_u8(),
+                wisdom: self.pull_u8(),
+                charisma: self.pull_u8(),
+                intelligence: self.pull_u8(),
+            },
             74 => ClientPacket::ChangeDirection(self.pull_u8()),
             83 => ClientPacket::CharacterSelect {
                 name: self.pull_string(),
@@ -550,11 +568,11 @@ impl Packet {
                 let v2 = self.pull_u8();
                 ClientPacket::WindowActivate(v2)
             }
-			100 => ClientPacket::ChangePassword {
-				account: self.pull_string(),
-				oldpass: self.pull_string(),
-				newpass: self.pull_string(),
-			},
+            100 => ClientPacket::ChangePassword {
+                account: self.pull_string(),
+                oldpass: self.pull_string(),
+                newpass: self.pull_string(),
+            },
             104 => {
                 let t = self.pull_u8();
                 let m = self.pull_string();
@@ -601,12 +619,12 @@ impl Packet {
         self.data.append(&mut d.to_le_bytes().to_vec());
         self
     }
-	pub fn add_i16(&mut self, d: i16) -> &mut Packet {
-		let a: U16Converter = U16Converter { i: d };
-		let a: u16 = unsafe { a.u };
-		self.add_u16(a);
-		self
-	}
+    pub fn add_i16(&mut self, d: i16) -> &mut Packet {
+        let a: U16Converter = U16Converter { i: d };
+        let a: u16 = unsafe { a.u };
+        self.add_u16(a);
+        self
+    }
     pub fn add_u32(&mut self, d: u32) -> &mut Packet {
         self.data.append(&mut d.to_le_bytes().to_vec());
         self
@@ -816,5 +834,3 @@ impl ServerPacketSender {
         Ok(())
     }
 }
-
-

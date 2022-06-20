@@ -10,7 +10,7 @@ use tokio::io::AsyncSeekExt;
 pub struct Pack {
     encrypted: bool,
     name: String,
-    file_data: HashMap<String,FileEntry>,
+    file_data: HashMap<String, FileEntry>,
     contents: Option<tokio::fs::File>,
 }
 
@@ -38,23 +38,22 @@ impl Pack {
             contents: None,
         }
     }
-    
-    pub fn file_extensions(&self) -> HashMap::<String, u32> {
-	let mut hm = HashMap::new();
-	for key in self.file_data.keys() {
-		let extension = key.split('.').nth(1);
-		if let Some(extension) = extension {
-			let extension = extension.to_string();
-			if hm.contains_key(&extension) {
-				let mut val = hm.get_mut(&extension).unwrap();
-				*val += 1;
-			}
-			else {
-				hm.insert(extension, 0);
-			}
-		}
-	}
-	hm
+
+    pub fn file_extensions(&self) -> HashMap<String, u32> {
+        let mut hm = HashMap::new();
+        for key in self.file_data.keys() {
+            let extension = key.split('.').nth(1);
+            if let Some(extension) = extension {
+                let extension = extension.to_string();
+                if hm.contains_key(&extension) {
+                    let mut val = hm.get_mut(&extension).unwrap();
+                    *val += 1;
+                } else {
+                    hm.insert(extension, 0);
+                }
+            }
+        }
+        hm
     }
 
     fn get_file_index(&self, name: String) -> Option<FileEntry> {
@@ -62,7 +61,7 @@ impl Pack {
     }
 
     pub async fn raw_file_contents(&mut self, name: String) -> Option<Vec<u8>> {
-	let index = self.get_file_index(name.clone());
+        let index = self.get_file_index(name.clone());
         if let Some(f) = &mut self.contents {
             if let Some(i) = index {
                 let offset = i.offset;
@@ -72,19 +71,19 @@ impl Pack {
                 }
                 let mut buffer = bytes::BytesMut::with_capacity(size as usize);
 
-		let mut amount_read : u64 = 0;
-		loop {
-			let val = f.read_buf(&mut buffer).await;
-			if let Err(_e) = val {
-			    return None;
-			}
-			if let Ok(val) = val {
-				amount_read += val as u64;
-			}
-			if amount_read == size as u64 {
-				break;
-			}
-		}
+                let mut amount_read: u64 = 0;
+                loop {
+                    let val = f.read_buf(&mut buffer).await;
+                    if let Err(_e) = val {
+                        return None;
+                    }
+                    if let Ok(val) = val {
+                        amount_read += val as u64;
+                    }
+                    if amount_read == size as u64 {
+                        break;
+                    }
+                }
                 Some(buffer.to_vec())
             } else {
                 None
@@ -135,10 +134,13 @@ impl Pack {
                 let mut name = String::from_utf8_lossy(&name[..]).into_owned();
                 name.make_ascii_lowercase();
                 name = name.trim_matches(char::from(0)).to_string();
-                self.file_data.insert(name, FileEntry {
-                    offset: offset,
-                    size: size,
-                });
+                self.file_data.insert(
+                    name,
+                    FileEntry {
+                        offset: offset,
+                        size: size,
+                    },
+                );
                 if offset as u64 + size as u64 > content_size as u64 {
                     println!("Invalid entry");
                     return Err(Exception::ContentError);

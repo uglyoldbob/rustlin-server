@@ -64,7 +64,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let mut client_ids: ClientList = ClientList::new();
     let mut clients: HashMap<u32, tokio::sync::mpsc::UnboundedSender<ServerMessage>> =
         HashMap::new();
-	let mut client_accounts: HashMap<u32, String> = HashMap::new();
+    let mut client_accounts: HashMap<u32, String> = HashMap::new();
 
     let mut testvar: u32;
 
@@ -89,57 +89,57 @@ async fn main() -> Result<(), Box<dyn Error>> {
                         clients.remove(&i);
                         client_ids.remove_entry(i);
                     }
-					ClientMessage::LoggedIn(id, account) => {
-						client_accounts.insert(id, account);
-					}
-					ClientMessage::NewCharacter{id, name, class, gender, strength,
-						dexterity, constitution, wisdom, charisma, intelligence} => {
-						let a = client_accounts.get(&id);
-						let cid = clients.get(&id).unwrap();
-						if let Some(account) = &a {
-							println!("{} wants to make a new character {}", account.clone(), name.clone());
-							//TODO ensure player name does not already exist
-							//TODO validate that all stats are legitimately possible
-							//TODO validate count of characters for account
-							
-							if !Player::valid_name(name.clone()) {
-								if let Err(e) = cid.send(ServerMessage::CharacterCreateStatus(1)) {
-									println!("Failed to send char create status {} ", e);
-								}
-							}
-							else {
-								if let Err(e) = cid.send(ServerMessage::CharacterCreateStatus(0)) {
-									println!("Failed to send char create status {} ", e);
-								}
-								//TODO: populate the correct details
-								if let Err(e) = cid.send(ServerMessage::NewCharacterDetails{
-								name: name.clone(),
-								pledge: "".to_string(),
-								class: class,
-								gender: gender,
-								alignment: 32764,
-								hp: 234,
-								mp: 456,
-								ac: 12,
-								level: 1,
-								strength: strength,
-								dexterity: dexterity,
-								constitution: constitution,
-								wisdom: wisdom,
-								charisma: charisma,
-								intelligence: intelligence,
-								}) {
-									println!("Failed to send new char details {}", e);
-								}
-							}
-						}
-					}
-					ClientMessage::DeleteCharacter{id, name} => {
-						let a = client_accounts.get(&id);
-						if let Some(account) = &a {
-							println!("{} wants to delete {}", account.clone(), name);
-						}
-					}
+                    ClientMessage::LoggedIn(id, account) => {
+                        client_accounts.insert(id, account);
+                    }
+                    ClientMessage::NewCharacter{id, name, class, gender, strength,
+                        dexterity, constitution, wisdom, charisma, intelligence} => {
+                        let a = client_accounts.get(&id);
+                        let cid = clients.get(&id).unwrap();
+                        if let Some(account) = &a {
+                            println!("{} wants to make a new character {}", account.clone(), name.clone());
+                            //TODO ensure player name does not already exist
+                            //TODO validate that all stats are legitimately possible
+                            //TODO validate count of characters for account
+
+                            if !Player::valid_name(name.clone()) {
+                                if let Err(e) = cid.send(ServerMessage::CharacterCreateStatus(1)) {
+                                    println!("Failed to send char create status {} ", e);
+                                }
+                            }
+                            else {
+                                if let Err(e) = cid.send(ServerMessage::CharacterCreateStatus(0)) {
+                                    println!("Failed to send char create status {} ", e);
+                                }
+                                //TODO: populate the correct details
+                                if let Err(e) = cid.send(ServerMessage::NewCharacterDetails{
+                                name: name.clone(),
+                                pledge: "".to_string(),
+                                class: class,
+                                gender: gender,
+                                alignment: 32764,
+                                hp: 234,
+                                mp: 456,
+                                ac: 12,
+                                level: 1,
+                                strength: strength,
+                                dexterity: dexterity,
+                                constitution: constitution,
+                                wisdom: wisdom,
+                                charisma: charisma,
+                                intelligence: intelligence,
+                                }) {
+                                    println!("Failed to send new char details {}", e);
+                                }
+                            }
+                        }
+                    }
+                    ClientMessage::DeleteCharacter{id, name} => {
+                        let a = client_accounts.get(&id);
+                        if let Some(account) = &a {
+                            println!("{} wants to delete {}", account.clone(), name);
+                        }
+                    }
                     ClientMessage::RegularChat{id, msg} => {
                         //TODO limit based on distance and map
                         let amsg = format!("[{}] {}", "unknown", msg);
@@ -172,10 +172,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
             }
         }
     }
-	
-	let _ = broadcast.send(ServerMessage::Disconnect);
-	
-	thread::sleep(time::Duration::from_secs(5));
+
+    let _ = broadcast.send(ServerMessage::Disconnect);
+
+    thread::sleep(time::Duration::from_secs(5));
 
     println!("server: Server is shutting down");
     if let Err(e) = update_tx.send(0) {
