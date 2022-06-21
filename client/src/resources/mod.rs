@@ -10,6 +10,13 @@ use tokio::io::AsyncReadExt;
 pub mod stringtable;
 use crate::resources::stringtable::*;
 
+use async_trait::async_trait;
+/// Represents a variety of lynx modules.
+#[async_trait]
+pub trait AsyncRunner: Send {
+    async fn do_stuff(&mut self, res: &mut Resources);
+}
+
 #[derive(Clone)]
 pub struct Img {
     width: u16,
@@ -82,6 +89,7 @@ pub enum MessageToAsync {
     LoadTable(String),
     LoadPng(u16),
     LoadImg(u16),
+    LoadRunner(Box<dyn AsyncRunner + Send>),
 }
 
 pub enum MessageFromAsync {
@@ -230,6 +238,9 @@ pub async fn async_main(
         match message {
             None => break,
             Some(msg) => match msg {
+                MessageToAsync::LoadRunner(mut r) => {
+                    r.do_stuff(&mut res).await;
+                }
                 MessageToAsync::LoadResources(path) => {
                     resource_path = path.clone();
                     println!("Loading resources {}", path);

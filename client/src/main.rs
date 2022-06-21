@@ -80,9 +80,9 @@ pub fn main() {
     if !windowed {
         windowb = windowb.fullscreen();
     }
-    let window = windowb.build().unwrap();
+    let window = windowb.opengl().build().unwrap();
 
-    let mut canvas = window.into_canvas().software().build().unwrap();
+    let mut canvas = window.into_canvas().build().unwrap();
 
     canvas.set_draw_color(Color::RGB(0, 0, 0));
     canvas.clear();

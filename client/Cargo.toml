@@ -9,6 +9,7 @@ bytes="1.1.0"
 configparser = "3.0.0"
 des="0.8.1"
 generic-array="0.14.5"
+async-trait="0.1.56"
 
 [dependencies.tokio]
 version="1.19.2"
