@@ -55,10 +55,6 @@ impl GameMode for ExplorerMenu {
         let value = 811;
         if r.pngs.contains_key(&value) {
             match &r.pngs[&value] {
-                Unloaded => {
-                    r.pngs.insert(value, Loading);
-                    send.blocking_send(MessageToAsync::LoadPng(value));
-                }
                 Loading => {}
                 Loaded(t) => {
                     canvas.copy(t, None, None);
@@ -72,16 +68,13 @@ impl GameMode for ExplorerMenu {
         let value = 330;
         if r.imgs.contains_key(&value) {
             match &r.imgs[&value] {
-                Unloaded => {
-                    r.imgs.insert(value, Loading);
-                    send.blocking_send(MessageToAsync::LoadImg(value));
-                }
                 Loading => {}
                 Loaded(t) => {
+                    let q = t.query();
                     canvas.copy(
-                        t.texture(),
+                        t,
                         None,
-                        Rect::new(241, 385, t.width().into(), t.height().into()),
+                        Rect::new(241, 385, q.width.into(), q.height.into()),
                     );
                 }
             }

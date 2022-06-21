@@ -26,24 +26,6 @@ pub struct Img {
     data: Vec<u8>,
 }
 
-pub struct ImgTexture<'a> {
-    width: u16,
-    height: u16,
-    texture: Texture<'a>,
-}
-
-impl<'a> ImgTexture<'a> {
-    pub fn width(&self) -> u16 {
-        self.width
-    }
-    pub fn height(&self) -> u16 {
-        self.height
-    }
-    pub fn texture(&self) -> &Texture<'a> {
-        &self.texture
-    }
-}
-
 impl Img {
     async fn from_cursor(cursor: &mut std::io::Cursor<&Vec<u8>>) -> Option<Self> {
         let width = cursor.read_u16_le().await.ok()?;
@@ -63,7 +45,7 @@ impl Img {
         })
     }
 
-    pub fn convert_img_data<'a, T>(&mut self, t: &'a TextureCreator<T>) -> Option<ImgTexture<'a>> {
+    pub fn convert_img_data<'a, T>(&mut self, t: &'a TextureCreator<T>) -> Option<Texture<'a>> {
         let mut surface = Surface::from_data(
             self.data.as_mut_slice(),
             self.width as u32,
@@ -74,11 +56,7 @@ impl Img {
         .unwrap();
         //TODO set colorkey
         let text = Texture::from_surface(&surface, t).unwrap();
-        Some(ImgTexture {
-            width: self.width,
-            height: self.height,
-            texture: text,
-        })
+        Some(text)
     }
 }
 
@@ -195,14 +173,13 @@ impl PackFiles {
 }
 
 pub enum Loadable<T> {
-    Unloaded,
     Loading,
     Loaded(T),
 }
 
 pub struct GameResources<'a> {
     pub pngs: HashMap<u16, Loadable<Texture<'a>>>,
-    pub imgs: HashMap<u16, Loadable<ImgTexture<'a>>>,
+    pub imgs: HashMap<u16, Loadable<Texture<'a>>>,
 }
 
 impl<'a> GameResources<'a> {
