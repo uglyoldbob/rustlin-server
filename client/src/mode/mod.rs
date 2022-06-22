@@ -13,6 +13,33 @@ pub enum Widget<'a> {
     PlainColorButton(PlainColorButton<'a>),
 }
 
+impl<'a> Widget<'a> {
+    fn draw(
+        &mut self,
+        canvas: &mut sdl2::render::WindowCanvas,
+        r: &mut GameResources,
+        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+    ) {
+        match self {
+            Widget::PlainColorButton(button) => {
+                button.draw(canvas, r, send);
+            }
+        }
+    }
+    fn contains(&self, x: i16, y: i16) -> bool {
+        match self {
+            Widget::PlainColorButton(button) => button.contains_point(x, y),
+        }
+    }
+    fn left_click(&mut self) {
+        match self {
+            Widget::PlainColorButton(button) => {
+                println!("Clicked the button");
+            }
+        }
+    }
+}
+
 pub struct PlainColorButton<'a> {
     t: Texture<'a>,
     x: u16,
@@ -55,8 +82,19 @@ impl<'a> PlainColorButton<'a> {
             ),
         );
     }
-    fn contains_point(x: u16, y: u16) -> bool {
-        false
+    fn contains_point(&self, x: i16, y: i16) -> bool {
+        let x = if x < 0 { 0 as u16 } else { x as u16 };
+        let y = if y < 0 { 0 as u16 } else { y as u16 };
+        if x >= self.x && y >= self.y {
+            let q = self.t.query();
+            if x < (self.x + q.width as u16) && y < (self.y + q.height as u16) {
+                true
+            } else {
+                false
+            }
+        } else {
+            false
+        }
     }
 }
 
@@ -75,14 +113,16 @@ pub trait GameMode {
 
 /// This is for exploring the resources of the game client
 pub struct ExplorerMenu<'a> {
-    b: PlainColorButton<'a>,
+    b: Vec<Widget<'a>>,
 }
 
 impl<'a> ExplorerMenu<'a> {
     pub fn new<T>(tc: &'a TextureCreator<T>) -> Self {
-        Self {
-            b: PlainColorButton::new(tc, 50, 50, 50, 50),
-        }
+        let mut b = Vec::new();
+        b.push(Widget::PlainColorButton(PlainColorButton::new(
+            tc, 50, 50, 50, 50,
+        )));
+        Self { b: b }
     }
 }
 
@@ -109,7 +149,11 @@ impl<'a> GameMode for ExplorerMenu<'a> {
                     println!("Stopped dragging");
                 }
                 MouseEventOutput::LeftClick((x, y)) => {
-                    println!("Left click at {} {}", x, y);
+                    for w in &mut self.b {
+                        if w.contains(*x,*y) {
+                            w.left_click();
+                        }
+                    }
                 }
                 MouseEventOutput::MiddleClick((x, y)) => {
                     println!("Middle click at {} {}", x, y);
@@ -162,7 +206,9 @@ impl<'a> GameMode for ExplorerMenu<'a> {
             r.imgs.insert(value, Loading);
             let _e = send.blocking_send(MessageToAsync::LoadImg(value));
         }
-        self.b.draw(canvas, r, send);
+        for w in &mut self.b {
+            w.draw(canvas, r, send);
+        }
     }
 
     fn framerate(&self) -> u8 {

@@ -46,7 +46,7 @@ impl Pack {
             if let Some(extension) = extension {
                 let extension = extension.to_string();
                 if hm.contains_key(&extension) {
-                    let mut val = hm.get_mut(&extension).unwrap();
+                    let val = hm.get_mut(&extension).unwrap();
                     *val += 1;
                 } else {
                     hm.insert(extension, 1);
@@ -126,7 +126,7 @@ impl Pack {
                 des_decrypt("~!@#%^$<".to_string(), &mut index_contents);
             }
             let mut indx = std::io::Cursor::new(index_contents);
-            for i in 0..size {
+            for _i in 0..size {
                 let offset = indx.read_u32_le().await?;
                 let mut name: [u8; 20] = [0; 20];
                 indx.read_exact(&mut name[..]).await?;
