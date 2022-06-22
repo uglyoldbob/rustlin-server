@@ -17,35 +17,56 @@ pub trait Widget {
         send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
     );
     fn active_pixel(x: u16, y: u16) -> bool {
-	true
+        true
     }
-    fn contains_point(x: u16, y:u16) -> bool;
+    fn contains_point(x: u16, y: u16) -> bool;
+}
+
+pub enum WidgetEnum<'a> {
+    PlainColorButton(PlainColorButton<'a>),
 }
 
 pub struct PlainColorButton<'a> {
-	t: Texture<'a>,
+    t: Texture<'a>,
+    x: u16,
+    y: u16,
 }
 
 impl<'a> PlainColorButton<'a> {
-	fn new<T>(tc: &'a TextureCreator<T>, x: u16, y: u16, w: u16, h: u16) -> Self {
-		let mut data = vec![0x7f; (w*h*2) as usize];
-		let surf = sdl2::surface::Surface::from_data(&mut data[..], w as u32, h as u32, (2*w) as u32, PixelFormatEnum::RGB555).unwrap();
-		Self {
-			t: surf.as_texture(tc).unwrap(),
-		}
-	}
+    fn new<T>(tc: &'a TextureCreator<T>, x: u16, y: u16, w: u16, h: u16) -> Self {
+        let mut data = vec![0x7f; (w * h * 2) as usize];
+        let surf = sdl2::surface::Surface::from_data(
+            &mut data[..],
+            w as u32,
+            h as u32,
+            (2 * w) as u32,
+            PixelFormatEnum::RGB555,
+        )
+        .unwrap();
+        Self {
+            t: surf.as_texture(tc).unwrap(),
+            x: x,
+            y: y,
+        }
+    }
 }
 
 impl<'a> Widget for PlainColorButton<'a> {
-	fn draw(
+    fn draw(
         &mut self,
         canvas: &mut sdl2::render::WindowCanvas,
         r: &mut GameResources,
         send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
     ) {
+        let q = self.t.query();
+        canvas.copy(
+            &self.t,
+            None,
+            Rect::new(self.x.into(), self.y.into(), q.width.into(), q.height.into()),
+        );
     }
-    fn contains_point(x: u16, y:u16) -> bool {
-	false
+    fn contains_point(x: u16, y: u16) -> bool {
+        false
     }
 }
 
@@ -64,15 +85,19 @@ pub trait GameMode {
 }
 
 /// This is for exploring the resources of the game client
-pub struct ExplorerMenu {}
+pub struct ExplorerMenu<'a> {
+    b: PlainColorButton<'a>,
+}
 
-impl ExplorerMenu {
-    pub fn new() -> Self {
-        Self {}
+impl<'a> ExplorerMenu<'a> {
+    pub fn new<T>(tc: &'a TextureCreator<T>) -> Self {
+        Self {
+            b: PlainColorButton::new(tc, 50, 50, 50, 50),
+        }
     }
 }
 
-impl GameMode for ExplorerMenu {
+impl<'a> GameMode for ExplorerMenu<'a> {
     fn parse_message(&mut self, m: &MessageFromAsync, r: &mut GameResources) {
         match m {
             MessageFromAsync::ResourceStatus(_b) => {}
@@ -120,6 +145,7 @@ impl GameMode for ExplorerMenu {
             r.imgs.insert(value, Loading);
             send.blocking_send(MessageToAsync::LoadImg(value));
         }
+        self.b.draw(canvas, r, send);
     }
 
     fn framerate(&self) -> u8 {

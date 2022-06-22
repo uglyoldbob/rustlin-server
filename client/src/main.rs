@@ -53,7 +53,6 @@ pub fn main() {
     let (s2, mut r2) = tokio::sync::mpsc::channel(100);
     rt.spawn(async_main(r1, s2));
 
-    let mut mode: Box<dyn GameMode> = Box::new(ExplorerMenu::new());
 
     println!("Loading resources from {}", resources);
 
@@ -89,6 +88,10 @@ pub fn main() {
     canvas.present();
     let mut event_pump = sdl_context.event_pump().unwrap();
     let texture_creator = canvas.texture_creator();
+
+    let mut mode: Box<dyn GameMode> = Box::new(ExplorerMenu::new(&texture_creator));
+
+
 
     let flags = sdl2::image::InitFlag::all();
     let sdl2_image = sdl2::image::init(flags).unwrap();

@@ -133,8 +133,8 @@ impl PackFiles {
         for i in 0..16 {
             let mut pack = Pack::new(format!("{}/Sprite{:02}", path, i), false);
             let e = pack.load().await;
-            for key in pack.file_extensions().keys() {
-                println!("Contains {}", key);
+            for (key,v) in pack.file_extensions().iter() {
+                println!("Contains {} {}", key, v);
             }
             println!("Time elapsed is {:?}", start.elapsed());
             if let Err(_a) = e {
@@ -145,22 +145,22 @@ impl PackFiles {
         let mut tile = Pack::new(format!("{}/Tile", path), false);
         tile.load().await;
         println!("TILE");
-        for key in tile.file_extensions().keys() {
-            println!("Contains {}", key);
+        for (key, v) in tile.file_extensions().iter() {
+            println!("Contains {} {}", key, v);
         }
         println!("Time elapsed is {:?}", start.elapsed());
         let mut text = Pack::new(format!("{}/Text", path), true);
         text.load().await;
         println!("TEXT");
-        for key in text.file_extensions().keys() {
-            println!("Contains {}", key);
+        for (key,v) in text.file_extensions().iter() {
+            println!("Contains {} {}", key, v);
         }
         println!("Time elapsed is {:?}", start.elapsed());
         let mut sprite = Pack::new(format!("{}/Sprite", path), false);
         sprite.load().await;
         println!("SPRITE");
-        for key in sprite.file_extensions().keys() {
-            println!("Contains {}", key);
+        for (key,v) in sprite.file_extensions().iter() {
+            println!("Contains {} {}", key, v);
         }
         println!("Time elapsed is {:?}", start.elapsed());
         Ok(Self {

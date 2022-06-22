@@ -49,7 +49,7 @@ impl Pack {
                     let mut val = hm.get_mut(&extension).unwrap();
                     *val += 1;
                 } else {
-                    hm.insert(extension, 0);
+                    hm.insert(extension, 1);
                 }
             }
         }
