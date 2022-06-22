@@ -1,3 +1,4 @@
+use crate::mouse::MouseEventOutput;
 use crate::GameResources;
 use crate::Loadable::*;
 use crate::MessageFromAsync;
@@ -8,21 +9,8 @@ use sdl2::rect::Rect;
 use sdl2::render::Texture;
 use sdl2::render::TextureCreator;
 
-/// This trait is used for the widgets in the game
-pub trait Widget {
-    fn draw(
-        &mut self,
-        canvas: &mut sdl2::render::WindowCanvas,
-        r: &mut GameResources,
-        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
-    );
-    fn active_pixel(x: u16, y: u16) -> bool {
-        true
-    }
-    fn contains_point(x: u16, y: u16) -> bool;
-}
-
-pub enum WidgetEnum<'a> {
+/// Al of the various kinds of widgets that can exist in the game
+pub enum Widget<'a> {
     PlainColorButton(PlainColorButton<'a>),
 }
 
@@ -49,9 +37,7 @@ impl<'a> PlainColorButton<'a> {
             y: y,
         }
     }
-}
 
-impl<'a> Widget for PlainColorButton<'a> {
     fn draw(
         &mut self,
         canvas: &mut sdl2::render::WindowCanvas,
@@ -62,7 +48,12 @@ impl<'a> Widget for PlainColorButton<'a> {
         canvas.copy(
             &self.t,
             None,
-            Rect::new(self.x.into(), self.y.into(), q.width.into(), q.height.into()),
+            Rect::new(
+                self.x.into(),
+                self.y.into(),
+                q.width.into(),
+                q.height.into(),
+            ),
         );
     }
     fn contains_point(x: u16, y: u16) -> bool {
@@ -72,8 +63,7 @@ impl<'a> Widget for PlainColorButton<'a> {
 
 /// This trait is used to determine what mode of operation the program is in
 pub trait GameMode {
-    fn parse_message(&mut self, m: &MessageFromAsync, r: &mut GameResources);
-    fn parse_event(&mut self, e: sdl2::event::Event, r: &mut GameResources);
+    fn process_mouse(&mut self, events: &Vec<MouseEventOutput>);
     fn draw(
         &mut self,
         canvas: &mut sdl2::render::WindowCanvas,
@@ -98,18 +88,16 @@ impl<'a> ExplorerMenu<'a> {
 }
 
 impl<'a> GameMode for ExplorerMenu<'a> {
-    fn parse_message(&mut self, m: &MessageFromAsync, r: &mut GameResources) {
-        match m {
-            MessageFromAsync::ResourceStatus(_b) => {}
-            MessageFromAsync::StringTable(_name, _data) => {}
-            MessageFromAsync::Png(_name, _data) => {}
-            MessageFromAsync::Img(_name, _data) => {}
-        }
-    }
-
-    fn parse_event(&mut self, e: sdl2::event::Event, r: &mut GameResources) {
-        match e {
-            _ => {}
+    fn process_mouse(&mut self, events: &Vec<MouseEventOutput>) {
+        for e in events {
+            match e {
+                MouseEventOutput::Move((x, y)) => {
+                    println!("Moved the mouse to {} {}", x, y);
+                }
+                _ => {
+                    println!("Some other mouse event");
+                }
+            }
         }
     }
 

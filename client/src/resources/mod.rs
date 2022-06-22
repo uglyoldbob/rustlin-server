@@ -133,7 +133,7 @@ impl PackFiles {
         for i in 0..16 {
             let mut pack = Pack::new(format!("{}/Sprite{:02}", path, i), false);
             let e = pack.load().await;
-            for (key,v) in pack.file_extensions().iter() {
+            for (key, v) in pack.file_extensions().iter() {
                 println!("Contains {} {}", key, v);
             }
             println!("Time elapsed is {:?}", start.elapsed());
@@ -152,14 +152,14 @@ impl PackFiles {
         let mut text = Pack::new(format!("{}/Text", path), true);
         text.load().await;
         println!("TEXT");
-        for (key,v) in text.file_extensions().iter() {
+        for (key, v) in text.file_extensions().iter() {
             println!("Contains {} {}", key, v);
         }
         println!("Time elapsed is {:?}", start.elapsed());
         let mut sprite = Pack::new(format!("{}/Sprite", path), false);
         sprite.load().await;
         println!("SPRITE");
-        for (key,v) in sprite.file_extensions().iter() {
+        for (key, v) in sprite.file_extensions().iter() {
             println!("Contains {} {}", key, v);
         }
         println!("Time elapsed is {:?}", start.elapsed());

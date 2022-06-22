@@ -26,6 +26,9 @@ use crate::exception::*;
 mod mode;
 use crate::mode::*;
 
+mod mouse;
+use crate::mouse::*;
+
 mod resources;
 use crate::resources::*;
 
@@ -52,7 +55,6 @@ pub fn main() {
     let (mut s1, r1) = tokio::sync::mpsc::channel(100);
     let (s2, mut r2) = tokio::sync::mpsc::channel(100);
     rt.spawn(async_main(r1, s2));
-
 
     println!("Loading resources from {}", resources);
 
@@ -91,12 +93,11 @@ pub fn main() {
 
     let mut mode: Box<dyn GameMode> = Box::new(ExplorerMenu::new(&texture_creator));
 
-
-
     let flags = sdl2::image::InitFlag::all();
     let sdl2_image = sdl2::image::init(flags).unwrap();
 
     let mut game_resources = GameResources::new();
+    let mut mouse = Mouse::new();
 
     'running: loop {
         while let Ok(msg) = r2.try_recv() {
@@ -162,7 +163,6 @@ pub fn main() {
                     }
                 }
             }
-            mode.parse_message(&msg, &mut game_resources);
         }
         for event in event_pump.poll_iter() {
             match event {
@@ -171,10 +171,24 @@ pub fn main() {
                     keycode: Some(Keycode::Escape),
                     ..
                 } => break 'running,
+                Event::MouseMotion {
+                    timestamp: _,
+                    window_id: _,
+                    which: _,
+                    mousestate: _,
+                    x,
+                    y,
+                    xrel: _,
+                    yrel: _,
+                } => {
+                    mouse.event(MouseEventInput::Move(x as i16, y as i16));
+                }
                 _ => {}
             }
-            mode.parse_event(event, &mut game_resources);
         }
+        mouse.parse();
+        mode.process_mouse(mouse.events());
+        mouse.clear();
         mode.draw(&mut canvas, &mut game_resources, &mut s1);
         canvas.present();
         let framerate = mode.framerate() as u64;

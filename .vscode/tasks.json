@@ -11,10 +11,17 @@
                 "build"
             ],
             "group": "build",
+            "dependsOn": "format",
             "presentation": {
                 // Reveal the output only if unrecognized errors occur.
                 "reveal": "always"
             }
+        },
+        {
+            "label": "format",
+            "type": "shell",
+            "command": "cargo",
+            "args": ["fmt"],
         }
     ]
 }

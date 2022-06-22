@@ -11,11 +11,11 @@
             "cargo": {
                 "args": [
                     "build",
-                    "--bin=rustlin",
-                    "--package=rustlin"
+                    "--bin=rustlin-client",
+                    "--package=rustlin-client"
                 ],
                 "filter": {
-                    "name": "rustlin",
+                    "name": "rustlin-client",
                     "kind": "bin"
                 }
             },
