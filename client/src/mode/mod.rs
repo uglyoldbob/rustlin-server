@@ -3,7 +3,51 @@ use crate::Loadable::*;
 use crate::MessageFromAsync;
 use crate::MessageToAsync;
 use sdl2::pixels::Color;
+use sdl2::pixels::PixelFormatEnum;
 use sdl2::rect::Rect;
+use sdl2::render::Texture;
+use sdl2::render::TextureCreator;
+
+/// This trait is used for the widgets in the game
+pub trait Widget {
+    fn draw(
+        &mut self,
+        canvas: &mut sdl2::render::WindowCanvas,
+        r: &mut GameResources,
+        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+    );
+    fn active_pixel(x: u16, y: u16) -> bool {
+	true
+    }
+    fn contains_point(x: u16, y:u16) -> bool;
+}
+
+pub struct PlainColorButton<'a> {
+	t: Texture<'a>,
+}
+
+impl<'a> PlainColorButton<'a> {
+	fn new<T>(tc: &'a TextureCreator<T>, x: u16, y: u16, w: u16, h: u16) -> Self {
+		let mut data = vec![0x7f; (w*h*2) as usize];
+		let surf = sdl2::surface::Surface::from_data(&mut data[..], w as u32, h as u32, (2*w) as u32, PixelFormatEnum::RGB555).unwrap();
+		Self {
+			t: surf.as_texture(tc).unwrap(),
+		}
+	}
+}
+
+impl<'a> Widget for PlainColorButton<'a> {
+	fn draw(
+        &mut self,
+        canvas: &mut sdl2::render::WindowCanvas,
+        r: &mut GameResources,
+        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+    ) {
+    }
+    fn contains_point(x: u16, y:u16) -> bool {
+	false
+    }
+}
 
 /// This trait is used to determine what mode of operation the program is in
 pub trait GameMode {
@@ -54,11 +98,8 @@ impl GameMode for ExplorerMenu {
         canvas.clear();
         let value = 811;
         if r.pngs.contains_key(&value) {
-            match &r.pngs[&value] {
-                Loading => {}
-                Loaded(t) => {
-                    canvas.copy(t, None, None);
-                }
+            if let Loaded(t) = &r.pngs[&value] {
+                canvas.copy(t, None, None);
             }
         } else {
             r.pngs.insert(value, Loading);
@@ -67,16 +108,13 @@ impl GameMode for ExplorerMenu {
 
         let value = 330;
         if r.imgs.contains_key(&value) {
-            match &r.imgs[&value] {
-                Loading => {}
-                Loaded(t) => {
-                    let q = t.query();
-                    canvas.copy(
-                        t,
-                        None,
-                        Rect::new(241, 385, q.width.into(), q.height.into()),
-                    );
-                }
+            if let Loaded(t) = &r.imgs[&value] {
+                let q = t.query();
+                canvas.copy(
+                    t,
+                    None,
+                    Rect::new(241, 385, q.width.into(), q.height.into()),
+                );
             }
         } else {
             r.imgs.insert(value, Loading);
