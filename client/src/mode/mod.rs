@@ -1,7 +1,6 @@
 use crate::mouse::MouseEventOutput;
 use crate::GameResources;
 use crate::Loadable::*;
-use crate::MessageFromAsync;
 use crate::MessageToAsync;
 use sdl2::pixels::Color;
 use sdl2::pixels::PixelFormatEnum;
@@ -45,7 +44,7 @@ impl<'a> PlainColorButton<'a> {
         send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
     ) {
         let q = self.t.query();
-        canvas.copy(
+        let _e = canvas.copy(
             &self.t,
             None,
             Rect::new(
@@ -106,6 +105,9 @@ impl<'a> GameMode for ExplorerMenu<'a> {
                     let (x, y) = to;
                     println!("Right drag to {} {}", x, y);
                 }
+                MouseEventOutput::DragStop => {
+                    println!("Stopped dragging");
+                }
                 MouseEventOutput::LeftClick((x, y)) => {
                     println!("Left click at {} {}", x, y);
                 }
@@ -139,18 +141,18 @@ impl<'a> GameMode for ExplorerMenu<'a> {
         let value = 811;
         if r.pngs.contains_key(&value) {
             if let Loaded(t) = &r.pngs[&value] {
-                canvas.copy(t, None, None);
+                let _e = canvas.copy(t, None, None);
             }
         } else {
             r.pngs.insert(value, Loading);
-            send.blocking_send(MessageToAsync::LoadPng(value));
+            let _e = send.blocking_send(MessageToAsync::LoadPng(value));
         }
 
         let value = 330;
         if r.imgs.contains_key(&value) {
             if let Loaded(t) = &r.imgs[&value] {
                 let q = t.query();
-                canvas.copy(
+                let _e = canvas.copy(
                     t,
                     None,
                     Rect::new(241, 385, q.width.into(), q.height.into()),
@@ -158,7 +160,7 @@ impl<'a> GameMode for ExplorerMenu<'a> {
             }
         } else {
             r.imgs.insert(value, Loading);
-            send.blocking_send(MessageToAsync::LoadImg(value));
+            let _e = send.blocking_send(MessageToAsync::LoadImg(value));
         }
         self.b.draw(canvas, r, send);
     }

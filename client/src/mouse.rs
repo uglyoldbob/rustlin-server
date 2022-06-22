@@ -27,6 +27,7 @@ pub enum MouseEventOutput {
     LeftDrag { from: (i16, i16), to: (i16, i16) },
     MiddleDrag { from: (i16, i16), to: (i16, i16) },
     RightDrag { from: (i16, i16), to: (i16, i16) },
+    DragStop,
     LeftClick((i16, i16)),
     MiddleClick((i16, i16)),
     RightClick((i16, i16)),
@@ -152,6 +153,7 @@ impl Mouse {
                         });
                         self.start = self.position;
                     }
+                    self.events.push(MouseEventOutput::DragStop);
                 }
                 MouseState::MiddleButtonDown => {}
                 MouseState::MiddleDragging => {}
@@ -189,6 +191,7 @@ impl Mouse {
                         });
                         self.start = self.position;
                     }
+                    self.events.push(MouseEventOutput::DragStop);
                 }
                 MouseState::RightButtonDown => {}
                 MouseState::RightDragging => {}
@@ -226,6 +229,7 @@ impl Mouse {
                         });
                         self.start = self.position;
                     }
+                    self.events.push(MouseEventOutput::DragStop);
                 }
             },
             MouseEventInput::ExtraDown => {
