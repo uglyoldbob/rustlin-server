@@ -2,6 +2,7 @@ use crate::Loadable::Loaded;
 use sdl2::event::Event;
 use sdl2::image::LoadTexture;
 use sdl2::keyboard::Keycode;
+use sdl2::mouse::MouseButton;
 use sdl2::pixels::Color;
 use sdl2::render::Texture;
 use std::collections::HashMap;
@@ -182,6 +183,62 @@ pub fn main() {
                     yrel: _,
                 } => {
                     mouse.event(MouseEventInput::Move(x as i16, y as i16));
+                }
+                Event::MouseButtonDown {
+                    timestamp: _,
+                    window_id: _,
+                    which: _,
+                    mouse_btn,
+                    clicks: _,
+                    x: _,
+                    y: _,
+                } => match mouse_btn {
+                    MouseButton::Left => {
+                        mouse.event(MouseEventInput::LeftDown);
+                    }
+                    MouseButton::Middle => {
+                        mouse.event(MouseEventInput::MiddleDown);
+                    }
+                    MouseButton::Right => {
+                        mouse.event(MouseEventInput::RightDown);
+                    }
+                    MouseButton::X1 => {
+                        mouse.event(MouseEventInput::ExtraDown);
+                    }
+                    MouseButton::X2 => {
+                        mouse.event(MouseEventInput::Extra2Down);
+                    }
+                    _ => {}
+                },
+                Event::MouseButtonUp {
+                    timestamp: _,
+                    window_id: _,
+                    which: _,
+                    mouse_btn,
+                    clicks: _,
+                    x: _,
+                    y: _,
+                } => match mouse_btn {
+                    MouseButton::Left => {
+                        mouse.event(MouseEventInput::LeftUp);
+                    }
+                    MouseButton::Middle => {
+                        mouse.event(MouseEventInput::MiddleUp);
+                    }
+                    MouseButton::Right => {
+                        mouse.event(MouseEventInput::RightUp);
+                    }
+                    _ => {}
+                },
+                Event::MouseWheel {
+                    timestamp: _,
+                    window_id: _,
+                    which: _,
+                    x: _,
+                    y,
+                    direction: _,
+                } => {
+                    mouse.event(MouseEventInput::Scrolling(y));
                 }
                 _ => {}
             }

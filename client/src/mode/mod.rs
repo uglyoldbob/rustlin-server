@@ -94,8 +94,35 @@ impl<'a> GameMode for ExplorerMenu<'a> {
                 MouseEventOutput::Move((x, y)) => {
                     println!("Moved the mouse to {} {}", x, y);
                 }
-                _ => {
-                    println!("Some other mouse event");
+                MouseEventOutput::LeftDrag { from, to } => {
+                    let (x, y) = to;
+                    println!("Left drag to {} {}", x, y);
+                }
+                MouseEventOutput::MiddleDrag { from, to } => {
+                    let (x, y) = to;
+                    println!("Middle drag to {} {}", x, y);
+                }
+                MouseEventOutput::RightDrag { from, to } => {
+                    let (x, y) = to;
+                    println!("Right drag to {} {}", x, y);
+                }
+                MouseEventOutput::LeftClick((x, y)) => {
+                    println!("Left click at {} {}", x, y);
+                }
+                MouseEventOutput::MiddleClick((x, y)) => {
+                    println!("Middle click at {} {}", x, y);
+                }
+                MouseEventOutput::RightClick((x, y)) => {
+                    println!("Right click at {} {}", x, y);
+                }
+                MouseEventOutput::ExtraClick => {
+                    println!("Extra click");
+                }
+                MouseEventOutput::Extra2Click => {
+                    println!("Extra2 click");
+                }
+                MouseEventOutput::Scrolling(amount) => {
+                    println!("Scrolled by {}", amount);
                 }
             }
         }

@@ -20,7 +20,7 @@ pub enum MouseEventInput {
     ExtraDown,
     Extra2Down,
     /// The mouse wheel scrolled by a given amount
-    Scrolling(i16),
+    Scrolling(i32),
 }
 
 pub enum MouseEventOutput {
@@ -33,7 +33,7 @@ pub enum MouseEventOutput {
     ExtraClick,
     Extra2Click,
     Move((i16, i16)),
-    Scrolling(i16),
+    Scrolling(i32),
 }
 
 pub struct Mouse {
@@ -41,7 +41,7 @@ pub struct Mouse {
     events: Vec<MouseEventOutput>,
     start: (i16, i16),
     position: (i16, i16),
-    scroll_amount: i16,
+    scroll_amount: i32,
 }
 
 impl Mouse {
@@ -72,11 +72,26 @@ impl Mouse {
                     self.events.push(MouseEventOutput::Move(self.position));
                 }
                 MouseState::LeftButtonDown => {}
-                MouseState::LeftDragging => {}
+                MouseState::LeftDragging => {
+                    self.events.push(MouseEventOutput::LeftDrag {
+                        from: self.start,
+                        to: self.position,
+                    });
+                }
                 MouseState::MiddleButtonDown => {}
-                MouseState::MiddleDragging => {}
+                MouseState::MiddleDragging => {
+                    self.events.push(MouseEventOutput::MiddleDrag {
+                        from: self.start,
+                        to: self.position,
+                    });
+                }
                 MouseState::RightButtonDown => {}
-                MouseState::RightDragging => {}
+                MouseState::RightDragging => {
+                    self.events.push(MouseEventOutput::RightDrag {
+                        from: self.start,
+                        to: self.position,
+                    });
+                }
             }
         }
     }
@@ -93,6 +108,21 @@ impl Mouse {
         match e {
             MouseEventInput::Move(x, y) => {
                 self.position = (x, y);
+                match self.state {
+                    MouseState::Normal => {}
+                    MouseState::LeftButtonDown => {
+                        self.state = MouseState::LeftDragging;
+                    }
+                    MouseState::LeftDragging => {}
+                    MouseState::MiddleButtonDown => {
+                        self.state = MouseState::MiddleDragging;
+                    }
+                    MouseState::MiddleDragging => {}
+                    MouseState::RightButtonDown => {
+                        self.state = MouseState::RightDragging;
+                    }
+                    MouseState::RightDragging => {}
+                }
             }
             MouseEventInput::LeftDown => {
                 self.events.push(MouseEventOutput::LeftClick(self.position));
