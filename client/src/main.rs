@@ -6,6 +6,7 @@ use sdl2::mouse::MouseButton;
 use sdl2::pixels::Color;
 use sdl2::render::Texture;
 use std::collections::HashMap;
+use std::collections::VecDeque;
 use std::time::Duration;
 
 use std::fs;
@@ -99,6 +100,7 @@ pub fn main() {
 
     let mut game_resources = GameResources::new();
     let mut mouse = Mouse::new();
+    let mut drawmode_commands: VecDeque<DrawModeRequest> = VecDeque::new();
 
     'running: loop {
         while let Ok(msg) = r2.try_recv() {
@@ -146,6 +148,7 @@ pub fn main() {
                         }
                         Err(e) => {
                             println!("PNG {} fail {}", name, e);
+                            println!("PNG DATA {:x?}", &data[0..25]);
                         }
                     }
                 }
@@ -244,8 +247,23 @@ pub fn main() {
             }
         }
         mouse.parse();
-        mode.process_mouse(mouse.events());
+        mode.process_mouse(mouse.events(), &mut drawmode_commands);
         mouse.clear();
+        while let Some(m) = drawmode_commands.pop_front() {
+            match m {
+                DrawModeRequest::ChangeDrawMode(m) => {
+                    println!("Requested to change the drawmode");
+                    match m {
+                        DrawMode::Explorer => {
+                            mode = Box::new(ExplorerMenu::new(&texture_creator));
+                        }
+                        DrawMode::Login => {
+                            mode = Box::new(Login::new(&texture_creator));
+                        }
+                    }
+                }
+            }
+        }
         mode.draw(&mut canvas, &mut game_resources, &mut s1);
         canvas.present();
         let framerate = mode.framerate() as u64;

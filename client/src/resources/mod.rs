@@ -46,7 +46,7 @@ impl Img {
     }
 
     pub fn convert_img_data<'a, T>(&mut self, t: &'a TextureCreator<T>) -> Option<Texture<'a>> {
-        let mut surface = Surface::from_data(
+        let surface = Surface::from_data(
             self.data.as_mut_slice(),
             self.width as u32,
             self.height as u32,
@@ -95,9 +95,20 @@ impl PackFiles {
 
     pub async fn load_png(&mut self, name: String) -> Option<Vec<u8>> {
         let hash = PackFiles::get_hash_index(name.clone());
-        let contents = self.sprites[hash as usize]
+        let mut contents = self.sprites[hash as usize]
             .raw_file_contents(name.clone())
             .await;
+        if let Some(c) = &mut contents {
+            if c[3] == 0x58 {
+                println!("Need to fixup this png resource");
+                c[3] = 0x47;
+                let size = c.len();
+                for i in 1..=size-5 {
+                    c[size-i] ^= c[size-i-1];
+                    c[size-i] ^= 0x52;
+                }
+            }
+        }
         contents
     }
 
