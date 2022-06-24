@@ -14,45 +14,103 @@ pub enum DrawMode {
     Login,
 }
 
+pub struct ImageBox {
+    pub x: u16,
+    pub y: u16,
+    pub w: u16,
+    pub h: u16,
+}
+
 /// The kind of request that can be issued by a draw mode
 pub enum DrawModeRequest {
     ChangeDrawMode(DrawMode),
 }
 
 /// All of the various kinds of widgets that can exist in the game
-pub enum Widget<'a> {
+pub enum WidgetEnum<'a> {
     PlainColorButton(PlainColorButton<'a>),
+    ImgButton(ImgButton),
+}
+
+pub struct Widget<'a> {
+	widget: WidgetEnum<'a>,
+	last_draw: Option<ImageBox>,
 }
 
 impl<'a> Widget<'a> {
+    fn new(we: WidgetEnum<'a>) -> Self {
+	Self {
+		widget: we,
+		last_draw: None,
+	}
+    }
+
     fn draw(
         &mut self,
         canvas: &mut sdl2::render::WindowCanvas,
         r: &mut GameResources,
         send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
     ) {
-        match self {
-            Widget::PlainColorButton(button) => {
-                button.draw(canvas, r, send);
-            }
-        }
-    }
-    fn contains(&self, x: i16, y: i16) -> bool {
-        match self {
-            Widget::PlainColorButton(button) => button.contains_point(x, y),
-        }
+        self.last_draw = self.widget.draw(canvas, r, send);
     }
     fn left_click(&mut self) {
-        match self {
-            Widget::PlainColorButton(button) => {
-                button.clicked();
-                println!("Clicked the button");
-            }
-        }
+        self.widget.left_click();
     }
     fn was_clicked(&mut self) -> bool {
+        self.widget.was_clicked()
+    }
+    fn contains(&self, x: i16, y: i16) -> bool {
+	if let Some(t) = &self.last_draw {
+		let x = if x < 0 { 0 as u16 } else { x as u16 };
+		let y = if y < 0 { 0 as u16 } else { y as u16 };
+		if x >= t.x && y >= t.y {
+		    if x < (t.x + t.w) && y < (t.y + t.h) {
+			true
+		    } else {
+			false
+		    }
+		} else {
+		    false
+		}
+	}
+	else {
+		false
+	}
+    }
+}
+
+impl<'a> WidgetEnum<'a> {
+    fn draw(
+        &mut self,
+        canvas: &mut sdl2::render::WindowCanvas,
+        r: &mut GameResources,
+        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+    ) -> Option<ImageBox>{
         match self {
-            Widget::PlainColorButton(button) => button.was_clicked(),
+            WidgetEnum::PlainColorButton(button) => {
+                button.draw(canvas, r, send)
+            }
+	    WidgetEnum::ImgButton(button) => {
+		button.draw(canvas, r, send)
+	    }
+        }
+    }
+    
+    fn left_click(&mut self) {
+        match self {
+            WidgetEnum::PlainColorButton(button) => {
+                button.clicked();
+            }
+	    WidgetEnum::ImgButton(button) => {
+		button.clicked();
+	    }
+        }
+    }
+    
+    fn was_clicked(&mut self) -> bool {
+        match self {
+            WidgetEnum::PlainColorButton(button) => button.was_clicked(),
+	    WidgetEnum::ImgButton(button) => button.was_clicked(),
         }
     }
 }
@@ -66,9 +124,11 @@ pub struct PlainColorButton<'a> {
 
 impl<'a> PlainColorButton<'a> {
     fn new<T>(tc: &'a TextureCreator<T>, x: u16, y: u16, w: u16, h: u16) -> Self {
-        let mut data = vec![0x7f; (w * h * 2) as usize];
+        let mut data : Vec<u8>= vec![0xff; (w * h * 2) as usize];
+	data[2] = 0xee;
+	data[3] = 0xee;
         let surf = sdl2::surface::Surface::from_data(
-            &mut data[..],
+            data.as_mut_slice(),
             w as u32,
             h as u32,
             (2 * w) as u32,
@@ -76,7 +136,7 @@ impl<'a> PlainColorButton<'a> {
         )
         .unwrap();
         Self {
-            t: surf.as_texture(tc).unwrap(),
+            t: Texture::from_surface(&surf, tc).unwrap(),
             x: x,
             y: y,
             clicked: false,
@@ -98,7 +158,7 @@ impl<'a> PlainColorButton<'a> {
         canvas: &mut sdl2::render::WindowCanvas,
         r: &mut GameResources,
         send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
-    ) {
+    ) -> Option<ImageBox>{
         let q = self.t.query();
         let _e = canvas.copy(
             &self.t,
@@ -110,19 +170,69 @@ impl<'a> PlainColorButton<'a> {
                 q.height.into(),
             ),
         );
+	Some(ImageBox{x:self.x,
+			y: self.y,
+			w: q.width as u16,
+			h: q.height as u16,
+		})
     }
-    fn contains_point(&self, x: i16, y: i16) -> bool {
-        let x = if x < 0 { 0 as u16 } else { x as u16 };
-        let y = if y < 0 { 0 as u16 } else { y as u16 };
-        if x >= self.x && y >= self.y {
-            let q = self.t.query();
-            if x < (self.x + q.width as u16) && y < (self.y + q.height as u16) {
-                true
-            } else {
-                false
+}
+
+pub struct ImgButton {
+    num: u16,
+    x: u16,
+    y: u16,
+    clicked: bool,
+}
+
+impl ImgButton {
+	fn new(num: u16, x: u16, y: u16) -> Self {
+        Self {
+            num: num,
+            x: x,
+            y: y,
+            clicked: false,
+        }
+    }
+
+    fn was_clicked(&mut self) -> bool {
+        let ret = self.clicked;
+        self.clicked = false;
+        ret
+    }
+
+    fn clicked(&mut self) {
+        self.clicked = true;
+    }
+
+    fn draw<'a>(
+        &mut self,
+        canvas: &mut sdl2::render::WindowCanvas,
+        r: &mut GameResources,
+        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+    ) -> Option<ImageBox>{
+	let value = self.num;
+        if r.imgs.contains_key(&value) {
+            if let Loaded(t) = &r.imgs[&value] {
+                let q = t.query();
+                let _e = canvas.copy(
+                    t,
+                    None,
+                    Rect::new(self.x as i32,self.y as i32, q.width.into(), q.height.into()),
+                );
+		Some(ImageBox{x:self.x,
+			y: self.y,
+			w: q.width as u16,
+			h: q.height as u16,
+		})
             }
+	    else {
+		None
+	    }
         } else {
-            false
+            r.imgs.insert(value, Loading);
+            let _e = send.blocking_send(MessageToAsync::LoadImg(value));
+	    None
         }
     }
 }
@@ -152,9 +262,16 @@ pub struct ExplorerMenu<'a> {
 impl<'a> ExplorerMenu<'a> {
     pub fn new<T>(tc: &'a TextureCreator<T>) -> Self {
         let mut b = Vec::new();
-        b.push(Widget::PlainColorButton(PlainColorButton::new(
+	b.push(Widget::new(WidgetEnum::ImgButton(ImgButton::new(53,100,100))));
+	b.push(Widget::new(WidgetEnum::PlainColorButton(PlainColorButton::new(
             tc, 50, 50, 50, 50,
-        )));
+        ))));
+	b.push(Widget::new(WidgetEnum::PlainColorButton(PlainColorButton::new(
+            tc, 150, 150, 50, 50,
+        ))));
+	b.push(Widget::new(WidgetEnum::PlainColorButton(PlainColorButton::new(
+            tc, 250, 250, 50, 50,
+        ))));
         Self { b: b }
     }
 }
@@ -267,9 +384,9 @@ pub struct Login<'a> {
 impl<'a> Login<'a> {
     pub fn new<T>(tc: &'a TextureCreator<T>) -> Self {
         let mut b = Vec::new();
-        b.push(Widget::PlainColorButton(PlainColorButton::new(
+        b.push(Widget::new(WidgetEnum::PlainColorButton(PlainColorButton::new(
             tc, 50, 50, 50, 50,
-        )));
+        ))));
         Self { b: b }
     }
 }
@@ -347,6 +464,21 @@ impl<'a> GameMode for Login<'a> {
         } else {
             r.pngs.insert(value, Loading);
             let _e = send.blocking_send(MessageToAsync::LoadPng(value));
+        }
+
+	let value = 59;
+        if r.imgs.contains_key(&value) {
+            if let Loaded(t) = &r.imgs[&value] {
+                let q = t.query();
+                let _e = canvas.copy(
+                    t,
+                    None,
+                    Rect::new(0x1a9, 0x138, q.width.into(), q.height.into()),
+                );
+            }
+        } else {
+            r.imgs.insert(value, Loading);
+            let _e = send.blocking_send(MessageToAsync::LoadImg(value));
         }
 
         for w in &mut self.b {
