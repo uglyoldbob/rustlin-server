@@ -32,6 +32,7 @@ pub enum DrawModeRequest {
 pub enum WidgetEnum<'a> {
     PlainColorButton(PlainColorButton<'a>),
     ImgButton(ImgButton),
+    CharacterSelect(CharacterSelectWidget),
 }
 
 pub struct Widget<'a> {
@@ -105,6 +106,9 @@ impl<'a> WidgetEnum<'a> {
 	    WidgetEnum::ImgButton(button) => {
 		button.draw(canvas, cursor, r, send)
 	    }
+	    WidgetEnum::CharacterSelect(button) => {
+	        button.draw(canvas, cursor, r, send)
+	    }
         }
     }
     
@@ -116,6 +120,9 @@ impl<'a> WidgetEnum<'a> {
 	    WidgetEnum::ImgButton(button) => {
 		button.clicked();
 	    }
+	    WidgetEnum::CharacterSelect(button) => {
+	        button.clicked();
+	    }
         }
     }
     
@@ -123,6 +130,7 @@ impl<'a> WidgetEnum<'a> {
         match self {
             WidgetEnum::PlainColorButton(button) => button.was_clicked(),
 	    WidgetEnum::ImgButton(button) => button.was_clicked(),
+	    WidgetEnum::CharacterSelect(button) => button.was_clicked(),
         }
     }
 }
@@ -250,6 +258,72 @@ impl ImgButton {
         }
     }
 }
+
+pub struct CharacterSelectWidget {
+    plain: u16,
+    hover: u16,
+    animating: bool,
+    x: u16,
+    y: u16,
+    clicked: bool,
+}
+
+impl CharacterSelectWidget {
+	fn new(x: u16, y: u16) -> Self {
+        Self {
+            plain: 0,
+	    hover: 1,
+	    animating: false,
+            x: x,
+            y: y,
+            clicked: false,
+        }
+    }
+
+    fn was_clicked(&mut self) -> bool {
+        let ret = self.clicked;
+        self.clicked = false;
+        ret
+    }
+
+    fn clicked(&mut self) {
+        self.clicked = true;
+    }
+
+    fn draw<'a>(
+        &mut self,
+        canvas: &mut sdl2::render::WindowCanvas,
+	cursor: bool,
+        r: &mut GameResources,
+        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+    ) -> Option<ImageBox>{
+	let value = if cursor { self.hover} else { self.plain };
+	if r.imgs.contains_key(&value) {
+            if let Loaded(t) = &r.imgs[&value] {
+                let q = t.query();
+		println!("drawing character select widget");
+                let _e = canvas.copy(
+                    t,
+                    None,
+                    Rect::new(self.x as i32,self.y as i32, q.width.into(), q.height.into()),
+                );
+		Some(ImageBox{x:self.x,
+			y: self.y,
+			w: q.width as u16,
+			h: q.height as u16,
+		})
+            }
+	    else {
+		None
+	    }
+        } else {
+            r.imgs.insert(value, Loading);
+            let _e = send.blocking_send(MessageToAsync::LoadImg(value));
+	    None
+        }
+    }
+}
+
 
 /// This trait is used to determine what mode of operation the program is in
 pub trait GameMode {
@@ -496,6 +570,7 @@ impl<'a> CharacterSelect<'a> {
 	b.push(Widget::new(WidgetEnum::ImgButton(ImgButton::new(0x334,0x20d,0x185))));
 	b.push(Widget::new(WidgetEnum::ImgButton(ImgButton::new(0x336,0x20d,0x19a))));
 	b.push(Widget::new(WidgetEnum::ImgButton(ImgButton::new(0x134,0x20d,0x1b5))));
+	b.push(Widget::new(WidgetEnum::CharacterSelect(CharacterSelectWidget::new(0xf4,0x013))));
         Self { b: b }
     }
 }

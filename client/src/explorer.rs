@@ -278,6 +278,12 @@ pub fn main() {
                         DrawMode::Login => {
                             mode = Box::new(Login::new(&texture_creator));
                         }
+			DrawMode::CharacterSelect => {
+			    mode = Box::new(CharacterSelect::new(&texture_creator));
+			}
+			DrawMode::Game => {
+			    mode = Box::new(Game::new(&texture_creator));
+			}
                     }
                 }
             }
