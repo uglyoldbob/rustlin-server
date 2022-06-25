@@ -4,7 +4,9 @@ use sdl2::image::LoadTexture;
 use sdl2::keyboard::Keycode;
 use sdl2::mouse::MouseButton;
 use sdl2::pixels::Color;
+use sdl2::pixels::PixelFormatEnum;
 use sdl2::render::Texture;
+use sdl2::render::TextureCreator;
 use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::time::Duration;
@@ -33,6 +35,20 @@ use crate::mouse::*;
 
 mod resources;
 use crate::resources::*;
+
+fn make_dummy_texture<'a,T>(tc: &'a TextureCreator<T>) -> Texture<'a> {
+	let mut data : Vec<u8>= vec![0; (4 * 4 * 2) as usize];
+        let mut surf = sdl2::surface::Surface::from_data(
+            data.as_mut_slice(),
+            4,
+            4,
+            (2 * 4) as u32,
+            PixelFormatEnum::RGB555,
+        )
+        .unwrap();
+	surf.set_color_key(true, sdl2::pixels::Color::BLACK);
+        Texture::from_surface(&surf, tc).unwrap()
+}
 
 pub fn main() {
     let settings_file = fs::read_to_string("./client-settings.ini");
@@ -92,6 +108,8 @@ pub fn main() {
     canvas.present();
     let mut event_pump = sdl_context.event_pump().unwrap();
     let texture_creator = canvas.texture_creator();
+    
+    let dummy_texture = make_dummy_texture(&texture_creator);
 
     let mut mode: Box<dyn GameMode> = Box::new(ExplorerMenu::new(&texture_creator));
 
@@ -148,6 +166,7 @@ pub fn main() {
                         }
                         Err(e) => {
                             println!("PNG {} fail {}", name, e);
+                            println!("PNG DATA {:x?}", &data[0..25]);
                         }
                     }
                 }
@@ -248,7 +267,23 @@ pub fn main() {
         mouse.parse();
         mode.process_mouse(mouse.events(), &mut drawmode_commands);
         mouse.clear();
+        while let Some(m) = drawmode_commands.pop_front() {
+            match m {
+                DrawModeRequest::ChangeDrawMode(m) => {
+                    println!("Requested to change the drawmode");
+                    match m {
+                        DrawMode::Explorer => {
+                            mode = Box::new(ExplorerMenu::new(&texture_creator));
+                        }
+                        DrawMode::Login => {
+                            mode = Box::new(Login::new(&texture_creator));
+                        }
+                    }
+                }
+            }
+        }
         mode.draw(&mut canvas, &mut game_resources, &mut s1);
+	canvas.copy(&dummy_texture, None, None);
         canvas.present();
         let framerate = mode.framerate() as u64;
         ::std::thread::sleep(Duration::from_nanos(1_000_000_000u64 / framerate));
