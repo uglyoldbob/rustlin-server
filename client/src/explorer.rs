@@ -282,7 +282,7 @@ pub fn main() {
                 }
             }
         }
-        mode.draw(&mut canvas, &mut game_resources, &mut s1);
+        mode.draw(&mut canvas, mouse.cursor(), &mut game_resources, &mut s1);
 	canvas.copy(&dummy_texture, None, None);
         canvas.present();
         let framerate = mode.framerate() as u64;

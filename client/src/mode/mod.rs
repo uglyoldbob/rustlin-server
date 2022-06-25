@@ -12,6 +12,8 @@ use std::collections::VecDeque;
 pub enum DrawMode {
     Explorer,
     Login,
+    CharacterSelect,
+    Game,
 }
 
 pub struct ImageBox {
@@ -48,10 +50,19 @@ impl<'a> Widget<'a> {
     fn draw(
         &mut self,
         canvas: &mut sdl2::render::WindowCanvas,
+	cursor: Option<(i16,i16)>,
         r: &mut GameResources,
         send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
     ) {
-        self.last_draw = self.widget.draw(canvas, r, send);
+	let cursor = if let Some(c) = cursor {
+		let (x,y) = c;
+		self.contains(x,y)
+	}
+	else
+	{
+		false
+	};
+        self.last_draw = self.widget.draw(canvas, cursor, r, send);
     }
     fn left_click(&mut self) {
         self.widget.left_click();
@@ -83,15 +94,16 @@ impl<'a> WidgetEnum<'a> {
     fn draw(
         &mut self,
         canvas: &mut sdl2::render::WindowCanvas,
+	cursor: bool,
         r: &mut GameResources,
         send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
     ) -> Option<ImageBox>{
         match self {
             WidgetEnum::PlainColorButton(button) => {
-                button.draw(canvas, r, send)
+                button.draw(canvas, cursor, r, send)
             }
 	    WidgetEnum::ImgButton(button) => {
-		button.draw(canvas, r, send)
+		button.draw(canvas, cursor, r, send)
 	    }
         }
     }
@@ -156,6 +168,7 @@ impl<'a> PlainColorButton<'a> {
     fn draw(
         &mut self,
         canvas: &mut sdl2::render::WindowCanvas,
+	cursor: bool,
         r: &mut GameResources,
         send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
     ) -> Option<ImageBox>{
@@ -208,11 +221,12 @@ impl ImgButton {
     fn draw<'a>(
         &mut self,
         canvas: &mut sdl2::render::WindowCanvas,
+	cursor: bool,
         r: &mut GameResources,
         send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
     ) -> Option<ImageBox>{
-	let value = self.num;
-        if r.imgs.contains_key(&value) {
+	let value = if cursor { self.num + 1} else { self.num };
+	if r.imgs.contains_key(&value) {
             if let Loaded(t) = &r.imgs[&value] {
                 let q = t.query();
                 let _e = canvas.copy(
@@ -247,6 +261,7 @@ pub trait GameMode {
     fn draw(
         &mut self,
         canvas: &mut sdl2::render::WindowCanvas,
+	cursor: Option<(i16,i16)>,
         r: &mut GameResources,
         send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
     );
@@ -262,15 +277,8 @@ pub struct ExplorerMenu<'a> {
 impl<'a> ExplorerMenu<'a> {
     pub fn new<T>(tc: &'a TextureCreator<T>) -> Self {
         let mut b = Vec::new();
-	b.push(Widget::new(WidgetEnum::ImgButton(ImgButton::new(53,100,100))));
 	b.push(Widget::new(WidgetEnum::PlainColorButton(PlainColorButton::new(
             tc, 50, 50, 50, 50,
-        ))));
-	b.push(Widget::new(WidgetEnum::PlainColorButton(PlainColorButton::new(
-            tc, 150, 150, 50, 50,
-        ))));
-	b.push(Widget::new(WidgetEnum::PlainColorButton(PlainColorButton::new(
-            tc, 250, 250, 50, 50,
         ))));
         Self { b: b }
     }
@@ -285,22 +293,17 @@ impl<'a> GameMode for ExplorerMenu<'a> {
         for e in events {
             match e {
                 MouseEventOutput::Move((x, y)) => {
-                    println!("Moved the mouse to {} {}", x, y);
                 }
                 MouseEventOutput::LeftDrag { from, to } => {
                     let (x, y) = to;
-                    println!("Left drag to {} {}", x, y);
                 }
                 MouseEventOutput::MiddleDrag { from, to } => {
                     let (x, y) = to;
-                    println!("Middle drag to {} {}", x, y);
                 }
                 MouseEventOutput::RightDrag { from, to } => {
                     let (x, y) = to;
-                    println!("Right drag to {} {}", x, y);
                 }
                 MouseEventOutput::DragStop => {
-                    println!("Stopped dragging");
                 }
                 MouseEventOutput::LeftClick((x, y)) => {
                     for w in &mut self.b {
@@ -310,19 +313,14 @@ impl<'a> GameMode for ExplorerMenu<'a> {
                     }
                 }
                 MouseEventOutput::MiddleClick((x, y)) => {
-                    println!("Middle click at {} {}", x, y);
                 }
                 MouseEventOutput::RightClick((x, y)) => {
-                    println!("Right click at {} {}", x, y);
                 }
                 MouseEventOutput::ExtraClick => {
-                    println!("Extra click");
                 }
                 MouseEventOutput::Extra2Click => {
-                    println!("Extra2 click");
                 }
                 MouseEventOutput::Scrolling(amount) => {
-                    println!("Scrolled by {}", amount);
                 }
             }
         }
@@ -336,6 +334,7 @@ impl<'a> GameMode for ExplorerMenu<'a> {
     fn draw(
         &mut self,
         canvas: &mut sdl2::render::WindowCanvas,
+	cursor: Option<(i16,i16)>,
         r: &mut GameResources,
         send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
     ) {
@@ -366,7 +365,7 @@ impl<'a> GameMode for ExplorerMenu<'a> {
             let _e = send.blocking_send(MessageToAsync::LoadImg(value));
         }
         for w in &mut self.b {
-            w.draw(canvas, r, send);
+            w.draw(canvas, cursor, r, send);
         }
     }
 
@@ -376,7 +375,7 @@ impl<'a> GameMode for ExplorerMenu<'a> {
 }
 
 
-/// This is for exploring the resources of the game client
+/// The screen that allows for user login
 pub struct Login<'a> {
     b: Vec<Widget<'a>>,
 }
@@ -384,9 +383,10 @@ pub struct Login<'a> {
 impl<'a> Login<'a> {
     pub fn new<T>(tc: &'a TextureCreator<T>) -> Self {
         let mut b = Vec::new();
-        b.push(Widget::new(WidgetEnum::PlainColorButton(PlainColorButton::new(
-            tc, 50, 50, 50, 50,
-        ))));
+        b.push(Widget::new(WidgetEnum::ImgButton(ImgButton::new(53,0x213,0x183))));
+	b.push(Widget::new(WidgetEnum::ImgButton(ImgButton::new(65,0x213,0x195))));
+	b.push(Widget::new(WidgetEnum::ImgButton(ImgButton::new(55,0x213,0x1a8))));
+	b.push(Widget::new(WidgetEnum::ImgButton(ImgButton::new(57,0x213,0x1c2))));
         Self { b: b }
     }
 }
@@ -400,22 +400,17 @@ impl<'a> GameMode for Login<'a> {
         for e in events {
             match e {
                 MouseEventOutput::Move((x, y)) => {
-                    println!("Moved the mouse to {} {}", x, y);
                 }
                 MouseEventOutput::LeftDrag { from, to } => {
                     let (x, y) = to;
-                    println!("Left drag to {} {}", x, y);
                 }
                 MouseEventOutput::MiddleDrag { from, to } => {
                     let (x, y) = to;
-                    println!("Middle drag to {} {}", x, y);
                 }
                 MouseEventOutput::RightDrag { from, to } => {
                     let (x, y) = to;
-                    println!("Right drag to {} {}", x, y);
                 }
                 MouseEventOutput::DragStop => {
-                    println!("Stopped dragging");
                 }
                 MouseEventOutput::LeftClick((x, y)) => {
                     for w in &mut self.b {
@@ -425,25 +420,20 @@ impl<'a> GameMode for Login<'a> {
                     }
                 }
                 MouseEventOutput::MiddleClick((x, y)) => {
-                    println!("Middle click at {} {}", x, y);
                 }
                 MouseEventOutput::RightClick((x, y)) => {
-                    println!("Right click at {} {}", x, y);
                 }
                 MouseEventOutput::ExtraClick => {
-                    println!("Extra click");
                 }
                 MouseEventOutput::Extra2Click => {
-                    println!("Extra2 click");
                 }
                 MouseEventOutput::Scrolling(amount) => {
-                    println!("Scrolled by {}", amount);
                 }
             }
         }
 
         if self.b[0].was_clicked() {
-            requests.push_back(DrawModeRequest::ChangeDrawMode(DrawMode::Explorer));
+            requests.push_back(DrawModeRequest::ChangeDrawMode(DrawMode::CharacterSelect));
             println!("You clicked the button");
         }
     }
@@ -451,6 +441,7 @@ impl<'a> GameMode for Login<'a> {
     fn draw(
         &mut self,
         canvas: &mut sdl2::render::WindowCanvas,
+	cursor: Option<(i16,i16)>,
         r: &mut GameResources,
         send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
     ) {
@@ -482,7 +473,213 @@ impl<'a> GameMode for Login<'a> {
         }
 
         for w in &mut self.b {
-            w.draw(canvas, r, send);
+            w.draw(canvas, cursor, r, send);
+        }
+    }
+
+    fn framerate(&self) -> u8 {
+        20
+    }
+}
+
+
+/// The screen that allows for selection of which character to play
+pub struct CharacterSelect<'a> {
+    b: Vec<Widget<'a>>,
+}
+
+impl<'a> CharacterSelect<'a> {
+    pub fn new<T>(tc: &'a TextureCreator<T>) -> Self {
+        let mut b = Vec::new();
+        b.push(Widget::new(WidgetEnum::ImgButton(ImgButton::new(0x6e5,0x0f7,0x10b))));
+	b.push(Widget::new(WidgetEnum::ImgButton(ImgButton::new(0x6e7,0x16c,0x10b))));
+	b.push(Widget::new(WidgetEnum::ImgButton(ImgButton::new(0x334,0x20d,0x185))));
+	b.push(Widget::new(WidgetEnum::ImgButton(ImgButton::new(0x336,0x20d,0x19a))));
+	b.push(Widget::new(WidgetEnum::ImgButton(ImgButton::new(0x134,0x20d,0x1b5))));
+        Self { b: b }
+    }
+}
+
+impl<'a> GameMode for CharacterSelect<'a> {
+    fn process_mouse(
+        &mut self,
+        events: &Vec<MouseEventOutput>,
+        requests: &mut VecDeque<DrawModeRequest>,
+    ) {
+        for e in events {
+            match e {
+                MouseEventOutput::Move((x, y)) => {
+                }
+                MouseEventOutput::LeftDrag { from, to } => {
+                    let (x, y) = to;
+                }
+                MouseEventOutput::MiddleDrag { from, to } => {
+                    let (x, y) = to;
+                }
+                MouseEventOutput::RightDrag { from, to } => {
+                    let (x, y) = to;
+                }
+                MouseEventOutput::DragStop => {
+                }
+                MouseEventOutput::LeftClick((x, y)) => {
+                    for w in &mut self.b {
+                        if w.contains(*x, *y) {
+                            w.left_click();
+                        }
+                    }
+                }
+                MouseEventOutput::MiddleClick((x, y)) => {
+                }
+                MouseEventOutput::RightClick((x, y)) => {
+                }
+                MouseEventOutput::ExtraClick => {
+                }
+                MouseEventOutput::Extra2Click => {
+                }
+                MouseEventOutput::Scrolling(amount) => {
+                }
+            }
+        }
+
+        if self.b[2].was_clicked() {
+            requests.push_back(DrawModeRequest::ChangeDrawMode(DrawMode::Game));
+            println!("You clicked the button");
+        }
+    }
+
+    fn draw(
+        &mut self,
+        canvas: &mut sdl2::render::WindowCanvas,
+	cursor: Option<(i16,i16)>,
+        r: &mut GameResources,
+        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+    ) {
+        canvas.set_draw_color(Color::RGB(0, 0, 0));
+        canvas.clear();
+        let value = 815;
+        if r.pngs.contains_key(&value) {
+            if let Loaded(t) = &r.pngs[&value] {
+                let _e = canvas.copy(t, None, None);
+            }
+        } else {
+            r.pngs.insert(value, Loading);
+            let _e = send.blocking_send(MessageToAsync::LoadPng(value));
+        }
+
+	let value = 0x6e9;
+        if r.imgs.contains_key(&value) {
+            if let Loaded(t) = &r.imgs[&value] {
+                let q = t.query();
+                let _e = canvas.copy(
+                    t,
+                    None,
+                    Rect::new(0x127, 0x10f, q.width.into(), q.height.into()),
+                );
+            }
+        } else {
+            r.imgs.insert(value, Loading);
+            let _e = send.blocking_send(MessageToAsync::LoadImg(value));
+        }
+	
+	let value = 0x6eb;
+        if r.imgs.contains_key(&value) {
+            if let Loaded(t) = &r.imgs[&value] {
+                let q = t.query();
+                let _e = canvas.copy(
+                    t,
+                    None,
+                    Rect::new(0x146, 0x10f, q.width.into(), q.height.into()),
+                );
+            }
+        } else {
+            r.imgs.insert(value, Loading);
+            let _e = send.blocking_send(MessageToAsync::LoadImg(value));
+        }
+
+        for w in &mut self.b {
+            w.draw(canvas, cursor, r, send);
+        }
+    }
+
+    fn framerate(&self) -> u8 {
+        20
+    }
+}
+
+/// The screen that allows for selection of which character to play
+pub struct Game<'a> {
+    b: Vec<Widget<'a>>,
+}
+
+impl<'a> Game<'a> {
+    pub fn new<T>(tc: &'a TextureCreator<T>) -> Self {
+        let mut b = Vec::new();
+        b.push(Widget::new(WidgetEnum::PlainColorButton(PlainColorButton::new(
+            tc, 50, 50, 50, 50,
+        ))));
+        Self { b: b }
+    }
+}
+
+impl<'a> GameMode for Game<'a> {
+    fn process_mouse(
+        &mut self,
+        events: &Vec<MouseEventOutput>,
+        requests: &mut VecDeque<DrawModeRequest>,
+    ) {
+        for e in events {
+            match e {
+                MouseEventOutput::Move((x, y)) => {
+                }
+                MouseEventOutput::LeftDrag { from, to } => {
+                    let (x, y) = to;
+                }
+                MouseEventOutput::MiddleDrag { from, to } => {
+                    let (x, y) = to;
+                }
+                MouseEventOutput::RightDrag { from, to } => {
+                    let (x, y) = to;
+                }
+                MouseEventOutput::DragStop => {
+                }
+                MouseEventOutput::LeftClick((x, y)) => {
+                    for w in &mut self.b {
+                        if w.contains(*x, *y) {
+                            w.left_click();
+                        }
+                    }
+                }
+                MouseEventOutput::MiddleClick((x, y)) => {
+                }
+                MouseEventOutput::RightClick((x, y)) => {
+                }
+                MouseEventOutput::ExtraClick => {
+                }
+                MouseEventOutput::Extra2Click => {
+                }
+                MouseEventOutput::Scrolling(amount) => {
+                }
+            }
+        }
+
+        if self.b[0].was_clicked() {
+            requests.push_back(DrawModeRequest::ChangeDrawMode(DrawMode::CharacterSelect));
+            println!("You clicked the button");
+        }
+    }
+
+    fn draw(
+        &mut self,
+        canvas: &mut sdl2::render::WindowCanvas,
+	cursor: Option<(i16,i16)>,
+        r: &mut GameResources,
+        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+    ) {
+        canvas.set_draw_color(Color::RGB(0, 0, 0));
+        canvas.clear();
+
+        for w in &mut self.b {
+            w.draw(canvas, cursor, r, send);
         }
     }
 
