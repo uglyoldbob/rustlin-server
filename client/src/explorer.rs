@@ -36,6 +36,8 @@ use crate::mouse::*;
 mod resources;
 use crate::resources::*;
 
+const embedded_font: &[u8] = include_bytes!("cmsltt10.ttf");
+
 fn make_dummy_texture<'a,T>(tc: &'a TextureCreator<T>) -> Texture<'a> {
 	let mut data : Vec<u8>= vec![0; (4 * 4 * 2) as usize];
         let mut surf = sdl2::surface::Surface::from_data(
@@ -92,6 +94,9 @@ pub fn main() {
 
     let sdl_context = sdl2::init().unwrap();
     let video_subsystem = sdl_context.video().unwrap();
+    let ttf_context = sdl2::ttf::init().unwrap();
+    let efont = sdl2::rwops::RWops::from_bytes(embedded_font).unwrap();
+    let font = ttf_context.load_font_from_rwops(efont, 12).unwrap();
 
     let mut vid_win = video_subsystem.window("l1j-client", 640, 480);
     let mut windowb = vid_win.position_centered();
@@ -111,12 +116,12 @@ pub fn main() {
     
     let dummy_texture = make_dummy_texture(&texture_creator);
 
-    let mut mode: Box<dyn GameMode> = Box::new(ExplorerMenu::new(&texture_creator));
+    let mut game_resources = GameResources::new(font);
+    let mut mode: Box<dyn GameMode> = Box::new(ExplorerMenu::new(&texture_creator, &mut game_resources));
 
     let flags = sdl2::image::InitFlag::all();
     let sdl2_image = sdl2::image::init(flags).unwrap();
 
-    let mut game_resources = GameResources::new();
     let mut mouse = Mouse::new();
     let mut drawmode_commands: VecDeque<DrawModeRequest> = VecDeque::new();
 
@@ -273,7 +278,7 @@ pub fn main() {
                     println!("Requested to change the drawmode");
                     match m {
                         DrawMode::Explorer => {
-                            mode = Box::new(ExplorerMenu::new(&texture_creator));
+                            mode = Box::new(ExplorerMenu::new(&texture_creator, &mut game_resources));
                         }
                         DrawMode::Login => {
                             mode = Box::new(Login::new(&texture_creator));

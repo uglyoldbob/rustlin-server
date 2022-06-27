@@ -31,6 +31,7 @@ pub enum DrawModeRequest {
 /// All of the various kinds of widgets that can exist in the game
 pub enum WidgetEnum<'a> {
     PlainColorButton(PlainColorButton<'a>),
+    TextButton(TextButton<'a>),
     ImgButton(ImgButton),
     CharacterSelect(CharacterSelectWidget),
 }
@@ -109,6 +110,9 @@ impl<'a> WidgetEnum<'a> {
 	    WidgetEnum::CharacterSelect(button) => {
 	        button.draw(canvas, cursor, r, send)
 	    }
+	    WidgetEnum::TextButton(button) => {
+		button.draw(canvas, cursor, r, send)
+	    }
         }
     }
     
@@ -123,6 +127,9 @@ impl<'a> WidgetEnum<'a> {
 	    WidgetEnum::CharacterSelect(button) => {
 	        button.clicked();
 	    }
+	    WidgetEnum::TextButton(button) => {
+		button.clicked();
+	    }
         }
     }
     
@@ -131,6 +138,7 @@ impl<'a> WidgetEnum<'a> {
             WidgetEnum::PlainColorButton(button) => button.was_clicked(),
 	    WidgetEnum::ImgButton(button) => button.was_clicked(),
 	    WidgetEnum::CharacterSelect(button) => button.was_clicked(),
+	    WidgetEnum::TextButton(button) => button.was_clicked(),
         }
     }
 }
@@ -199,12 +207,70 @@ impl<'a> PlainColorButton<'a> {
     }
 }
 
+pub struct TextButton<'a> {
+    t: Texture<'a>,
+    x: u16,
+    y: u16,
+    clicked: bool,
+}
+
+impl<'a> TextButton<'a> {
+    fn new<T>(tc: &'a TextureCreator<T>, x: u16, y: u16, text: &str,
+	font: &sdl2::ttf::Font) -> Self {
+	let pr = font.render(text);
+	let ft = pr.solid(sdl2::pixels::Color::RED).unwrap();
+	
+        Self {
+            t: Texture::from_surface(&ft, tc).unwrap(),
+            x: x,
+            y: y,
+            clicked: false,
+        }
+    }
+
+    fn was_clicked(&mut self) -> bool {
+        let ret = self.clicked;
+        self.clicked = false;
+        ret
+    }
+
+    fn clicked(&mut self) {
+        self.clicked = true;
+    }
+
+    fn draw(
+        &mut self,
+        canvas: &mut sdl2::render::WindowCanvas,
+	cursor: bool,
+        r: &mut GameResources,
+        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+    ) -> Option<ImageBox>{
+        let q = self.t.query();
+        let _e = canvas.copy(
+            &self.t,
+            None,
+            Rect::new(
+                self.x.into(),
+                self.y.into(),
+                q.width.into(),
+                q.height.into(),
+            ),
+        );
+	Some(ImageBox{x:self.x,
+			y: self.y,
+			w: q.width as u16,
+			h: q.height as u16,
+		})
+    }
+}
+
 pub struct ImgButton {
     num: u16,
     x: u16,
     y: u16,
     clicked: bool,
 }
+
 
 impl ImgButton {
 	fn new(num: u16, x: u16, y: u16) -> Self {
@@ -349,11 +415,14 @@ pub struct ExplorerMenu<'a> {
 }
 
 impl<'a> ExplorerMenu<'a> {
-    pub fn new<T>(tc: &'a TextureCreator<T>) -> Self {
+    pub fn new<T>(tc: &'a TextureCreator<T>,
+	r: &mut GameResources) -> Self {
         let mut b = Vec::new();
 	b.push(Widget::new(WidgetEnum::PlainColorButton(PlainColorButton::new(
             tc, 50, 50, 50, 50,
         ))));
+	b.push(Widget::new(WidgetEnum::TextButton(TextButton::new(
+	    tc, 50, 100, "Example button", &r.font))));
         Self { b: b }
     }
 }
@@ -402,6 +471,9 @@ impl<'a> GameMode for ExplorerMenu<'a> {
         if self.b[0].was_clicked() {
             requests.push_back(DrawModeRequest::ChangeDrawMode(DrawMode::Login));
             println!("You clicked the button");
+        }
+	if self.b[1].was_clicked() {
+            println!("You clicked the second button");
         }
     }
 

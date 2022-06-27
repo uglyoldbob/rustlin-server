@@ -188,16 +188,18 @@ pub enum Loadable<T> {
     Loaded(T),
 }
 
-pub struct GameResources<'a> {
+pub struct GameResources<'a,'b,'c> {
     pub pngs: HashMap<u16, Loadable<Texture<'a>>>,
     pub imgs: HashMap<u16, Loadable<Texture<'a>>>,
+    pub font: sdl2::ttf::Font<'b,'c>,
 }
 
-impl<'a> GameResources<'a> {
-    pub fn new() -> Self {
+impl<'a,'b,'c> GameResources<'a,'b,'c> {
+    pub fn new(font: sdl2::ttf::Font<'b,'c>) -> Self {
         Self {
             pngs: HashMap::new(),
             imgs: HashMap::new(),
+	    font: font,
         }
     }
 }
