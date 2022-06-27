@@ -209,6 +209,7 @@ impl<'a> PlainColorButton<'a> {
 
 pub struct TextButton<'a> {
     t: Texture<'a>,
+    t2: Texture<'a>,
     x: u16,
     y: u16,
     clicked: bool,
@@ -219,9 +220,12 @@ impl<'a> TextButton<'a> {
 	font: &sdl2::ttf::Font) -> Self {
 	let pr = font.render(text);
 	let ft = pr.solid(sdl2::pixels::Color::RED).unwrap();
+	let pr = font.render(text);
+	let ft2 = pr.solid(sdl2::pixels::Color::YELLOW).unwrap();
 	
         Self {
             t: Texture::from_surface(&ft, tc).unwrap(),
+	    t2: Texture::from_surface(&ft2, tc).unwrap(),
             x: x,
             y: y,
             clicked: false,
@@ -245,9 +249,10 @@ impl<'a> TextButton<'a> {
         r: &mut GameResources,
         send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
     ) -> Option<ImageBox>{
-        let q = self.t.query();
+	let t = if cursor { &self.t2} else { &self.t };
+        let q = t.query();
         let _e = canvas.copy(
-            &self.t,
+            &t,
             None,
             Rect::new(
                 self.x.into(),

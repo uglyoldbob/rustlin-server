@@ -96,7 +96,7 @@ pub fn main() {
     let video_subsystem = sdl_context.video().unwrap();
     let ttf_context = sdl2::ttf::init().unwrap();
     let efont = sdl2::rwops::RWops::from_bytes(embedded_font).unwrap();
-    let font = ttf_context.load_font_from_rwops(efont, 12).unwrap();
+    let font = ttf_context.load_font_from_rwops(efont, 14).unwrap();
 
     let mut vid_win = video_subsystem.window("l1j-client", 640, 480);
     let mut windowb = vid_win.position_centered();
