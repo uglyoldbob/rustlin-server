@@ -74,6 +74,9 @@ pub fn startup(mode: DrawMode) {
 	    let t = ExplorerMenu::new(&texture_creator, &mut game_resources);
 	    Box::new(t)
 	}
+	DrawMode::PngExplorer => {
+	    Box::new(PngExplorer::new(&texture_creator, &mut game_resources))
+	}
 	DrawMode::GameLoader => {
 	    Box::new(GameLoader::new(&texture_creator, &mut game_resources))
 	}
@@ -279,24 +282,27 @@ pub fn startup(mode: DrawMode) {
             match m {
                 DrawModeRequest::ChangeDrawMode(m) => {
                     println!("Requested to change the drawmode");
-                    match m {
+                    mode = match m {
                         DrawMode::Explorer => {
 			    let t = ExplorerMenu::new(&texture_creator, &mut game_resources);
-                            mode = Box::new(t);
+                            Box::new(t)
                         }
+			DrawMode::PngExplorer => {
+			    Box::new(PngExplorer::new(&texture_creator, &mut game_resources))
+			}
 			DrawMode::GameLoader => {
-			    mode = Box::new(GameLoader::new(&texture_creator, &mut game_resources));
+			    Box::new(GameLoader::new(&texture_creator, &mut game_resources))
 	                }
                         DrawMode::Login => {
-                            mode = Box::new(Login::new(&texture_creator));
+                            Box::new(Login::new(&texture_creator))
                         }
 			DrawMode::CharacterSelect => {
-			    mode = Box::new(CharacterSelect::new(&texture_creator));
+			    Box::new(CharacterSelect::new(&texture_creator))
 			}
 			DrawMode::Game => {
-			    mode = Box::new(Game::new(&texture_creator));
+			    Box::new(Game::new(&texture_creator))
 			}
-                    }
+                    };
                 }
             }
         }
