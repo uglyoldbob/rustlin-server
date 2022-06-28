@@ -69,7 +69,21 @@ pub fn startup(mode: DrawMode) {
     let texture_creator = canvas.texture_creator();
 
     let mut game_resources = GameResources::new(font);
-    let mut mode: Box<dyn GameMode> = Box::new(ExplorerMenu::new(&texture_creator, &mut game_resources));
+    let mut mode: Box<dyn GameMode> = match mode {
+	DrawMode::Explorer => {
+	    let t = ExplorerMenu::new(&texture_creator, &mut game_resources);
+	    Box::new(t)
+	}
+	DrawMode::Login => {
+	    Box::new(Login::new(&texture_creator))
+	}
+	DrawMode::CharacterSelect => {
+	    Box::new(CharacterSelect::new(&texture_creator))
+	}
+	DrawMode::Game => {
+	    Box::new(Game::new(&texture_creator))
+	}
+    };
 
     let windowed = match settings.get("general", "window").unwrap().as_str() {
         "yes" => true,
