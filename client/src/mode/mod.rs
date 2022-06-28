@@ -11,6 +11,7 @@ use std::collections::VecDeque;
 
 pub enum DrawMode {
     Explorer,
+    GameLoader,
     Login,
     CharacterSelect,
     Game,
@@ -423,9 +424,6 @@ impl<'a> ExplorerMenu<'a> {
     pub fn new<T>(tc: &'a TextureCreator<T>,
 	r: &mut GameResources) -> Self {
         let mut b = Vec::new();
-	b.push(Widget::new(WidgetEnum::PlainColorButton(PlainColorButton::new(
-            tc, 50, 50, 50, 50,
-        ))));
 	b.push(Widget::new(WidgetEnum::TextButton(TextButton::new(
 	    tc, 50, 100, "Example button", &r.font))));
         Self { b: b }
@@ -474,11 +472,114 @@ impl<'a> GameMode for ExplorerMenu<'a> {
         }
 
         if self.b[0].was_clicked() {
-            requests.push_back(DrawModeRequest::ChangeDrawMode(DrawMode::Login));
+            //requests.push_back(DrawModeRequest::ChangeDrawMode(DrawMode::Login));
             println!("You clicked the button");
         }
-	if self.b[1].was_clicked() {
-            println!("You clicked the second button");
+    }
+
+    fn draw(
+        &mut self,
+        canvas: &mut sdl2::render::WindowCanvas,
+	cursor: Option<(i16,i16)>,
+        r: &mut GameResources,
+        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+    ) {
+        canvas.set_draw_color(Color::RGB(0, 0, 0));
+        canvas.clear();
+        let value = 811;
+        if r.pngs.contains_key(&value) {
+            if let Loaded(t) = &r.pngs[&value] {
+                let _e = canvas.copy(t, None, None);
+            }
+        } else {
+            r.pngs.insert(value, Loading);
+            let _e = send.blocking_send(MessageToAsync::LoadPng(value));
+        }
+
+        let value = 330;
+        if r.imgs.contains_key(&value) {
+            if let Loaded(t) = &r.imgs[&value] {
+                let q = t.query();
+                let _e = canvas.copy(
+                    t,
+                    None,
+                    Rect::new(241, 385, q.width.into(), q.height.into()),
+                );
+            }
+        } else {
+            r.imgs.insert(value, Loading);
+            let _e = send.blocking_send(MessageToAsync::LoadImg(value));
+        }
+        for w in &mut self.b {
+            w.draw(canvas, cursor, r, send);
+        }
+    }
+
+    fn framerate(&self) -> u8 {
+        20
+    }
+}
+
+/// This is for exploring the resources of the game client
+pub struct GameLoader<'a> {
+    b: Vec<Widget<'a>>,
+}
+
+impl<'a> GameLoader<'a> {
+    pub fn new<T>(tc: &'a TextureCreator<T>,
+	r: &mut GameResources) -> Self {
+        let mut b = Vec::new();
+	b.push(Widget::new(WidgetEnum::PlainColorButton(PlainColorButton::new(
+            tc, 50, 50, 50, 50,
+        ))));
+        Self { b: b }
+    }
+}
+
+impl<'a> GameMode for GameLoader<'a> {
+    fn process_mouse(
+        &mut self,
+        events: &Vec<MouseEventOutput>,
+        requests: &mut VecDeque<DrawModeRequest>,
+    ) {
+        for e in events {
+            match e {
+                MouseEventOutput::Move((x, y)) => {
+                }
+                MouseEventOutput::LeftDrag { from, to } => {
+                    let (x, y) = to;
+                }
+                MouseEventOutput::MiddleDrag { from, to } => {
+                    let (x, y) = to;
+                }
+                MouseEventOutput::RightDrag { from, to } => {
+                    let (x, y) = to;
+                }
+                MouseEventOutput::DragStop => {
+                }
+                MouseEventOutput::LeftClick((x, y)) => {
+                    for w in &mut self.b {
+                        if w.contains(*x, *y) {
+                            w.left_click();
+                        }
+                    }
+                }
+                MouseEventOutput::MiddleClick((x, y)) => {
+                }
+                MouseEventOutput::RightClick((x, y)) => {
+                }
+                MouseEventOutput::ExtraClick => {
+                }
+                MouseEventOutput::Extra2Click => {
+                }
+                MouseEventOutput::Scrolling(amount) => {
+                }
+            }
+        }
+
+        if self.b[0].was_clicked() {
+            requests.push_back(DrawModeRequest::ChangeDrawMode(DrawMode::Login));
+            println!("You clicked the button");
         }
     }
 

@@ -74,6 +74,9 @@ pub fn startup(mode: DrawMode) {
 	    let t = ExplorerMenu::new(&texture_creator, &mut game_resources);
 	    Box::new(t)
 	}
+	DrawMode::GameLoader => {
+	    Box::new(GameLoader::new(&texture_creator, &mut game_resources))
+	}
 	DrawMode::Login => {
 	    Box::new(Login::new(&texture_creator))
 	}
@@ -281,6 +284,9 @@ pub fn startup(mode: DrawMode) {
 			    let t = ExplorerMenu::new(&texture_creator, &mut game_resources);
                             mode = Box::new(t);
                         }
+			DrawMode::GameLoader => {
+			    mode = Box::new(GameLoader::new(&texture_creator, &mut game_resources));
+	                }
                         DrawMode::Login => {
                             mode = Box::new(Login::new(&texture_creator));
                         }
