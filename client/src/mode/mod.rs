@@ -34,6 +34,7 @@ pub enum DrawModeRequest {
 pub enum WidgetEnum<'a> {
     PlainColorButton(PlainColorButton<'a>),
     TextButton(TextButton<'a>),
+    DynamicTextWidget(DynamicTextWidget<'a>),
     ImgButton(ImgButton),
     CharacterSelect(CharacterSelectWidget),
 }
@@ -109,6 +110,9 @@ impl<'a> WidgetEnum<'a> {
 	    WidgetEnum::ImgButton(button) => {
 		button.draw(canvas, cursor, r, send)
 	    }
+	    WidgetEnum::DynamicTextWidget(widget) => {
+	        widget.draw(canvas, cursor, r, send)
+	    }
 	    WidgetEnum::CharacterSelect(button) => {
 	        button.draw(canvas, cursor, r, send)
 	    }
@@ -126,6 +130,9 @@ impl<'a> WidgetEnum<'a> {
 	    WidgetEnum::ImgButton(button) => {
 		button.clicked();
 	    }
+	    WidgetEnum::DynamicTextWidget(widget) => {
+	        widget.clicked();
+	    }
 	    WidgetEnum::CharacterSelect(button) => {
 	        button.clicked();
 	    }
@@ -139,6 +146,7 @@ impl<'a> WidgetEnum<'a> {
         match self {
             WidgetEnum::PlainColorButton(button) => button.was_clicked(),
 	    WidgetEnum::ImgButton(button) => button.was_clicked(),
+	    WidgetEnum::DynamicTextWidget(widget) => widget.was_clicked(),
 	    WidgetEnum::CharacterSelect(button) => button.was_clicked(),
 	    WidgetEnum::TextButton(button) => button.was_clicked(),
         }
@@ -329,6 +337,72 @@ impl ImgButton {
             let _e = send.blocking_send(MessageToAsync::LoadImg(value));
 	    None
         }
+    }
+}
+
+pub struct DynamicTextWidget<'a> {
+    t: Texture<'a>,
+    x: u16,
+    y: u16,
+    s: String,
+}
+
+impl<'a> DynamicTextWidget<'a> {
+    fn new<T>(tc: &'a TextureCreator<T>, x: u16, y: u16, text: &str,
+	font: &sdl2::ttf::Font) -> Self {
+	let pr = font.render(text);
+	let ft = pr.solid(sdl2::pixels::Color::RED).unwrap();
+	
+        Self {
+            t: Texture::from_surface(&ft, tc).unwrap(),
+            x: x,
+            y: y,
+            s: text.to_string(),
+        }
+    }
+    
+    fn update_text<T>(&mut self, tc: &'a TextureCreator<T>, 
+        text: &str,
+	font: &sdl2::ttf::Font) {
+	if (text != self.s) {
+	    let pr = font.render(text);
+	    let ft = pr.solid(sdl2::pixels::Color::RED).unwrap();
+	    self.t = Texture::from_surface(&ft, tc).unwrap();
+	    self.s = text.to_string();
+	}
+    }
+
+    fn was_clicked(&mut self) -> bool {
+        false
+    }
+
+    fn clicked(&mut self) {
+    }
+
+    fn draw(
+        &mut self,
+        canvas: &mut sdl2::render::WindowCanvas,
+	cursor: bool,
+        r: &mut GameResources,
+        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+    ) -> Option<ImageBox>{
+	let t = &self.t;
+        let q = t.query();
+        let _e = canvas.copy(
+            &t,
+            None,
+            Rect::new(
+                self.x.into(),
+                self.y.into(),
+                q.width.into(),
+                q.height.into(),
+            ),
+        );
+	Some(ImageBox{x:self.x,
+			y: self.y,
+			w: q.width as u16,
+			h: q.height as u16,
+		})
     }
 }
 
@@ -931,6 +1005,8 @@ impl<'a> GameMode for Game<'a> {
 /// The screen that allows for user login
 pub struct PngExplorer<'a> {
     b: Vec<Widget<'a>>,
+    disp: Vec<DynamicTextWidget<'a>>,
+    current_png: u16,
 }
 
 impl<'a> PngExplorer<'a> {
@@ -939,7 +1015,11 @@ impl<'a> PngExplorer<'a> {
         let mut b = Vec::new();
 	b.push(Widget::new(WidgetEnum::TextButton(TextButton::new(
 	    tc, 320, 600, "Go Back", &r.font))));
-        Self { b: b }
+	let disp = Vec::new();
+        Self { b: b,
+		disp: disp,
+		current_png: 0,
+	}
     }
 }
 
@@ -999,7 +1079,7 @@ impl<'a> GameMode for PngExplorer<'a> {
     ) {
         canvas.set_draw_color(Color::RGB(0, 0, 0));
         canvas.clear();
-        let value = 0;
+        let value = self.current_png;
         if r.pngs.contains_key(&value) {
             if let Loaded(t) = &r.pngs[&value] {
                 let q = t.query();
