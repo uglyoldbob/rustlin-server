@@ -98,6 +98,11 @@ impl PackFiles {
         let mut contents = self.sprites[hash as usize]
             .raw_file_contents(name.clone())
             .await;
+	if let None = contents {
+		contents = self.sprite
+                    .raw_file_contents(name.clone())
+                    .await;
+	}
         if let Some(c) = &mut contents {
             if c[3] == 0x58 {
                 println!("Need to fixup this png resource");
