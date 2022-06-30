@@ -172,9 +172,10 @@ pub fn startup(mode: DrawMode) {
                     println!("Loaded string table {}", name);
                 }
                 MessageFromAsync::Png(name, data) => {
-                    let png = texture_creator.load_texture_bytes(data);
+                    let mut png = texture_creator.load_texture_bytes(data);
                     match png {
-                        Ok(a) => {
+                        Ok(mut a) => {
+			    a.set_blend_mode(sdl2::render::BlendMode::Add);
                             game_resources.pngs.insert(*name, Loaded(a));
                             println!("PNG {} success", name);
                         }

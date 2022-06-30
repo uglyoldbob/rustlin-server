@@ -446,10 +446,9 @@ impl CharacterSelectWidget {
         send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
     ) -> Option<ImageBox>{
 	let value = if cursor { self.hover} else { self.plain };
-	if r.imgs.contains_key(&value) {
-            if let Loaded(t) = &r.imgs[&value] {
+	if r.pngs.contains_key(&value) {
+            if let Loaded(t) = &r.pngs[&value] {
                 let q = t.query();
-		println!("drawing character select widget");
                 let _e = canvas.copy(
                     t,
                     None,
@@ -465,8 +464,8 @@ impl CharacterSelectWidget {
 		None
 	    }
         } else {
-            r.imgs.insert(value, Loading);
-            let _e = send.blocking_send(MessageToAsync::LoadImg(value));
+            r.pngs.insert(value, Loading);
+            let _e = send.blocking_send(MessageToAsync::LoadPng(value));
 	    None
         }
     }
@@ -847,7 +846,10 @@ impl<'a> CharacterSelect<'a> {
 	b.push(Widget::new(WidgetEnum::ImgButton(ImgButton::new(0x334,0x20d,0x185))));
 	b.push(Widget::new(WidgetEnum::ImgButton(ImgButton::new(0x336,0x20d,0x19a))));
 	b.push(Widget::new(WidgetEnum::ImgButton(ImgButton::new(0x134,0x20d,0x1b5))));
-	b.push(Widget::new(WidgetEnum::CharacterSelect(CharacterSelectWidget::new(0xf4,0x013))));
+	b.push(Widget::new(WidgetEnum::CharacterSelect(CharacterSelectWidget::new(0x13, 0x13))));
+	b.push(Widget::new(WidgetEnum::CharacterSelect(CharacterSelectWidget::new(0xb0, 0x13))));
+	b.push(Widget::new(WidgetEnum::CharacterSelect(CharacterSelectWidget::new(0x14d, 0x13))));
+	b.push(Widget::new(WidgetEnum::CharacterSelect(CharacterSelectWidget::new(0x1ea, 0x13))));
         Self { b: b }
     }
 }
