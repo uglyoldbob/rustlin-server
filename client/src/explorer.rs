@@ -31,6 +31,8 @@ use crate::mode::*;
 mod mouse;
 use crate::mouse::*;
 
+mod keyboard;
+
 mod resources;
 use crate::resources::*;
 

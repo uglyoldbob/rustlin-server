@@ -479,6 +479,13 @@ pub trait GameMode {
         events: &Vec<MouseEventOutput>,
         requests: &mut VecDeque<DrawModeRequest>,
     );
+    /// Down is true when the button is pressed, false when released.
+    fn process_button(
+	&mut self,
+	button: sdl2::keyboard::Keycode,
+	down: bool,
+	r: &mut GameResources,
+    );
     fn draw(
         &mut self,
         canvas: &mut sdl2::render::WindowCanvas,
@@ -550,6 +557,14 @@ impl<'a> GameMode for ExplorerMenu<'a> {
             requests.push_back(DrawModeRequest::ChangeDrawMode(DrawMode::PngExplorer));
             println!("You clicked the button");
         }
+    }
+    
+    fn process_button(
+	&mut self,
+	button: sdl2::keyboard::Keycode,
+	down: bool,
+	r: &mut GameResources,
+    ) {
     }
 
     fn draw(
@@ -642,6 +657,14 @@ impl<'a> GameMode for GameLoader<'a> {
             requests.push_back(DrawModeRequest::ChangeDrawMode(DrawMode::Login));
             println!("You clicked the button");
         }
+    }
+    
+    fn process_button(
+	&mut self,
+	button: sdl2::keyboard::Keycode,
+	down: bool,
+	r: &mut GameResources,
+    ) {
     }
 
     fn draw(
@@ -749,6 +772,14 @@ impl<'a> GameMode for Login<'a> {
             requests.push_back(DrawModeRequest::ChangeDrawMode(DrawMode::CharacterSelect));
             println!("You clicked the button");
         }
+    }
+    
+    fn process_button(
+	&mut self,
+	button: sdl2::keyboard::Keycode,
+	down: bool,
+	r: &mut GameResources,
+    ) {
     }
 
     fn draw(
@@ -859,6 +890,14 @@ impl<'a> GameMode for CharacterSelect<'a> {
             requests.push_back(DrawModeRequest::ChangeDrawMode(DrawMode::Game));
             println!("You clicked the button");
         }
+    }
+    
+    fn process_button(
+	&mut self,
+	button: sdl2::keyboard::Keycode,
+	down: bool,
+	r: &mut GameResources,
+    ) {
     }
 
     fn draw(
@@ -981,6 +1020,14 @@ impl<'a> GameMode for Game<'a> {
             println!("You clicked the button");
         }
     }
+    
+    fn process_button(
+	&mut self,
+	button: sdl2::keyboard::Keycode,
+	down: bool,
+	r: &mut GameResources,
+    ) {
+    }
 
     fn draw(
         &mut self,
@@ -1003,27 +1050,31 @@ impl<'a> GameMode for Game<'a> {
 }
 
 /// The screen that allows for user login
-pub struct PngExplorer<'a> {
+pub struct PngExplorer<'a, T> {
     b: Vec<Widget<'a>>,
     disp: Vec<DynamicTextWidget<'a>>,
     current_png: u16,
+    tc: &'a TextureCreator<T>,
 }
 
-impl<'a> PngExplorer<'a> {
-    pub fn new<T>(tc: &'a TextureCreator<T>,
+impl<'a, T> PngExplorer<'a, T> {
+    pub fn new(tc: &'a TextureCreator<T>,
         r: &mut GameResources) -> Self {
         let mut b = Vec::new();
 	b.push(Widget::new(WidgetEnum::TextButton(TextButton::new(
-	    tc, 320, 600, "Go Back", &r.font))));
-	let disp = Vec::new();
+	    tc, 320, 400, "Go Back", &r.font))));
+	let mut disp = Vec::new();
+	disp.push(DynamicTextWidget::new(tc, 320, 386, "Displaying 0.png", &r.font));
+	
         Self { b: b,
 		disp: disp,
 		current_png: 0,
+		tc: tc,
 	}
     }
 }
 
-impl<'a> GameMode for PngExplorer<'a> {
+impl<'a, T> GameMode for PngExplorer<'a, T> {
     fn process_mouse(
         &mut self,
         events: &Vec<MouseEventOutput>,
@@ -1069,6 +1120,37 @@ impl<'a> GameMode for PngExplorer<'a> {
             println!("You clicked the button");
         }
     }
+    
+    fn process_button(
+	&mut self,
+	button: sdl2::keyboard::Keycode,
+	down: bool,
+	r: &mut GameResources,
+    ) {
+	if down {
+		match button {
+			sdl2::keyboard::Keycode::Left => {
+				if self.current_png > 0 {
+					r.pngs.remove(&self.current_png);
+					self.current_png -= 1;
+					let words = format!("Displaying {}.png", self.current_png);
+					self.disp[0].update_text(self.tc, &words, &r.font);
+				}
+				println!("Pressed left");
+			}
+			sdl2::keyboard::Keycode::Right => {
+				if self.current_png < 65534 {
+					r.pngs.remove(&self.current_png);
+					self.current_png += 1;
+					let words = format!("Displaying {}.png", self.current_png);
+					self.disp[0].update_text(self.tc, &words, &r.font);
+				}
+				println!("Pressed right");
+			}
+			_ => {}
+		}
+	}
+    }
 
     fn draw(
         &mut self,
@@ -1097,6 +1179,9 @@ impl<'a> GameMode for PngExplorer<'a> {
 	for w in &mut self.b {
             w.draw(canvas, cursor, r, send);
         }
+	for w in &mut self.disp {
+	    w.draw(canvas, false, r, send);
+	}
     }
 
     fn framerate(&self) -> u8 {

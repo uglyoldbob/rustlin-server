@@ -272,6 +272,30 @@ pub fn startup(mode: DrawMode) {
                 } => {
                     mouse.event(MouseEventInput::Scrolling(y));
                 }
+		Event::KeyDown {
+		    timestamp: _,
+		    window_id: _,
+		    keycode,
+		    scancode: _,
+		    keymod: _,
+		    repeat: _} => {
+		    println!("Key down event");
+		    if let Some(key) = keycode {
+			mode.process_button(key, true, &mut game_resources);
+		    }
+		}
+		Event::KeyUp {
+		    timestamp: _,
+		    window_id: _,
+		    keycode,
+		    scancode: _,
+		    keymod: _,
+		    repeat: _} => {
+		    println!("Key up event");
+		    if let Some(key) = keycode {
+			mode.process_button(key, false, &mut game_resources);
+		    }
+		}
                 _ => {}
             }
         }
