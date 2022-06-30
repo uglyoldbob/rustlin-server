@@ -410,6 +410,9 @@ impl<'a> DynamicTextWidget<'a> {
 pub struct CharacterSelectWidget {
     plain: u16,
     hover: u16,
+    animate_start: u16,
+    animate_quantity: u16,
+    animate_index: u16,
     animating: bool,
     x: u16,
     y: u16,
@@ -422,6 +425,9 @@ impl CharacterSelectWidget {
             plain: 0,
 	    hover: 1,
 	    animating: false,
+	    animate_start: 1,
+	    animate_quantity: 24,
+	    animate_index: 0,
             x: x,
             y: y,
             clicked: false,
@@ -436,6 +442,7 @@ impl CharacterSelectWidget {
 
     fn clicked(&mut self) {
         self.clicked = true;
+	self.animating = true;
     }
 
     fn draw<'a>(
@@ -445,7 +452,17 @@ impl CharacterSelectWidget {
         r: &mut GameResources,
         send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
     ) -> Option<ImageBox>{
-	let value = if cursor { self.hover} else { self.plain };
+	let value = if self.animating {
+		let val: u16 = self.animate_start + self.animate_index;
+		self.animate_index += 1;
+		if self.animate_index == self.animate_quantity {
+			self.animate_index = 0;
+		}
+		val
+	}
+	else {
+		if cursor { self.hover} else { self.plain }
+	};
 	if r.pngs.contains_key(&value) {
             if let Loaded(t) = &r.pngs[&value] {
                 let q = t.query();
