@@ -77,6 +77,9 @@ pub fn startup(mode: DrawMode) {
 	DrawMode::PngExplorer => {
 	    Box::new(PngExplorer::new(&texture_creator, &mut game_resources))
 	}
+	DrawMode::ImgExplorer => {
+	    Box::new(ImgExplorer::new(&texture_creator, &mut game_resources))
+	}
 	DrawMode::GameLoader => {
 	    Box::new(GameLoader::new(&texture_creator, &mut game_resources))
 	}
@@ -313,6 +316,9 @@ pub fn startup(mode: DrawMode) {
                         }
 			DrawMode::PngExplorer => {
 			    Box::new(PngExplorer::new(&texture_creator, &mut game_resources))
+			}
+			DrawMode::ImgExplorer => {
+			    Box::new(ImgExplorer::new(&texture_creator, &mut game_resources))
 			}
 			DrawMode::GameLoader => {
 			    Box::new(GameLoader::new(&texture_creator, &mut game_resources))

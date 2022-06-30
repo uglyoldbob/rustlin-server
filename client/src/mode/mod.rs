@@ -12,6 +12,7 @@ use std::collections::VecDeque;
 pub enum DrawMode {
     Explorer,
     PngExplorer,
+    ImgExplorer,
     GameLoader,
     Login,
     CharacterSelect,
@@ -508,6 +509,8 @@ impl<'a> ExplorerMenu<'a> {
         let mut b = Vec::new();
 	b.push(Widget::new(WidgetEnum::TextButton(TextButton::new(
 	    tc, 50, 100, "Png browser", &r.font))));
+	b.push(Widget::new(WidgetEnum::TextButton(TextButton::new(
+	    tc, 50, 114, "Img browser", &r.font))));
         Self { b: b }
     }
 }
@@ -555,6 +558,10 @@ impl<'a> GameMode for ExplorerMenu<'a> {
 
         if self.b[0].was_clicked() {
             requests.push_back(DrawModeRequest::ChangeDrawMode(DrawMode::PngExplorer));
+            println!("You clicked the button");
+        }
+	if self.b[1].was_clicked() {
+            requests.push_back(DrawModeRequest::ChangeDrawMode(DrawMode::ImgExplorer));
             println!("You clicked the button");
         }
     }
@@ -1174,6 +1181,146 @@ impl<'a, T> GameMode for PngExplorer<'a, T> {
         } else {
             r.pngs.insert(value, Loading);
             let _e = send.blocking_send(MessageToAsync::LoadPng(value));
+        }
+
+	for w in &mut self.b {
+            w.draw(canvas, cursor, r, send);
+        }
+	for w in &mut self.disp {
+	    w.draw(canvas, false, r, send);
+	}
+    }
+
+    fn framerate(&self) -> u8 {
+        20
+    }
+}
+
+/// The screen that allows for user login
+pub struct ImgExplorer<'a, T> {
+    b: Vec<Widget<'a>>,
+    disp: Vec<DynamicTextWidget<'a>>,
+    current_img: u16,
+    tc: &'a TextureCreator<T>,
+}
+
+impl<'a, T> ImgExplorer<'a, T> {
+    pub fn new(tc: &'a TextureCreator<T>,
+        r: &mut GameResources) -> Self {
+        let mut b = Vec::new();
+	b.push(Widget::new(WidgetEnum::TextButton(TextButton::new(
+	    tc, 320, 400, "Go Back", &r.font))));
+	let mut disp = Vec::new();
+	disp.push(DynamicTextWidget::new(tc, 320, 386, "Displaying 0.img", &r.font));
+	
+        Self { b: b,
+		disp: disp,
+		current_img: 0,
+		tc: tc,
+	}
+    }
+}
+
+impl<'a, T> GameMode for ImgExplorer<'a, T> {
+    fn process_mouse(
+        &mut self,
+        events: &Vec<MouseEventOutput>,
+        requests: &mut VecDeque<DrawModeRequest>,
+    ) {
+        for e in events {
+            match e {
+                MouseEventOutput::Move((x, y)) => {
+                }
+                MouseEventOutput::LeftDrag { from, to } => {
+                    let (x, y) = to;
+                }
+                MouseEventOutput::MiddleDrag { from, to } => {
+                    let (x, y) = to;
+                }
+                MouseEventOutput::RightDrag { from, to } => {
+                    let (x, y) = to;
+                }
+                MouseEventOutput::DragStop => {
+                }
+                MouseEventOutput::LeftClick((x, y)) => {
+                    for w in &mut self.b {
+                        if w.contains(*x, *y) {
+                            w.left_click();
+                        }
+                    }
+                }
+                MouseEventOutput::MiddleClick((x, y)) => {
+                }
+                MouseEventOutput::RightClick((x, y)) => {
+                }
+                MouseEventOutput::ExtraClick => {
+                }
+                MouseEventOutput::Extra2Click => {
+                }
+                MouseEventOutput::Scrolling(amount) => {
+                }
+            }
+        }
+
+        if self.b[0].was_clicked() {
+            requests.push_back(DrawModeRequest::ChangeDrawMode(DrawMode::Explorer));
+            println!("You clicked the button");
+        }
+    }
+    
+    fn process_button(
+	&mut self,
+	button: sdl2::keyboard::Keycode,
+	down: bool,
+	r: &mut GameResources,
+    ) {
+	if down {
+		match button {
+			sdl2::keyboard::Keycode::Left => {
+				if self.current_img > 0 {
+					r.imgs.remove(&self.current_img);
+					self.current_img -= 1;
+					let words = format!("Displaying {}.img", self.current_img);
+					self.disp[0].update_text(self.tc, &words, &r.font);
+				}
+				println!("Pressed left");
+			}
+			sdl2::keyboard::Keycode::Right => {
+				if self.current_img < 65534 {
+					r.imgs.remove(&self.current_img);
+					self.current_img += 1;
+					let words = format!("Displaying {}.img", self.current_img);
+					self.disp[0].update_text(self.tc, &words, &r.font);
+				}
+				println!("Pressed right");
+			}
+			_ => {}
+		}
+	}
+    }
+
+    fn draw(
+        &mut self,
+        canvas: &mut sdl2::render::WindowCanvas,
+	cursor: Option<(i16,i16)>,
+        r: &mut GameResources,
+        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+    ) {
+        canvas.set_draw_color(Color::RGB(0, 0, 0));
+        canvas.clear();
+        let value = self.current_img;
+        if r.imgs.contains_key(&value) {
+            if let Loaded(t) = &r.imgs[&value] {
+                let q = t.query();
+                let _e = canvas.copy(
+                    t,
+                    None,
+                    Rect::new(0, 0, q.width.into(), q.height.into()),
+                );
+            }
+        } else {
+            r.imgs.insert(value, Loading);
+            let _e = send.blocking_send(MessageToAsync::LoadImg(value));
         }
 
 	for w in &mut self.b {
