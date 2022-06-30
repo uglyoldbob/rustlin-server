@@ -853,6 +853,7 @@ impl<'a> GameMode for Login<'a> {
 /// The screen that allows for selection of which character to play
 pub struct CharacterSelect<'a> {
     b: Vec<Widget<'a>>,
+    char_sel: Vec<CharacterSelectWidget>,
 }
 
 impl<'a> CharacterSelect<'a> {
@@ -863,11 +864,15 @@ impl<'a> CharacterSelect<'a> {
 	b.push(Widget::new(WidgetEnum::ImgButton(ImgButton::new(0x334,0x20d,0x185))));
 	b.push(Widget::new(WidgetEnum::ImgButton(ImgButton::new(0x336,0x20d,0x19a))));
 	b.push(Widget::new(WidgetEnum::ImgButton(ImgButton::new(0x134,0x20d,0x1b5))));
-	b.push(Widget::new(WidgetEnum::CharacterSelect(CharacterSelectWidget::new(0x13, 0x13))));
-	b.push(Widget::new(WidgetEnum::CharacterSelect(CharacterSelectWidget::new(0xb0, 0x13))));
-	b.push(Widget::new(WidgetEnum::CharacterSelect(CharacterSelectWidget::new(0x14d, 0x13))));
-	b.push(Widget::new(WidgetEnum::CharacterSelect(CharacterSelectWidget::new(0x1ea, 0x13))));
-        Self { b: b }
+	let mut ch = Vec::new();
+	
+	ch.push(CharacterSelectWidget::new(0x13, 0));
+	ch.push(CharacterSelectWidget::new(0xb0, 0));
+	ch.push(CharacterSelectWidget::new(0x14d, 0));
+	ch.push(CharacterSelectWidget::new(0x1ea, 0));
+        Self { b: b,
+		char_sel: ch,
+	}
     }
 }
 
@@ -978,6 +983,9 @@ impl<'a> GameMode for CharacterSelect<'a> {
         for w in &mut self.b {
             w.draw(canvas, cursor, r, send);
         }
+	for w in &mut self.char_sel {
+	    w.draw(canvas, false, r, send);
+	}
     }
 
     fn framerate(&self) -> u8 {
