@@ -19,6 +19,7 @@ pub enum DrawMode {
     Game,
 }
 
+#[derive(Clone,Copy)]
 pub struct ImageBox {
     pub x: u16,
     pub y: u16,
@@ -31,127 +32,46 @@ pub enum DrawModeRequest {
     ChangeDrawMode(DrawMode),
 }
 
-/// All of the various kinds of widgets that can exist in the game
-pub enum WidgetEnum<'a> {
-    PlainColorButton(PlainColorButton<'a>),
-    TextButton(TextButton<'a>),
-    DynamicTextWidget(DynamicTextWidget<'a>),
-    ImgButton(ImgButton),
-    CharacterSelect(CharacterSelectWidget),
-}
-
-pub struct Widget<'a> {
-	widget: WidgetEnum<'a>,
-	last_draw: Option<ImageBox>,
-}
-
-impl<'a> Widget<'a> {
-    fn new(we: WidgetEnum<'a>) -> Self {
-	Self {
-		widget: we,
-		last_draw: None,
+pub trait Widget {
+	fn draw(
+		&mut self,
+		canvas: &mut sdl2::render::WindowCanvas,
+		cursor: Option<(i16,i16)>,
+		r: &mut GameResources,
+		send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+	    ) {
+	    let hover= false; //TODO implement this correctly
+	    self.draw_hover(canvas, hover, r, send);
 	}
-    }
-
-    fn draw(
-        &mut self,
-        canvas: &mut sdl2::render::WindowCanvas,
-	cursor: Option<(i16,i16)>,
-        r: &mut GameResources,
-        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
-    ) {
-	let cursor = if let Some(c) = cursor {
-		let (x,y) = c;
-		self.contains(x,y)
-	}
-	else
+	fn draw_hover(
+		&mut self,
+		canvas: &mut sdl2::render::WindowCanvas,
+		cursor: bool,
+		r: &mut GameResources,
+		send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+	    ) -> Option<ImageBox>;
+	fn was_clicked(&mut self) -> bool;
+	fn clicked(&mut self);
+	fn contains(&self, x: i16, y: i16) -> bool
 	{
-		false
-	};
-        self.last_draw = self.widget.draw(canvas, cursor, r, send);
-    }
-    fn left_click(&mut self) {
-        self.widget.left_click();
-    }
-    fn was_clicked(&mut self) -> bool {
-        self.widget.was_clicked()
-    }
-    fn contains(&self, x: i16, y: i16) -> bool {
-	if let Some(t) = &self.last_draw {
-		let x = if x < 0 { 0 as u16 } else { x as u16 };
-		let y = if y < 0 { 0 as u16 } else { y as u16 };
-		if x >= t.x && y >= t.y {
-		    if x < (t.x + t.w) && y < (t.y + t.h) {
-			true
-		    } else {
+		if let Some(t) = &self.last_draw() {
+			let x = if x < 0 { 0 as u16 } else { x as u16 };
+			let y = if y < 0 { 0 as u16 } else { y as u16 };
+			if x >= t.x && y >= t.y {
+			    if x < (t.x + t.w) && y < (t.y + t.h) {
+				true
+			    } else {
+				false
+			    }
+			} else {
+			    false
+			}
+		}
+		else {
 			false
-		    }
-		} else {
-		    false
 		}
 	}
-	else {
-		false
-	}
-    }
-}
-
-impl<'a> WidgetEnum<'a> {
-    fn draw(
-        &mut self,
-        canvas: &mut sdl2::render::WindowCanvas,
-	cursor: bool,
-        r: &mut GameResources,
-        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
-    ) -> Option<ImageBox>{
-        match self {
-            WidgetEnum::PlainColorButton(button) => {
-                button.draw(canvas, cursor, r, send)
-            }
-	    WidgetEnum::ImgButton(button) => {
-		button.draw(canvas, cursor, r, send)
-	    }
-	    WidgetEnum::DynamicTextWidget(widget) => {
-	        widget.draw(canvas, cursor, r, send)
-	    }
-	    WidgetEnum::CharacterSelect(button) => {
-	        button.draw(canvas, cursor, r, send)
-	    }
-	    WidgetEnum::TextButton(button) => {
-		button.draw(canvas, cursor, r, send)
-	    }
-        }
-    }
-    
-    fn left_click(&mut self) {
-        match self {
-            WidgetEnum::PlainColorButton(button) => {
-                button.clicked();
-            }
-	    WidgetEnum::ImgButton(button) => {
-		button.clicked();
-	    }
-	    WidgetEnum::DynamicTextWidget(widget) => {
-	        widget.clicked();
-	    }
-	    WidgetEnum::CharacterSelect(button) => {
-	        button.clicked();
-	    }
-	    WidgetEnum::TextButton(button) => {
-		button.clicked();
-	    }
-        }
-    }
-    
-    fn was_clicked(&mut self) -> bool {
-        match self {
-            WidgetEnum::PlainColorButton(button) => button.was_clicked(),
-	    WidgetEnum::ImgButton(button) => button.was_clicked(),
-	    WidgetEnum::DynamicTextWidget(widget) => widget.was_clicked(),
-	    WidgetEnum::CharacterSelect(button) => button.was_clicked(),
-	    WidgetEnum::TextButton(button) => button.was_clicked(),
-        }
-    }
+	fn last_draw(&self) -> Option<ImageBox>;
 }
 
 pub struct PlainColorButton<'a> {
@@ -159,6 +79,7 @@ pub struct PlainColorButton<'a> {
     x: u16,
     y: u16,
     clicked: bool,
+    last_draw: Option<ImageBox>,
 }
 
 impl<'a> PlainColorButton<'a> {
@@ -179,20 +100,27 @@ impl<'a> PlainColorButton<'a> {
             x: x,
             y: y,
             clicked: false,
+	    last_draw: None,
         }
     }
+}
 
+impl<'a> Widget for PlainColorButton<'a> {
     fn was_clicked(&mut self) -> bool {
         let ret = self.clicked;
         self.clicked = false;
         ret
+    }
+    
+    fn last_draw(&self) -> Option<ImageBox> {
+	self.last_draw
     }
 
     fn clicked(&mut self) {
         self.clicked = true;
     }
 
-    fn draw(
+    fn draw_hover(
         &mut self,
         canvas: &mut sdl2::render::WindowCanvas,
 	cursor: bool,
@@ -224,6 +152,7 @@ pub struct TextButton<'a> {
     x: u16,
     y: u16,
     clicked: bool,
+    last_draw: Option<ImageBox>,
 }
 
 impl<'a> TextButton<'a> {
@@ -240,7 +169,15 @@ impl<'a> TextButton<'a> {
             x: x,
             y: y,
             clicked: false,
+	    last_draw: None,
         }
+    }
+}
+
+impl<'a> Widget for TextButton<'a> {
+
+    fn last_draw(&self) -> Option<ImageBox> {
+	self.last_draw
     }
 
     fn was_clicked(&mut self) -> bool {
@@ -253,7 +190,7 @@ impl<'a> TextButton<'a> {
         self.clicked = true;
     }
 
-    fn draw(
+    fn draw_hover(
         &mut self,
         canvas: &mut sdl2::render::WindowCanvas,
 	cursor: bool,
@@ -285,6 +222,7 @@ pub struct ImgButton {
     x: u16,
     y: u16,
     clicked: bool,
+    last_draw: Option<ImageBox>,
 }
 
 
@@ -295,7 +233,15 @@ impl ImgButton {
             x: x,
             y: y,
             clicked: false,
+	    last_draw: None,
         }
+    }
+}
+
+impl Widget for ImgButton {
+
+    fn last_draw(&self) -> Option<ImageBox> {
+	self.last_draw
     }
 
     fn was_clicked(&mut self) -> bool {
@@ -308,7 +254,7 @@ impl ImgButton {
         self.clicked = true;
     }
 
-    fn draw<'a>(
+    fn draw_hover(
         &mut self,
         canvas: &mut sdl2::render::WindowCanvas,
 	cursor: bool,
@@ -346,6 +292,7 @@ pub struct DynamicTextWidget<'a> {
     x: u16,
     y: u16,
     s: String,
+    last_draw: Option<ImageBox>,
 }
 
 impl<'a> DynamicTextWidget<'a> {
@@ -359,6 +306,7 @@ impl<'a> DynamicTextWidget<'a> {
             x: x,
             y: y,
             s: text.to_string(),
+	    last_draw: None,
         }
     }
     
@@ -372,6 +320,13 @@ impl<'a> DynamicTextWidget<'a> {
 	    self.s = text.to_string();
 	}
     }
+}
+
+impl<'a> Widget for DynamicTextWidget<'a> {
+
+    fn last_draw(&self) -> Option<ImageBox> {
+	self.last_draw
+    }
 
     fn was_clicked(&mut self) -> bool {
         false
@@ -380,7 +335,7 @@ impl<'a> DynamicTextWidget<'a> {
     fn clicked(&mut self) {
     }
 
-    fn draw(
+    fn draw_hover(
         &mut self,
         canvas: &mut sdl2::render::WindowCanvas,
 	cursor: bool,
@@ -417,6 +372,7 @@ pub struct CharacterSelectWidget {
     x: u16,
     y: u16,
     clicked: bool,
+    last_draw: Option<ImageBox>,
 }
 
 impl CharacterSelectWidget {
@@ -431,7 +387,15 @@ impl CharacterSelectWidget {
             x: x,
             y: y,
             clicked: false,
+	    last_draw: None,
         }
+    }
+}
+
+impl Widget for CharacterSelectWidget {
+
+    fn last_draw(&self) -> Option<ImageBox> {
+	self.last_draw
     }
 
     fn was_clicked(&mut self) -> bool {
@@ -445,7 +409,7 @@ impl CharacterSelectWidget {
 	self.animating = true;
     }
 
-    fn draw<'a>(
+    fn draw_hover(
         &mut self,
         canvas: &mut sdl2::render::WindowCanvas,
 	cursor: bool,
@@ -516,17 +480,17 @@ pub trait GameMode {
 
 /// This is for exploring the resources of the game client
 pub struct ExplorerMenu<'a> {
-    b: Vec<Widget<'a>>,
+    b: Vec<Box<dyn Widget + 'a>>,
 }
 
 impl<'a> ExplorerMenu<'a> {
     pub fn new<T>(tc: &'a TextureCreator<T>,
 	r: &mut GameResources) -> Self {
-        let mut b = Vec::new();
-	b.push(Widget::new(WidgetEnum::TextButton(TextButton::new(
-	    tc, 50, 100, "Png browser", &r.font))));
-	b.push(Widget::new(WidgetEnum::TextButton(TextButton::new(
-	    tc, 50, 114, "Img browser", &r.font))));
+        let mut b : Vec<Box<dyn Widget>>= Vec::new();
+	b.push(Box::new(TextButton::new(
+	    tc, 50, 100, "Png browser", &r.font)));
+	b.push(Box::new(TextButton::new(
+	    tc, 50, 114, "Img browser", &r.font)));
         Self { b: b }
     }
 }
@@ -555,7 +519,7 @@ impl<'a> GameMode for ExplorerMenu<'a> {
                 MouseEventOutput::LeftClick((x, y)) => {
                     for w in &mut self.b {
                         if w.contains(*x, *y) {
-                            w.left_click();
+                            w.clicked();
                         }
                     }
                 }
@@ -621,16 +585,16 @@ impl<'a> GameMode for ExplorerMenu<'a> {
 
 /// This is for exploring the resources of the game client
 pub struct GameLoader<'a> {
-    b: Vec<Widget<'a>>,
+    b: Vec<Box<dyn Widget + 'a>>,
 }
 
 impl<'a> GameLoader<'a> {
     pub fn new<T>(tc: &'a TextureCreator<T>,
 	r: &mut GameResources) -> Self {
-        let mut b = Vec::new();
-	b.push(Widget::new(WidgetEnum::PlainColorButton(PlainColorButton::new(
+        let mut b : Vec<Box<dyn Widget + 'a>> = Vec::new();
+	b.push(Box::new(PlainColorButton::new(
             tc, 50, 50, 50, 50,
-        ))));
+        )));
         Self { b: b }
     }
 }
@@ -659,7 +623,7 @@ impl<'a> GameMode for GameLoader<'a> {
                 MouseEventOutput::LeftClick((x, y)) => {
                     for w in &mut self.b {
                         if w.contains(*x, *y) {
-                            w.left_click();
+                            w.clicked();
                         }
                     }
                 }
@@ -736,16 +700,16 @@ impl<'a> GameMode for GameLoader<'a> {
 
 /// The screen that allows for user login
 pub struct Login<'a> {
-    b: Vec<Widget<'a>>,
+    b: Vec<Box<dyn Widget + 'a>>,
 }
 
 impl<'a> Login<'a> {
     pub fn new<T>(tc: &'a TextureCreator<T>) -> Self {
-        let mut b = Vec::new();
-        b.push(Widget::new(WidgetEnum::ImgButton(ImgButton::new(53,0x213,0x183))));
-	b.push(Widget::new(WidgetEnum::ImgButton(ImgButton::new(65,0x213,0x195))));
-	b.push(Widget::new(WidgetEnum::ImgButton(ImgButton::new(55,0x213,0x1a8))));
-	b.push(Widget::new(WidgetEnum::ImgButton(ImgButton::new(57,0x213,0x1c2))));
+        let mut b : Vec<Box<dyn Widget + 'a>> = Vec::new();
+        b.push(Box::new(ImgButton::new(53,0x213,0x183)));
+	b.push(Box::new(ImgButton::new(65,0x213,0x195)));
+	b.push(Box::new(ImgButton::new(55,0x213,0x1a8)));
+	b.push(Box::new(ImgButton::new(57,0x213,0x1c2)));
         Self { b: b }
     }
 }
@@ -774,7 +738,7 @@ impl<'a> GameMode for Login<'a> {
                 MouseEventOutput::LeftClick((x, y)) => {
                     for w in &mut self.b {
                         if w.contains(*x, *y) {
-                            w.left_click();
+                            w.clicked();
                         }
                     }
                 }
@@ -852,18 +816,18 @@ impl<'a> GameMode for Login<'a> {
 
 /// The screen that allows for selection of which character to play
 pub struct CharacterSelect<'a> {
-    b: Vec<Widget<'a>>,
+    b: Vec<Box<dyn Widget + 'a>>,
     char_sel: Vec<CharacterSelectWidget>,
 }
 
 impl<'a> CharacterSelect<'a> {
     pub fn new<T>(tc: &'a TextureCreator<T>) -> Self {
-        let mut b = Vec::new();
-        b.push(Widget::new(WidgetEnum::ImgButton(ImgButton::new(0x6e5,0x0f7,0x10b))));
-	b.push(Widget::new(WidgetEnum::ImgButton(ImgButton::new(0x6e7,0x16c,0x10b))));
-	b.push(Widget::new(WidgetEnum::ImgButton(ImgButton::new(0x334,0x20d,0x185))));
-	b.push(Widget::new(WidgetEnum::ImgButton(ImgButton::new(0x336,0x20d,0x19a))));
-	b.push(Widget::new(WidgetEnum::ImgButton(ImgButton::new(0x134,0x20d,0x1b5))));
+        let mut b : Vec<Box<dyn Widget + 'a>> = Vec::new();
+        b.push(Box::new(ImgButton::new(0x6e5,0x0f7,0x10b)));
+	b.push(Box::new(ImgButton::new(0x6e7,0x16c,0x10b)));
+	b.push(Box::new(ImgButton::new(0x334,0x20d,0x185)));
+	b.push(Box::new(ImgButton::new(0x336,0x20d,0x19a)));
+	b.push(Box::new(ImgButton::new(0x134,0x20d,0x1b5)));
 	let mut ch = Vec::new();
 	
 	ch.push(CharacterSelectWidget::new(0x13, 0));
@@ -900,7 +864,7 @@ impl<'a> GameMode for CharacterSelect<'a> {
                 MouseEventOutput::LeftClick((x, y)) => {
                     for w in &mut self.b {
                         if w.contains(*x, *y) {
-                            w.left_click();
+                            w.clicked();
                         }
                     }
                 }
@@ -984,7 +948,7 @@ impl<'a> GameMode for CharacterSelect<'a> {
             w.draw(canvas, cursor, r, send);
         }
 	for w in &mut self.char_sel {
-	    w.draw(canvas, false, r, send);
+	    w.draw(canvas, cursor, r, send);
 	}
     }
 
@@ -995,15 +959,15 @@ impl<'a> GameMode for CharacterSelect<'a> {
 
 /// The screen that allows for selection of which character to play
 pub struct Game<'a> {
-    b: Vec<Widget<'a>>,
+    b: Vec<Box<dyn Widget +'a>>,
 }
 
 impl<'a> Game<'a> {
     pub fn new<T>(tc: &'a TextureCreator<T>) -> Self {
-        let mut b = Vec::new();
-        b.push(Widget::new(WidgetEnum::PlainColorButton(PlainColorButton::new(
+        let mut b : Vec<Box<dyn Widget + 'a>>= Vec::new();
+        b.push(Box::new(PlainColorButton::new(
             tc, 50, 50, 50, 50,
-        ))));
+        )));
         Self { b: b }
     }
 }
@@ -1032,7 +996,7 @@ impl<'a> GameMode for Game<'a> {
                 MouseEventOutput::LeftClick((x, y)) => {
                     for w in &mut self.b {
                         if w.contains(*x, *y) {
-                            w.left_click();
+                            w.clicked();
                         }
                     }
                 }
@@ -1085,7 +1049,7 @@ impl<'a> GameMode for Game<'a> {
 
 /// The screen that allows for user login
 pub struct PngExplorer<'a, T> {
-    b: Vec<Widget<'a>>,
+    b: Vec<Box<dyn Widget + 'a>>,
     disp: Vec<DynamicTextWidget<'a>>,
     current_png: u16,
     tc: &'a TextureCreator<T>,
@@ -1094,9 +1058,9 @@ pub struct PngExplorer<'a, T> {
 impl<'a, T> PngExplorer<'a, T> {
     pub fn new(tc: &'a TextureCreator<T>,
         r: &mut GameResources) -> Self {
-        let mut b = Vec::new();
-	b.push(Widget::new(WidgetEnum::TextButton(TextButton::new(
-	    tc, 320, 400, "Go Back", &r.font))));
+        let mut b : Vec<Box<dyn Widget + 'a>> = Vec::new();
+	b.push(Box::new(TextButton::new(
+	    tc, 320, 400, "Go Back", &r.font)));
 	let mut disp = Vec::new();
 	disp.push(DynamicTextWidget::new(tc, 320, 386, "Displaying 0.png", &r.font));
 	
@@ -1132,7 +1096,7 @@ impl<'a, T> GameMode for PngExplorer<'a, T> {
                 MouseEventOutput::LeftClick((x, y)) => {
                     for w in &mut self.b {
                         if w.contains(*x, *y) {
-                            w.left_click();
+                            w.clicked();
                         }
                     }
                 }
@@ -1214,7 +1178,7 @@ impl<'a, T> GameMode for PngExplorer<'a, T> {
             w.draw(canvas, cursor, r, send);
         }
 	for w in &mut self.disp {
-	    w.draw(canvas, false, r, send);
+	    w.draw(canvas, cursor, r, send);
 	}
     }
 
@@ -1225,7 +1189,7 @@ impl<'a, T> GameMode for PngExplorer<'a, T> {
 
 /// The screen that allows for user login
 pub struct ImgExplorer<'a, T> {
-    b: Vec<Widget<'a>>,
+    b: Vec<Box<dyn Widget + 'a>>,
     disp: Vec<DynamicTextWidget<'a>>,
     current_img: u16,
     tc: &'a TextureCreator<T>,
@@ -1234,9 +1198,9 @@ pub struct ImgExplorer<'a, T> {
 impl<'a, T> ImgExplorer<'a, T> {
     pub fn new(tc: &'a TextureCreator<T>,
         r: &mut GameResources) -> Self {
-        let mut b = Vec::new();
-	b.push(Widget::new(WidgetEnum::TextButton(TextButton::new(
-	    tc, 320, 400, "Go Back", &r.font))));
+        let mut b : Vec<Box<dyn Widget + 'a>>= Vec::new();
+	b.push(Box::new(TextButton::new(
+	    tc, 320, 400, "Go Back", &r.font)));
 	let mut disp = Vec::new();
 	disp.push(DynamicTextWidget::new(tc, 320, 386, "Displaying 0.img", &r.font));
 	
@@ -1272,7 +1236,7 @@ impl<'a, T> GameMode for ImgExplorer<'a, T> {
                 MouseEventOutput::LeftClick((x, y)) => {
                     for w in &mut self.b {
                         if w.contains(*x, *y) {
-                            w.left_click();
+                            w.clicked();
                         }
                     }
                 }
@@ -1354,7 +1318,7 @@ impl<'a, T> GameMode for ImgExplorer<'a, T> {
             w.draw(canvas, cursor, r, send);
         }
 	for w in &mut self.disp {
-	    w.draw(canvas, false, r, send);
+	    w.draw(canvas, cursor, r, send);
 	}
     }
 
