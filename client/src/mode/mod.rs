@@ -368,9 +368,29 @@ impl<'a> Widget for DynamicTextWidget<'a> {
     }
 }
 
+#[derive(PartialEq, Clone, Copy)]
+enum CharacterDisplayType {
+	NewCharacter,
+	MaleRoyal,
+	FemaleRoyal,
+	MaleKnight,
+	FemaleKnight,
+	MaleElf,
+	FemaleElf,
+	MaleWizard,
+	FemaleWizard,
+	MaleDarkElf,
+	FemaleDarkElf,
+	MaleDragonKnight,
+	FemaleDragonKnight,
+	MaleIllusionist,
+	FemaleIllusionist,
+}
+
 pub struct CharacterSelectWidget {
     plain: u16,
     hover: u16,
+    t: CharacterDisplayType,
     animate_start: u16,
     animate_quantity: u16,
     animate_index: u16,
@@ -386,6 +406,7 @@ impl CharacterSelectWidget {
         Self {
             plain: 0,
 	    hover: 1,
+	    t: CharacterDisplayType::NewCharacter,
 	    animating: false,
 	    animate_start: 1,
 	    animate_quantity: 24,
@@ -396,6 +417,119 @@ impl CharacterSelectWidget {
 	    last_draw: None,
         }
     }
+}
+
+impl CharacterSelectWidget {
+	fn set_animating(&mut self, a: bool) {
+		if a {
+			if !self.animating {
+				self.animate_index = 0;
+				self.animating = true;
+			}
+		}
+		else {
+			self.animating = false;
+		}
+	}
+
+	fn set_type(&mut self, t: CharacterDisplayType) {
+		if self.t != t {
+			self.t = t;
+			self.animate_index = 0;
+			match t {
+				CharacterDisplayType::NewCharacter => {
+					self.plain = 0;
+					self.hover = 0;
+					self.animate_start = 1;
+					self.animate_quantity = 24;
+				}
+				CharacterDisplayType::MaleRoyal => {
+					self.plain = 799;
+					self.hover = 801;
+					self.animate_start = 714;
+					self.animate_quantity = 86;
+				}
+				CharacterDisplayType::FemaleRoyal => {
+					self.plain = 711;
+					self.hover = 713;
+					self.animate_start = 629;
+					self.animate_quantity = 82;
+				}
+				CharacterDisplayType::MaleKnight => {
+					self.plain = 449;
+					self.hover = 451;
+					self.animate_start = 378;
+					self.animate_quantity = 71;
+				}
+				CharacterDisplayType::FemaleKnight => {
+					self.plain = 375;
+					self.hover = 377;
+					self.animate_start = 315;
+					self.animate_quantity = 60;
+				}
+				CharacterDisplayType::MaleElf => {
+					self.plain = 312;
+					self.hover = 314;
+					self.animate_start = 245;
+					self.animate_quantity = 67;
+				}
+				CharacterDisplayType::FemaleElf => {
+					self.plain = 242;
+					self.hover = 244;
+					self.animate_start = 166;
+					self.animate_quantity = 76;
+				}
+				CharacterDisplayType::MaleWizard => {
+					self.plain = 626;
+					self.hover = 628;
+					self.animate_start = 531;
+					self.animate_quantity = 95;
+				}
+				CharacterDisplayType::FemaleWizard => {
+					self.plain = 528;
+					self.hover = 530;
+					self.animate_start = 452;
+					self.animate_quantity = 76;
+				}
+				CharacterDisplayType::MaleDarkElf => {
+					self.plain = 163;
+					self.hover = 165;
+					self.animate_start = 90;
+					self.animate_quantity = 73;
+				}
+				CharacterDisplayType::FemaleDarkElf => {
+					self.plain = 87;
+					self.hover = 89;
+					self.animate_start = 25;
+					self.animate_quantity = 62;
+				}
+				CharacterDisplayType::MaleDragonKnight => {
+					self.plain = 906;
+					self.hover = 907;
+					self.animate_start = 841;
+					self.animate_quantity = 65;
+				}
+				CharacterDisplayType::FemaleDragonKnight => {
+					self.plain = 966;
+					self.hover = 967;
+					self.animate_start = 908;
+					self.animate_quantity = 58;
+				}
+				CharacterDisplayType::MaleIllusionist => {
+					self.plain = 1037;
+					self.hover = 1038;
+					self.animate_start = 969;
+					self.animate_quantity = 68;
+				}
+				CharacterDisplayType::FemaleIllusionist => {
+					self.plain = 1126;
+					self.hover = 1127;
+					self.animate_start = 1039;
+					self.animate_quantity = 87;
+				}
+			}
+		}
+	}
 }
 
 impl Widget for CharacterSelectWidget {
@@ -840,6 +974,7 @@ impl<'a> CharacterSelect<'a> {
 	ch.push(CharacterSelectWidget::new(0xb0, 0));
 	ch.push(CharacterSelectWidget::new(0x14d, 0));
 	ch.push(CharacterSelectWidget::new(0x1ea, 0));
+	ch[0].set_animating(true);
         Self { b: b,
 		char_sel: ch,
 	}
