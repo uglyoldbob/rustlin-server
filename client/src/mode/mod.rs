@@ -607,6 +607,11 @@ pub trait GameMode {
 	down: bool,
 	r: &mut GameResources,
     );
+    /// Perform any additional processing, before drawing, and after receiving all input events
+    fn process_frame(&mut self, 
+	r: &mut GameResources,
+        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+	requests: &mut VecDeque<DrawModeRequest>,);
     fn draw(
         &mut self,
         canvas: &mut sdl2::render::WindowCanvas,
@@ -693,6 +698,11 @@ impl<'a> GameMode for ExplorerMenu<'a> {
 	r: &mut GameResources,
     ) {
     }
+    
+    fn process_frame(&mut self, 
+	r: &mut GameResources,
+        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+	requests: &mut VecDeque<DrawModeRequest>,) {}
 
     fn draw(
         &mut self,
@@ -793,6 +803,11 @@ impl<'a> GameMode for GameLoader<'a> {
 	r: &mut GameResources,
     ) {
     }
+    
+    fn process_frame(&mut self, 
+	r: &mut GameResources,
+        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+	requests: &mut VecDeque<DrawModeRequest>,) {}
 
     fn draw(
         &mut self,
@@ -908,6 +923,11 @@ impl<'a> GameMode for Login<'a> {
 	r: &mut GameResources,
     ) {
     }
+    
+    fn process_frame(&mut self, 
+	r: &mut GameResources,
+        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+	requests: &mut VecDeque<DrawModeRequest>,) {}
 
     fn draw(
         &mut self,
@@ -975,7 +995,6 @@ impl<'a> CharacterSelect<'a> {
 	ch.push(CharacterSelectWidget::new(0xb0, 0));
 	ch.push(CharacterSelectWidget::new(0x14d, 0));
 	ch.push(CharacterSelectWidget::new(0x1ea, 0));
-	ch[0].set_animating(true);
         Self { b: b,
 		char_sel: ch,
 		page: 0,
@@ -1028,8 +1047,21 @@ impl<'a> GameMode for CharacterSelect<'a> {
                 }
             }
         }
-
-        if self.b[2].was_clicked() {
+    }
+    
+    fn process_button(
+	&mut self,
+	button: sdl2::keyboard::Keycode,
+	down: bool,
+	r: &mut GameResources,
+    ) {
+    }
+    
+    fn process_frame(&mut self, 
+	r: &mut GameResources,
+        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+	requests: &mut VecDeque<DrawModeRequest>,) {
+	if self.b[2].was_clicked() {
             requests.push_back(DrawModeRequest::ChangeDrawMode(DrawMode::Game));
             println!("You clicked the button");
         }
@@ -1076,14 +1108,6 @@ impl<'a> GameMode for CharacterSelect<'a> {
 		self.char_sel[2].set_animating(false);
 		self.char_sel[3].set_animating(true);
 	}
-    }
-    
-    fn process_button(
-	&mut self,
-	button: sdl2::keyboard::Keycode,
-	down: bool,
-	r: &mut GameResources,
-    ) {
     }
 
     fn draw(
@@ -1217,6 +1241,11 @@ impl<'a> GameMode for Game<'a> {
 	r: &mut GameResources,
     ) {
     }
+    
+    fn process_frame(&mut self, 
+	r: &mut GameResources,
+        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+	requests: &mut VecDeque<DrawModeRequest>,) {}
 
     fn draw(
         &mut self,
@@ -1340,6 +1369,11 @@ impl<'a, T> GameMode for PngExplorer<'a, T> {
 		}
 	}
     }
+    
+    fn process_frame(&mut self, 
+	r: &mut GameResources,
+        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+	requests: &mut VecDeque<DrawModeRequest>,) {}
 
     fn draw(
         &mut self,
@@ -1480,6 +1514,11 @@ impl<'a, T> GameMode for ImgExplorer<'a, T> {
 		}
 	}
     }
+    
+    fn process_frame(&mut self, 
+	r: &mut GameResources,
+        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+	requests: &mut VecDeque<DrawModeRequest>,) {}
 
     fn draw(
         &mut self,

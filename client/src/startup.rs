@@ -306,6 +306,7 @@ pub fn startup(mode: DrawMode) {
         mouse.parse();
         mode.process_mouse(mouse.events(), &mut drawmode_commands);
         mouse.clear();
+	mode.process_frame(&mut game_resources, &mut s1, &mut drawmode_commands);
         while let Some(m) = drawmode_commands.pop_front() {
             match m {
                 DrawModeRequest::ChangeDrawMode(m) => {
