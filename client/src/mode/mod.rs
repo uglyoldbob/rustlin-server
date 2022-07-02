@@ -40,7 +40,13 @@ pub trait Widget {
 		r: &mut GameResources,
 		send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
 	    ) {
-	    let hover= false; //TODO implement this correctly
+	    let hover = if let Some(c) = cursor {
+	        let (x,y) = c;
+		self.contains(x,y)
+	    }
+	    else {
+		false
+	    };
 	    self.draw_hover(canvas, hover, r, send);
 	}
 	fn draw_hover(
@@ -49,7 +55,7 @@ pub trait Widget {
 		cursor: bool,
 		r: &mut GameResources,
 		send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
-	    ) -> Option<ImageBox>;
+	    );
 	fn was_clicked(&mut self) -> bool;
 	fn clicked(&mut self);
 	fn contains(&self, x: i16, y: i16) -> bool
@@ -126,7 +132,7 @@ impl<'a> Widget for PlainColorButton<'a> {
 	cursor: bool,
         r: &mut GameResources,
         send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
-    ) -> Option<ImageBox>{
+    ){
         let q = self.t.query();
         let _e = canvas.copy(
             &self.t,
@@ -138,11 +144,11 @@ impl<'a> Widget for PlainColorButton<'a> {
                 q.height.into(),
             ),
         );
-	Some(ImageBox{x:self.x,
+	self.last_draw = Some(ImageBox{x:self.x,
 			y: self.y,
 			w: q.width as u16,
 			h: q.height as u16,
-		})
+		});
     }
 }
 
@@ -196,7 +202,7 @@ impl<'a> Widget for TextButton<'a> {
 	cursor: bool,
         r: &mut GameResources,
         send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
-    ) -> Option<ImageBox>{
+    ){
 	let t = if cursor { &self.t2} else { &self.t };
         let q = t.query();
         let _e = canvas.copy(
@@ -209,11 +215,11 @@ impl<'a> Widget for TextButton<'a> {
                 q.height.into(),
             ),
         );
-	Some(ImageBox{x:self.x,
+	self.last_draw = Some(ImageBox{x:self.x,
 			y: self.y,
 			w: q.width as u16,
 			h: q.height as u16,
-		})
+		});
     }
 }
 
@@ -260,9 +266,9 @@ impl Widget for ImgButton {
 	cursor: bool,
         r: &mut GameResources,
         send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
-    ) -> Option<ImageBox>{
+    ){
 	let value = if cursor { self.num + 1} else { self.num };
-	if r.imgs.contains_key(&value) {
+	self.last_draw = if r.imgs.contains_key(&value) {
             if let Loaded(t) = &r.imgs[&value] {
                 let q = t.query();
                 let _e = canvas.copy(
@@ -283,7 +289,7 @@ impl Widget for ImgButton {
             r.imgs.insert(value, Loading);
             let _e = send.blocking_send(MessageToAsync::LoadImg(value));
 	    None
-        }
+        };
     }
 }
 
@@ -341,7 +347,7 @@ impl<'a> Widget for DynamicTextWidget<'a> {
 	cursor: bool,
         r: &mut GameResources,
         send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
-    ) -> Option<ImageBox>{
+    ){
 	let t = &self.t;
         let q = t.query();
         let _e = canvas.copy(
@@ -354,11 +360,11 @@ impl<'a> Widget for DynamicTextWidget<'a> {
                 q.height.into(),
             ),
         );
-	Some(ImageBox{x:self.x,
+	self.last_draw = Some(ImageBox{x:self.x,
 			y: self.y,
 			w: q.width as u16,
 			h: q.height as u16,
-		})
+		});
     }
 }
 
@@ -415,7 +421,7 @@ impl Widget for CharacterSelectWidget {
 	cursor: bool,
         r: &mut GameResources,
         send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
-    ) -> Option<ImageBox>{
+    ) {
 	let value = if self.animating {
 		let val: u16 = self.animate_start + self.animate_index;
 		self.animate_index += 1;
@@ -427,7 +433,7 @@ impl Widget for CharacterSelectWidget {
 	else {
 		if cursor { self.hover} else { self.plain }
 	};
-	if r.pngs.contains_key(&value) {
+	self.last_draw = if r.pngs.contains_key(&value) {
             if let Loaded(t) = &r.pngs[&value] {
                 let q = t.query();
                 let _e = canvas.copy(
@@ -448,7 +454,7 @@ impl Widget for CharacterSelectWidget {
             r.pngs.insert(value, Loading);
             let _e = send.blocking_send(MessageToAsync::LoadPng(value));
 	    None
-        }
+        };
     }
 }
 
