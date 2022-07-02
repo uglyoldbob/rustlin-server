@@ -1008,6 +1008,11 @@ impl<'a> GameMode for CharacterSelect<'a> {
                             w.clicked();
                         }
                     }
+		    for w in &mut self.char_sel {
+			if w.contains(*x, *y) {
+                            w.clicked();
+                        }
+		    }
                 }
                 MouseEventOutput::MiddleClick((x, y)) => {
                 }
@@ -1026,6 +1031,28 @@ impl<'a> GameMode for CharacterSelect<'a> {
             requests.push_back(DrawModeRequest::ChangeDrawMode(DrawMode::Game));
             println!("You clicked the button");
         }
+	
+	if self.char_sel[0].was_clicked() {
+		self.char_sel[0].set_animating(true);
+		self.char_sel[1].set_animating(false);
+		self.char_sel[2].set_animating(false);
+		self.char_sel[3].set_animating(false);
+	} else if self.char_sel[1].was_clicked() {
+		self.char_sel[0].set_animating(false);
+		self.char_sel[1].set_animating(true);
+		self.char_sel[2].set_animating(false);
+		self.char_sel[3].set_animating(false);
+	} else if self.char_sel[2].was_clicked() {
+		self.char_sel[0].set_animating(false);
+		self.char_sel[1].set_animating(false);
+		self.char_sel[2].set_animating(true);
+		self.char_sel[3].set_animating(false);
+	} else if self.char_sel[3].was_clicked() {
+		self.char_sel[0].set_animating(false);
+		self.char_sel[1].set_animating(false);
+		self.char_sel[2].set_animating(false);
+		self.char_sel[3].set_animating(true);
+	}
     }
     
     fn process_button(
