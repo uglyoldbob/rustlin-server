@@ -958,6 +958,7 @@ impl<'a> GameMode for Login<'a> {
 pub struct CharacterSelect<'a> {
     b: Vec<Box<dyn Widget + 'a>>,
     char_sel: Vec<CharacterSelectWidget>,
+    page: u8,
 }
 
 impl<'a> CharacterSelect<'a> {
@@ -977,6 +978,7 @@ impl<'a> CharacterSelect<'a> {
 	ch[0].set_animating(true);
         Self { b: b,
 		char_sel: ch,
+		page: 0,
 	}
     }
 }
@@ -1032,6 +1034,27 @@ impl<'a> GameMode for CharacterSelect<'a> {
             println!("You clicked the button");
         }
 	
+	if self.b[0].was_clicked() {
+		if self.page > 0 {
+			self.page -= 1;
+			//todo update the animation data for each char_sel widget
+			self.char_sel[0].set_animating(false);
+			self.char_sel[1].set_animating(false);
+			self.char_sel[2].set_animating(false);
+			self.char_sel[3].set_animating(false);
+		}
+	}
+	if self.b[1].was_clicked() {
+		if self.page < 1 {
+			self.page += 1;
+			//todo update the animation data for each char_sel widget
+			self.char_sel[0].set_animating(false);
+			self.char_sel[1].set_animating(false);
+			self.char_sel[2].set_animating(false);
+			self.char_sel[3].set_animating(false);
+		}
+	}
+	
 	if self.char_sel[0].was_clicked() {
 		self.char_sel[0].set_animating(true);
 		self.char_sel[1].set_animating(false);
@@ -1082,7 +1105,7 @@ impl<'a> GameMode for CharacterSelect<'a> {
             let _e = send.blocking_send(MessageToAsync::LoadPng(value));
         }
 
-	let value = 0x6e9;
+	let value = if self.page == 0 { 0x6ea } else { 0x6e9 };
         if r.imgs.contains_key(&value) {
             if let Loaded(t) = &r.imgs[&value] {
                 let q = t.query();
@@ -1097,7 +1120,7 @@ impl<'a> GameMode for CharacterSelect<'a> {
             let _e = send.blocking_send(MessageToAsync::LoadImg(value));
         }
 	
-	let value = 0x6eb;
+	let value = if self.page == 1 { 0x6ec } else { 0x6eb };
         if r.imgs.contains_key(&value) {
             if let Loaded(t) = &r.imgs[&value] {
                 let q = t.query();
