@@ -10,6 +10,9 @@ use tokio::io::AsyncReadExt;
 pub mod stringtable;
 use crate::resources::stringtable::*;
 
+pub mod character_data;
+use crate::resources::character_data::*;
+
 use async_trait::async_trait;
 /// Represents a variety of lynx modules.
 #[async_trait]
@@ -197,6 +200,7 @@ pub struct GameResources<'a,'b,'c> {
     pub pngs: HashMap<u16, Loadable<Texture<'a>>>,
     pub imgs: HashMap<u16, Loadable<Texture<'a>>>,
     pub font: sdl2::ttf::Font<'b,'c>,
+    pub characters: [CharacterData; 8],
 }
 
 impl<'a,'b,'c> GameResources<'a,'b,'c> {
@@ -205,6 +209,7 @@ impl<'a,'b,'c> GameResources<'a,'b,'c> {
             pngs: HashMap::new(),
             imgs: HashMap::new(),
 	    font: font,
+	    characters: [CharacterData::new(); 8],
         }
     }
 }

@@ -87,7 +87,7 @@ pub fn startup(mode: DrawMode) {
 	    Box::new(Login::new(&texture_creator))
 	}
 	DrawMode::CharacterSelect => {
-	    Box::new(CharacterSelect::new(&texture_creator))
+	    Box::new(CharacterSelect::new(&texture_creator, &mut game_resources))
 	}
 	DrawMode::Game => {
 	    Box::new(Game::new(&texture_creator))
@@ -329,7 +329,7 @@ pub fn startup(mode: DrawMode) {
                             Box::new(Login::new(&texture_creator))
                         }
 			DrawMode::CharacterSelect => {
-			    Box::new(CharacterSelect::new(&texture_creator))
+			    Box::new(CharacterSelect::new(&texture_creator, &mut game_resources))
 			}
 			DrawMode::Game => {
 			    Box::new(Game::new(&texture_creator))

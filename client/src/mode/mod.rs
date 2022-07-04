@@ -369,7 +369,7 @@ impl<'a> Widget for DynamicTextWidget<'a> {
 }
 
 #[derive(PartialEq, Clone, Copy)]
-enum CharacterDisplayType {
+pub enum CharacterDisplayType {
 	NewCharacter,
 	MaleRoyal,
 	FemaleRoyal,
@@ -982,7 +982,8 @@ pub struct CharacterSelect<'a> {
 }
 
 impl<'a> CharacterSelect<'a> {
-    pub fn new<T>(tc: &'a TextureCreator<T>) -> Self {
+    pub fn new<T>(tc: &'a TextureCreator<T>,
+	r: &mut GameResources) -> Self {
         let mut b : Vec<Box<dyn Widget + 'a>> = Vec::new();
         b.push(Box::new(ImgButton::new(0x6e5,0x0f7,0x10b)));
 	b.push(Box::new(ImgButton::new(0x6e7,0x16c,0x10b)));
@@ -1061,6 +1062,12 @@ impl<'a> GameMode for CharacterSelect<'a> {
 	r: &mut GameResources,
         send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
 	requests: &mut VecDeque<DrawModeRequest>,) {
+	
+	self.char_sel[0].set_type(r.characters[(0+self.page*4) as usize].t);
+	self.char_sel[1].set_type(r.characters[(1+self.page*4) as usize].t);
+	self.char_sel[2].set_type(r.characters[(2+self.page*4) as usize].t);
+	self.char_sel[3].set_type(r.characters[(3+self.page*4) as usize].t);
+	
 	if self.b[2].was_clicked() {
             requests.push_back(DrawModeRequest::ChangeDrawMode(DrawMode::Game));
             println!("You clicked the button");
