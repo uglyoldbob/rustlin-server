@@ -370,6 +370,8 @@ impl<'a> Widget for DynamicTextWidget<'a> {
 
 #[derive(PartialEq, Clone, Copy)]
 pub enum CharacterDisplayType {
+	Blank,
+	Locked,
 	NewCharacter,
 	MaleRoyal,
 	FemaleRoyal,
@@ -398,6 +400,7 @@ pub struct CharacterSelectWidget {
     x: u16,
     y: u16,
     clicked: bool,
+    no_draw: bool,
     last_draw: Option<ImageBox>,
 }
 
@@ -406,7 +409,7 @@ impl CharacterSelectWidget {
         Self {
             plain: 0,
 	    hover: 1,
-	    t: CharacterDisplayType::NewCharacter,
+	    t: CharacterDisplayType::Blank,
 	    animating: false,
 	    animate_start: 1,
 	    animate_quantity: 24,
@@ -415,6 +418,7 @@ impl CharacterSelectWidget {
             y: y,
             clicked: false,
 	    last_draw: None,
+	    no_draw: true,
         }
     }
 }
@@ -437,91 +441,112 @@ impl CharacterSelectWidget {
 			self.t = t;
 			self.animate_index = 0;
 			match t {
+				CharacterDisplayType::Blank => {
+					self.no_draw = true;
+				}
+				CharacterDisplayType::Locked => {
+					self.no_draw = false;
+				}
 				CharacterDisplayType::NewCharacter => {
+					self.no_draw = false;
 					self.plain = 0;
-					self.hover = 0;
+					self.hover = 1;
 					self.animate_start = 1;
 					self.animate_quantity = 24;
 				}
 				CharacterDisplayType::MaleRoyal => {
+					self.no_draw = false;
 					self.plain = 799;
 					self.hover = 801;
 					self.animate_start = 714;
 					self.animate_quantity = 86;
 				}
 				CharacterDisplayType::FemaleRoyal => {
+					self.no_draw = false;
 					self.plain = 711;
 					self.hover = 713;
 					self.animate_start = 629;
 					self.animate_quantity = 82;
 				}
 				CharacterDisplayType::MaleKnight => {
+					self.no_draw = false;
 					self.plain = 449;
 					self.hover = 451;
 					self.animate_start = 378;
 					self.animate_quantity = 71;
 				}
 				CharacterDisplayType::FemaleKnight => {
+					self.no_draw = false;
 					self.plain = 375;
 					self.hover = 377;
 					self.animate_start = 315;
 					self.animate_quantity = 60;
 				}
 				CharacterDisplayType::MaleElf => {
+					self.no_draw = false;
 					self.plain = 312;
 					self.hover = 314;
 					self.animate_start = 245;
 					self.animate_quantity = 67;
 				}
 				CharacterDisplayType::FemaleElf => {
+					self.no_draw = false;
 					self.plain = 242;
 					self.hover = 244;
 					self.animate_start = 166;
 					self.animate_quantity = 76;
 				}
 				CharacterDisplayType::MaleWizard => {
+					self.no_draw = false;
 					self.plain = 626;
 					self.hover = 628;
 					self.animate_start = 531;
 					self.animate_quantity = 95;
 				}
 				CharacterDisplayType::FemaleWizard => {
+					self.no_draw = false;
 					self.plain = 528;
 					self.hover = 530;
 					self.animate_start = 452;
 					self.animate_quantity = 76;
 				}
 				CharacterDisplayType::MaleDarkElf => {
+					self.no_draw = false;
 					self.plain = 163;
 					self.hover = 165;
 					self.animate_start = 90;
 					self.animate_quantity = 73;
 				}
 				CharacterDisplayType::FemaleDarkElf => {
+					self.no_draw = false;
 					self.plain = 87;
 					self.hover = 89;
 					self.animate_start = 25;
 					self.animate_quantity = 62;
 				}
 				CharacterDisplayType::MaleDragonKnight => {
+					self.no_draw = false;
 					self.plain = 906;
 					self.hover = 907;
 					self.animate_start = 841;
 					self.animate_quantity = 65;
 				}
 				CharacterDisplayType::FemaleDragonKnight => {
+					self.no_draw = false;
 					self.plain = 966;
 					self.hover = 967;
 					self.animate_start = 908;
 					self.animate_quantity = 58;
 				}
 				CharacterDisplayType::MaleIllusionist => {
+					self.no_draw = false;
 					self.plain = 1037;
 					self.hover = 1038;
 					self.animate_start = 969;
 					self.animate_quantity = 68;
 				}
 				CharacterDisplayType::FemaleIllusionist => {
+					self.no_draw = false;
 					self.plain = 1126;
 					self.hover = 1127;
 					self.animate_start = 1039;
@@ -567,28 +592,33 @@ impl Widget for CharacterSelectWidget {
 	else {
 		if cursor { self.hover} else { self.plain }
 	};
-	self.last_draw = if r.pngs.contains_key(&value) {
-            if let Loaded(t) = &r.pngs[&value] {
-                let q = t.query();
-                let _e = canvas.copy(
-                    t,
-                    None,
-                    Rect::new(self.x as i32,self.y as i32, q.width.into(), q.height.into()),
-                );
-		Some(ImageBox{x:self.x,
-			y: self.y,
-			w: q.width as u16,
-			h: q.height as u16,
-		})
-            }
-	    else {
+	self.last_draw = if !self.no_draw {
+	    if r.pngs.contains_key(&value) {
+                if let Loaded(t) = &r.pngs[&value] {
+                    let q = t.query();
+                    let _e = canvas.copy(
+			    t,
+			    None,
+			    Rect::new(self.x as i32,self.y as i32, q.width.into(), q.height.into()),
+			);
+			Some(ImageBox{x:self.x,
+				y: self.y,
+				w: q.width as u16,
+				h: q.height as u16,
+			})
+		    }
+		    else {
+			None
+		    }
+		} else {
+		    r.pngs.insert(value, Loading);
+		    let _e = send.blocking_send(MessageToAsync::LoadPng(value));
+		    None
+		}
+	}
+	else {
 		None
-	    }
-        } else {
-            r.pngs.insert(value, Loading);
-            let _e = send.blocking_send(MessageToAsync::LoadPng(value));
-	    None
-        };
+	};
     }
 }
 
@@ -979,6 +1009,7 @@ pub struct CharacterSelect<'a> {
     b: Vec<Box<dyn Widget + 'a>>,
     char_sel: Vec<CharacterSelectWidget>,
     page: u8,
+    //1764.img for disabled slot
 }
 
 impl<'a> CharacterSelect<'a> {

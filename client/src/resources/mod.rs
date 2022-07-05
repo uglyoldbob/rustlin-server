@@ -10,6 +10,8 @@ use tokio::io::AsyncReadExt;
 pub mod stringtable;
 use crate::resources::stringtable::*;
 
+use crate::mode::CharacterDisplayType;
+
 pub mod character_data;
 use crate::resources::character_data::*;
 
@@ -205,11 +207,16 @@ pub struct GameResources<'a,'b,'c> {
 
 impl<'a,'b,'c> GameResources<'a,'b,'c> {
     pub fn new(font: sdl2::ttf::Font<'b,'c>) -> Self {
+	let mut chars = [CharacterData::new(),
+		CharacterData::new(),CharacterData::new(),CharacterData::new(),
+		CharacterData::new(),CharacterData::new(),CharacterData::new(),
+		CharacterData::new()];
+	chars[2].t = CharacterDisplayType::Blank;
         Self {
             pngs: HashMap::new(),
             imgs: HashMap::new(),
 	    font: font,
-	    characters: [CharacterData::new(); 8],
+	    characters: chars,
         }
     }
 }
