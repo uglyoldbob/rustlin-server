@@ -37,7 +37,7 @@ impl Img {
         let height = cursor.read_u16_le().await.ok()?;
         let unknown = cursor.read_u16_le().await.ok()?;
         let colorkey = cursor.read_u16_le().await.ok()?;
-        println!("IMG is {} x {} {} {}", width, height, unknown, colorkey);
+        println!("IMG is {} x {} {} {}", width, height, unknown, colorkey);	
 
         let mut data = Vec::new();
         cursor.read_to_end(&mut data).await.ok()?;
@@ -51,7 +51,7 @@ impl Img {
     }
 
     pub fn convert_img_data<'a, T>(&mut self, t: &'a TextureCreator<T>) -> Option<Texture<'a>> {
-        let surface = Surface::from_data(
+        let mut surface = Surface::from_data(
             self.data.as_mut_slice(),
             self.width as u32,
             self.height as u32,
@@ -59,6 +59,9 @@ impl Img {
             PixelFormatEnum::RGB555,
         )
         .unwrap();
+	let color = sdl2::pixels::Color::from_u32(&sdl2::pixels::PixelFormat::try_from(PixelFormatEnum::RGB555).unwrap(), self.colorkey.into());
+	surface.set_color_key(true, color);
+	
         //TODO set colorkey
         let text = Texture::from_surface(&surface, t).unwrap();
         Some(text)
@@ -211,7 +214,7 @@ impl<'a,'b,'c> GameResources<'a,'b,'c> {
 		CharacterData::new(),CharacterData::new(),CharacterData::new(),
 		CharacterData::new(),CharacterData::new(),CharacterData::new(),
 		CharacterData::new()];
-	chars[2].t = CharacterDisplayType::Blank;
+	chars[2].t = CharacterDisplayType::Locked;
         Self {
             pngs: HashMap::new(),
             imgs: HashMap::new(),
