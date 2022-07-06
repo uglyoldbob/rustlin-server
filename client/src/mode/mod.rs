@@ -609,7 +609,21 @@ impl Widget for CharacterSelectWidget {
 		val
 	}
 	else {
-		if cursor { self.hover} else { self.plain }
+		if cursor { 
+			if let Some(i) = r.pngs.get(&self.hover) {
+				if let Loaded(_) = i {
+					self.hover
+				}
+				else {
+					self.plain
+				}
+			}
+			else {
+				r.pngs.insert(self.hover, Loading);
+				let _e = send.blocking_send(MessageToAsync::LoadPng(self.hover));
+				self.plain
+			}
+		} else { self.plain }
 	};
 	self.last_draw = if !self.no_draw {
 	    if self.locked {
