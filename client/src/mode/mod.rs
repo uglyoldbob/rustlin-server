@@ -408,6 +408,7 @@ pub enum CharacterDisplayType {
 pub struct CharacterSelectWidget {
     plain: u16,
     hover: u16,
+    last_png: u16,
     t: CharacterDisplayType,
     animate_start: u16,
     animate_quantity: u16,
@@ -426,6 +427,7 @@ impl CharacterSelectWidget {
         Self {
             plain: 0,
 	    hover: 1,
+	    last_png: 0,
 	    t: CharacterDisplayType::Blank,
 	    animating: false,
 	    animate_start: 1,
@@ -618,7 +620,26 @@ impl Widget for CharacterSelectWidget {
     ) {
 	let value = if self.animating {
 		let val: u16 = self.animate_start + self.animate_index;
-		self.animate_index += 1;
+		
+		let mut check_val = self.animate_index + 1;
+		if check_val == self.animate_quantity {
+			check_val = 0;
+		}
+		println!("Check {} for loaded", check_val);
+		if let Some(i) = r.pngs.get(&check_val) {
+			if let Loaded(_) = i {
+				println!("{} is loaded", check_val);
+				self.animate_index += 1;
+			}
+			else {
+				println!("{} is loading", check_val);
+			}
+		}
+		else {
+			println!("{} is not loaded", check_val);
+			r.imgs.insert(check_val, Loading);
+			let _e = send.blocking_send(MessageToAsync::LoadImg(check_val));
+		}
 		if self.animate_index == self.animate_quantity {
 			self.animate_index = 0;
 		}
@@ -641,6 +662,7 @@ impl Widget for CharacterSelectWidget {
 			}
 		} else { self.plain }
 	};
+	if self.animating { println!("Value is {}", value) }
 	self.last_draw = if !self.no_draw {
 	    if self.locked {
 		let value = 1764;
@@ -663,6 +685,8 @@ impl Widget for CharacterSelectWidget {
 	    if r.pngs.contains_key(&value) {
                 if let Loaded(t) = &r.pngs[&value] {
                     let q = t.query();
+		    if self.animating { println!("Draw {}", value) }
+		    self.last_png = value;
                     let _e = canvas.copy(
 			    t,
 			    None,
@@ -675,12 +699,36 @@ impl Widget for CharacterSelectWidget {
 			})
 		    }
 		    else {
+			if self.animating { println!("Draw not {}", value) }
 			None
 		    }
 		} else {
 		    r.pngs.insert(value, Loading);
+		    if self.animating { println!("load and Draw not {}", value) }
 		    let _e = send.blocking_send(MessageToAsync::LoadPng(value));
-		    None
+		    if let Some(i) = r.pngs.get(&self.last_png) {
+			if let Loaded(t) = i {
+			let q = t.query();
+			    if self.animating { println!("Draw {}", value) }
+			    self.last_png = value;
+			    let _e = canvas.copy(
+				    t,
+				    None,
+				    Rect::new(self.x as i32,self.y as i32, q.width.into(), q.height.into()),
+				);
+				Some(ImageBox{x:self.x,
+					y: self.y,
+					w: q.width as u16,
+					h: q.height as u16,
+				})
+			}
+			else {
+				None
+			}
+		    }
+		    else {
+			None
+		    }
 		}
 	    }
 	}
