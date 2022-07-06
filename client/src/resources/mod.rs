@@ -214,6 +214,7 @@ impl<'a,'b,'c> GameResources<'a,'b,'c> {
 		CharacterData::new(),CharacterData::new(),CharacterData::new(),
 		CharacterData::new(),CharacterData::new(),CharacterData::new(),
 		CharacterData::new()];
+	chars[1].t = CharacterDisplayType::MaleDarkElf;
 	chars[2].t = CharacterDisplayType::Locked;
         Self {
             pngs: HashMap::new(),

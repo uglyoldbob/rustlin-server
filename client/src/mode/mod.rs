@@ -384,7 +384,7 @@ impl<'a> Widget for DynamicTextWidget<'a> {
     }
 }
 
-#[derive(PartialEq, Clone, Copy)]
+#[derive(PartialEq, Clone, Copy, Debug)]
 pub enum CharacterDisplayType {
 	Blank,
 	Locked,
@@ -625,20 +625,14 @@ impl Widget for CharacterSelectWidget {
 		if check_val == self.animate_quantity {
 			check_val = 0;
 		}
-		println!("Check {} for loaded", check_val);
 		if let Some(i) = r.pngs.get(&check_val) {
 			if let Loaded(_) = i {
-				println!("{} is loaded", check_val);
 				self.animate_index += 1;
-			}
-			else {
-				println!("{} is loading", check_val);
 			}
 		}
 		else {
-			println!("{} is not loaded", check_val);
-			r.imgs.insert(check_val, Loading);
-			let _e = send.blocking_send(MessageToAsync::LoadImg(check_val));
+			r.pngs.insert(check_val, Loading);
+			let _e = send.blocking_send(MessageToAsync::LoadPng(check_val));
 		}
 		if self.animate_index == self.animate_quantity {
 			self.animate_index = 0;
@@ -662,7 +656,6 @@ impl Widget for CharacterSelectWidget {
 			}
 		} else { self.plain }
 	};
-	if self.animating { println!("Value is {}", value) }
 	self.last_draw = if !self.no_draw {
 	    if self.locked {
 		let value = 1764;
@@ -685,7 +678,6 @@ impl Widget for CharacterSelectWidget {
 	    if r.pngs.contains_key(&value) {
                 if let Loaded(t) = &r.pngs[&value] {
                     let q = t.query();
-		    if self.animating { println!("Draw {}", value) }
 		    self.last_png = value;
                     let _e = canvas.copy(
 			    t,
@@ -704,12 +696,10 @@ impl Widget for CharacterSelectWidget {
 		    }
 		} else {
 		    r.pngs.insert(value, Loading);
-		    if self.animating { println!("load and Draw not {}", value) }
 		    let _e = send.blocking_send(MessageToAsync::LoadPng(value));
 		    if let Some(i) = r.pngs.get(&self.last_png) {
 			if let Loaded(t) = i {
 			let q = t.query();
-			    if self.animating { println!("Draw {}", value) }
 			    self.last_png = value;
 			    let _e = canvas.copy(
 				    t,
@@ -1125,6 +1115,7 @@ pub struct CharacterSelect<'a> {
     b: Vec<Box<dyn Widget + 'a>>,
     char_sel: Vec<CharacterSelectWidget>,
     page: u8,
+    selection: Option<u8>,
     //1764.img for disabled slot
 }
 
@@ -1146,6 +1137,7 @@ impl<'a> CharacterSelect<'a> {
         Self { b: b,
 		char_sel: ch,
 		page: 0,
+		selection: None,
 	}
     }
 }
@@ -1215,11 +1207,6 @@ impl<'a> GameMode for CharacterSelect<'a> {
 	self.char_sel[2].set_type(r.characters[(2+self.page*4) as usize].t);
 	self.char_sel[3].set_type(r.characters[(3+self.page*4) as usize].t);
 	
-	if self.b[2].was_clicked() {
-            requests.push_back(DrawModeRequest::ChangeDrawMode(DrawMode::Game));
-            println!("You clicked the button");
-        }
-	
 	if self.b[0].was_clicked() {
 		if self.page > 0 {
 			self.page -= 1;
@@ -1228,12 +1215,14 @@ impl<'a> GameMode for CharacterSelect<'a> {
 			self.char_sel[1].set_animating(false);
 			self.char_sel[2].set_animating(false);
 			self.char_sel[3].set_animating(false);
+			self.selection = None;
 		}
 	}
 	if self.b[1].was_clicked() {
 		if self.page < 1 {
 			self.page += 1;
 			//todo update the animation data for each char_sel widget
+			self.selection = None;
 			self.char_sel[0].set_animating(false);
 			self.char_sel[1].set_animating(false);
 			self.char_sel[2].set_animating(false);
@@ -1242,26 +1231,44 @@ impl<'a> GameMode for CharacterSelect<'a> {
 	}
 	
 	if self.char_sel[0].was_clicked() {
+		self.selection = Some(4 * self.page + 0);
 		self.char_sel[0].set_animating(true);
 		self.char_sel[1].set_animating(false);
 		self.char_sel[2].set_animating(false);
 		self.char_sel[3].set_animating(false);
 	} else if self.char_sel[1].was_clicked() {
+		self.selection = Some(4 * self.page + 1);
 		self.char_sel[0].set_animating(false);
 		self.char_sel[1].set_animating(true);
 		self.char_sel[2].set_animating(false);
 		self.char_sel[3].set_animating(false);
 	} else if self.char_sel[2].was_clicked() {
+		self.selection = Some(4 * self.page + 2);
 		self.char_sel[0].set_animating(false);
 		self.char_sel[1].set_animating(false);
 		self.char_sel[2].set_animating(true);
 		self.char_sel[3].set_animating(false);
 	} else if self.char_sel[3].was_clicked() {
+		self.selection = Some(4 * self.page + 3);
 		self.char_sel[0].set_animating(false);
 		self.char_sel[1].set_animating(false);
 		self.char_sel[2].set_animating(false);
 		self.char_sel[3].set_animating(true);
 	}
+	
+	if self.b[2].was_clicked() {
+	    if let Some(c) = self.selection {
+		match r.characters[c as usize].t {
+			CharacterDisplayType::NewCharacter => {
+				println!("Create new character {}", c);
+			}
+			_ => {
+				println!("Select existing character {}", c);
+				requests.push_back(DrawModeRequest::ChangeDrawMode(DrawMode::Game));
+			}
+		}
+	    }
+        }
     }
 
     fn draw(
