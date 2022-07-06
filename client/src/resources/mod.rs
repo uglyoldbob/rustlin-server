@@ -16,7 +16,7 @@ pub mod character_data;
 use crate::resources::character_data::*;
 
 use async_trait::async_trait;
-/// Represents a variety of lynx modules.
+/// Represents data and code that can be transferred to the async runtime for execution.
 #[async_trait]
 pub trait AsyncRunner: Send {
     async fn do_stuff(&mut self, res: &mut Resources);

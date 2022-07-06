@@ -1494,6 +1494,7 @@ pub struct ImgExplorer<'a, T> {
     disp: Vec<DynamicTextWidget<'a>>,
     current_img: u16,
     tc: &'a TextureCreator<T>,
+    displayed: bool,
 }
 
 impl<'a, T> ImgExplorer<'a, T> {
@@ -1509,6 +1510,7 @@ impl<'a, T> ImgExplorer<'a, T> {
 		disp: disp,
 		current_img: 0,
 		tc: tc,
+		displayed: false,
 	}
     }
 }
@@ -1570,19 +1572,25 @@ impl<'a, T> GameMode for ImgExplorer<'a, T> {
 		match button {
 			sdl2::keyboard::Keycode::Left => {
 				if self.current_img > 0 {
-					r.imgs.remove(&self.current_img);
-					self.current_img -= 1;
-					let words = format!("Displaying {}.img", self.current_img);
-					self.disp[0].update_text(self.tc, &words, &r.font);
+					if self.displayed {
+						r.imgs.remove(&self.current_img);
+						self.current_img -= 1;
+						let words = format!("Displaying {}.img", self.current_img);
+						self.disp[0].update_text(self.tc, &words, &r.font);
+						self.displayed = false;
+					}
 				}
 				println!("Pressed left");
 			}
 			sdl2::keyboard::Keycode::Right => {
 				if self.current_img < 65534 {
-					r.imgs.remove(&self.current_img);
-					self.current_img += 1;
-					let words = format!("Displaying {}.img", self.current_img);
-					self.disp[0].update_text(self.tc, &words, &r.font);
+					if self.displayed {
+						r.imgs.remove(&self.current_img);
+						self.current_img += 1;
+						let words = format!("Displaying {}.img", self.current_img);
+						self.disp[0].update_text(self.tc, &words, &r.font);
+						self.displayed = false;
+					}
 				}
 				println!("Pressed right");
 			}
@@ -1614,6 +1622,7 @@ impl<'a, T> GameMode for ImgExplorer<'a, T> {
                     None,
                     Rect::new(0, 0, q.width.into(), q.height.into()),
                 );
+		self.displayed = true;
             }
         } else {
             r.imgs.insert(value, Loading);
