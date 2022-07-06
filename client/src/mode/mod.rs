@@ -267,7 +267,23 @@ impl Widget for ImgButton {
         r: &mut GameResources,
         send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
     ){
-	let value = if cursor { self.num + 1} else { self.num };
+
+	let value = if cursor { 
+			if let Some(i) = r.imgs.get(&(self.num+1)) {
+				if let Loaded(_) = i {
+					self.num + 1
+				}
+				else {
+					self.num
+				}
+			}
+			else {
+				r.imgs.insert(self.num + 1, Loading);
+				let _e = send.blocking_send(MessageToAsync::LoadImg(self.num+1));
+				self.num
+			}
+		} else { self.num };
+	
 	self.last_draw = if r.imgs.contains_key(&value) {
             if let Loaded(t) = &r.imgs[&value] {
                 let q = t.query();
