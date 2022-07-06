@@ -1493,6 +1493,7 @@ pub struct ImgExplorer<'a, T> {
     b: Vec<Box<dyn Widget + 'a>>,
     disp: Vec<DynamicTextWidget<'a>>,
     current_img: u16,
+    prev_img: u16,
     tc: &'a TextureCreator<T>,
     displayed: bool,
 }
@@ -1509,6 +1510,7 @@ impl<'a, T> ImgExplorer<'a, T> {
         Self { b: b,
 		disp: disp,
 		current_img: 0,
+		prev_img: 0,
 		tc: tc,
 		displayed: false,
 	}
@@ -1573,7 +1575,7 @@ impl<'a, T> GameMode for ImgExplorer<'a, T> {
 			sdl2::keyboard::Keycode::Left => {
 				if self.current_img > 0 {
 					if self.displayed {
-						r.imgs.remove(&self.current_img);
+						self.prev_img = self.current_img;
 						self.current_img -= 1;
 						let words = format!("Displaying {}.img", self.current_img);
 						self.disp[0].update_text(self.tc, &words, &r.font);
@@ -1585,7 +1587,7 @@ impl<'a, T> GameMode for ImgExplorer<'a, T> {
 			sdl2::keyboard::Keycode::Right => {
 				if self.current_img < 65534 {
 					if self.displayed {
-						r.imgs.remove(&self.current_img);
+						self.prev_img = self.current_img;
 						self.current_img += 1;
 						let words = format!("Displaying {}.img", self.current_img);
 						self.disp[0].update_text(self.tc, &words, &r.font);
@@ -1614,20 +1616,52 @@ impl<'a, T> GameMode for ImgExplorer<'a, T> {
         canvas.set_draw_color(Color::RGB(0, 0, 0));
         canvas.clear();
         let value = self.current_img;
+	let mut remove_prev = false;
         if r.imgs.contains_key(&value) {
             if let Loaded(t) = &r.imgs[&value] {
                 let q = t.query();
+		if self.prev_img != self.current_img {
+			remove_prev = true;
+		}
                 let _e = canvas.copy(
                     t,
                     None,
                     Rect::new(0, 0, q.width.into(), q.height.into()),
                 );
 		self.displayed = true;
-            }
+            } else  {
+		let value = self.prev_img;
+		if r.imgs.contains_key(&value) {
+		    if let Loaded(t) = &r.imgs[&value] {
+			let q = t.query();
+			let _e = canvas.copy(
+			    t,
+			    None,
+			    Rect::new(0, 0, q.width.into(), q.height.into()),
+			);
+			self.displayed = true;
+		    }
+		}
+	    }
         } else {
             r.imgs.insert(value, Loading);
             let _e = send.blocking_send(MessageToAsync::LoadImg(value));
+	    let value = self.prev_img;
+	    if r.imgs.contains_key(&value) {
+		    if let Loaded(t) = &r.imgs[&value] {
+			let q = t.query();
+			let _e = canvas.copy(
+			    t,
+			    None,
+			    Rect::new(0, 0, q.width.into(), q.height.into()),
+			);
+			self.displayed = true;
+		    }
+	    }
         }
+	if remove_prev {
+		r.imgs.remove(&self.prev_img);
+	}
 
 	for w in &mut self.b {
             w.draw(canvas, cursor, r, send);
