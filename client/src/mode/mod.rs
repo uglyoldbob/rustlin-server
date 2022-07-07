@@ -691,8 +691,27 @@ impl Widget for CharacterSelectWidget {
 			})
 		    }
 		    else {
-			if self.animating { println!("Draw not {}", value) }
+			if let Some(i) = r.pngs.get(&self.last_png) {
+			if let Loaded(t) = i {
+			let q = t.query();
+			    let _e = canvas.copy(
+				    t,
+				    None,
+				    Rect::new(self.x as i32,self.y as i32, q.width.into(), q.height.into()),
+				);
+				Some(ImageBox{x:self.x,
+					y: self.y,
+					w: q.width as u16,
+					h: q.height as u16,
+				})
+			}
+			else {
+				None
+			}
+		    }
+		    else {
 			None
+		    }
 		    }
 		} else {
 		    r.pngs.insert(value, Loading);
@@ -700,7 +719,6 @@ impl Widget for CharacterSelectWidget {
 		    if let Some(i) = r.pngs.get(&self.last_png) {
 			if let Loaded(t) = i {
 			let q = t.query();
-			    self.last_png = value;
 			    let _e = canvas.copy(
 				    t,
 				    None,
