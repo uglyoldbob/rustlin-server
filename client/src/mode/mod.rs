@@ -16,6 +16,7 @@ pub enum DrawMode {
     GameLoader,
     Login,
     CharacterSelect,
+    NewCharacter,
     Game,
 }
 
@@ -1279,6 +1280,7 @@ impl<'a> GameMode for CharacterSelect<'a> {
 		match r.characters[c as usize].t {
 			CharacterDisplayType::NewCharacter => {
 				println!("Create new character {}", c);
+				requests.push_back(DrawModeRequest::ChangeDrawMode(DrawMode::NewCharacter));
 			}
 			_ => {
 				println!("Select existing character {}", c);
@@ -1772,6 +1774,123 @@ impl<'a, T> GameMode for ImgExplorer<'a, T> {
 	for w in &mut self.disp {
 	    w.draw(canvas, cursor, r, send);
 	}
+    }
+
+    fn framerate(&self) -> u8 {
+        20
+    }
+}
+
+/// This is for exploring the resources of the game client
+pub struct NewCharacterMode<'a> {
+    b: Vec<Box<dyn Widget + 'a>>,
+    c: CharacterSelectWidget,
+}
+
+impl<'a> NewCharacterMode<'a> {
+    pub fn new<T>(tc: &'a TextureCreator<T>,
+	r: &mut GameResources) -> Self {
+        let mut b : Vec<Box<dyn Widget>>= Vec::new();
+	b.push(Box::new(ImgButton::new(825,476,403)));
+	b.push(Box::new(ImgButton::new(827,476,430)));
+	b.push(Box::new(ImgButton::new(556,424,317)));
+	b.push(Box::new(ImgButton::new(554,435,317)));
+	b.push(Box::new(ImgButton::new(556,424,332)));
+	b.push(Box::new(ImgButton::new(554,435,332)));
+	b.push(Box::new(ImgButton::new(556,424,347)));
+	b.push(Box::new(ImgButton::new(554,435,347)));
+	b.push(Box::new(ImgButton::new(556,498,317)));
+	b.push(Box::new(ImgButton::new(554,509,317)));
+	b.push(Box::new(ImgButton::new(556,498,332)));
+	b.push(Box::new(ImgButton::new(554,509,332)));
+	b.push(Box::new(ImgButton::new(556,498,347)));
+	b.push(Box::new(ImgButton::new(554,509,347)));
+	let mut c = CharacterSelectWidget::new(410, 0);
+	c.set_animating(true);
+        Self { b: b,
+	    c: c,
+	}
+    }
+}
+
+impl<'a> GameMode for NewCharacterMode<'a> {
+    fn process_mouse(
+        &mut self,
+        events: &Vec<MouseEventOutput>,
+        requests: &mut VecDeque<DrawModeRequest>,
+    ) {
+        for e in events {
+            match e {
+                MouseEventOutput::Move((x, y)) => {
+                }
+                MouseEventOutput::LeftDrag { from, to } => {
+                    let (x, y) = to;
+                }
+                MouseEventOutput::MiddleDrag { from, to } => {
+                    let (x, y) = to;
+                }
+                MouseEventOutput::RightDrag { from, to } => {
+                    let (x, y) = to;
+                }
+                MouseEventOutput::DragStop => {
+                }
+                MouseEventOutput::LeftClick((x, y)) => {
+                    for w in &mut self.b {
+                        if w.contains(*x, *y) {
+                            w.clicked();
+                        }
+                    }
+                }
+                MouseEventOutput::MiddleClick((x, y)) => {
+                }
+                MouseEventOutput::RightClick((x, y)) => {
+                }
+                MouseEventOutput::ExtraClick => {
+                }
+                MouseEventOutput::Extra2Click => {
+                }
+                MouseEventOutput::Scrolling(amount) => {
+                }
+            }
+        }
+    }
+    
+    fn process_button(
+	&mut self,
+	button: sdl2::keyboard::Keycode,
+	down: bool,
+	r: &mut GameResources,
+    ) {
+    }
+    
+    fn process_frame(&mut self, 
+	r: &mut GameResources,
+        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+	requests: &mut VecDeque<DrawModeRequest>,) {}
+
+    fn draw(
+        &mut self,
+        canvas: &mut sdl2::render::WindowCanvas,
+	cursor: Option<(i16,i16)>,
+        r: &mut GameResources,
+        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+    ) {
+        canvas.set_draw_color(Color::RGB(0, 0, 0));
+        canvas.clear();
+        let value = 824;
+        if r.imgs.contains_key(&value) {
+            if let Loaded(t) = &r.imgs[&value] {
+                let _e = canvas.copy(t, None, None);
+            }
+        } else {
+            r.imgs.insert(value, Loading);
+            let _e = send.blocking_send(MessageToAsync::LoadImg(value));
+        }
+
+        for w in &mut self.b {
+            w.draw(canvas, cursor, r, send);
+        }
+	self.c.draw(canvas, cursor, r, send);
     }
 
     fn framerate(&self) -> u8 {
