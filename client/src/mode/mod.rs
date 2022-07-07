@@ -310,6 +310,103 @@ impl Widget for ImgButton {
     }
 }
 
+pub struct SelectableWidget {
+    num: u16,
+    x: u16,
+    y: u16,
+    clicked: bool,
+    selected: bool,
+    last_draw: Option<ImageBox>,
+}
+
+
+impl SelectableWidget {
+	fn new(num: u16, x: u16, y: u16) -> Self {
+        Self {
+            num: num,
+            x: x,
+            y: y,
+            clicked: false,
+	    selected: false,
+	    last_draw: None,
+        }
+    }
+    
+    fn is_selected(&self) -> bool {
+        self.selected
+    }
+    
+    fn set_selected(&mut self, s: bool) {
+        self.selected = s;
+    }
+}
+
+impl Widget for SelectableWidget {
+
+    fn last_draw(&self) -> Option<ImageBox> {
+	self.last_draw
+    }
+
+    fn was_clicked(&mut self) -> bool {
+        let ret = self.clicked;
+        self.clicked = false;
+        ret
+    }
+
+    fn clicked(&mut self) {
+        self.clicked = true;
+    }
+
+    fn draw_hover(
+        &mut self,
+        canvas: &mut sdl2::render::WindowCanvas,
+	cursor: bool,
+        r: &mut GameResources,
+        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+    ){
+
+	let value = if self.selected { 
+			if let Some(i) = r.imgs.get(&(self.num+1)) {
+				if let Loaded(_) = i {
+					self.num + 1
+				}
+				else {
+					self.num
+				}
+			}
+			else {
+				r.imgs.insert(self.num + 1, Loading);
+				let _e = send.blocking_send(MessageToAsync::LoadImg(self.num+1));
+				self.num
+			}
+		} else { self.num };
+	
+	self.last_draw = if r.imgs.contains_key(&value) {
+            if let Loaded(t) = &r.imgs[&value] {
+                let q = t.query();
+                let _e = canvas.copy(
+                    t,
+                    None,
+                    Rect::new(self.x as i32,self.y as i32, q.width.into(), q.height.into()),
+                );
+		Some(ImageBox{x:self.x,
+			y: self.y,
+			w: q.width as u16,
+			h: q.height as u16,
+		})
+            }
+	    else {
+		None
+	    }
+        } else {
+            r.imgs.insert(value, Loading);
+            let _e = send.blocking_send(MessageToAsync::LoadImg(value));
+	    None
+        };
+    }
+}
+
+
 pub struct DynamicTextWidget<'a> {
     t: Texture<'a>,
     x: u16,
@@ -1785,6 +1882,10 @@ impl<'a, T> GameMode for ImgExplorer<'a, T> {
 pub struct NewCharacterMode<'a> {
     b: Vec<Box<dyn Widget + 'a>>,
     c: CharacterSelectWidget,
+    options: Vec<SelectableWidget>,
+    selected_class: u8,
+    /// true is male, false is female
+    selected_gender: bool,
 }
 
 impl<'a> NewCharacterMode<'a> {
@@ -1807,8 +1908,21 @@ impl<'a> NewCharacterMode<'a> {
 	b.push(Box::new(ImgButton::new(554,509,347)));
 	let mut c = CharacterSelectWidget::new(410, 0);
 	c.set_animating(true);
+	let mut o = Vec::new();
+	o.push(SelectableWidget::new(1753, 332, 11));
+	o.push(SelectableWidget::new(1755, 542, 11));
+	o.push(SelectableWidget::new(1757, 332, 67));
+	o.push(SelectableWidget::new(1759, 542, 67));
+	o.push(SelectableWidget::new(1761, 332, 118));
+	o.push(SelectableWidget::new(1749, 542, 118));
+	o.push(SelectableWidget::new(1751, 332, 166));
+	o.push(SelectableWidget::new(306, 348, 248));
+	o.push(SelectableWidget::new(304, 533, 248));
         Self { b: b,
 	    c: c,
+	    options: o,
+	    selected_class: 0,
+	    selected_gender: true,
 	}
     }
 }
@@ -1840,6 +1954,11 @@ impl<'a> GameMode for NewCharacterMode<'a> {
                             w.clicked();
                         }
                     }
+		    for w in &mut self.options {
+			if w.contains(*x, *y) {
+                            w.clicked();
+                        }
+		    }
                 }
                 MouseEventOutput::MiddleClick((x, y)) => {
                 }
@@ -1866,7 +1985,50 @@ impl<'a> GameMode for NewCharacterMode<'a> {
     fn process_frame(&mut self, 
 	r: &mut GameResources,
         send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
-	requests: &mut VecDeque<DrawModeRequest>,) {}
+	requests: &mut VecDeque<DrawModeRequest>,) {
+	for i in 0..=6 {
+	    if self.options[i].was_clicked() {
+		self.options[0].set_selected(false);
+		self.options[1].set_selected(false);
+		self.options[2].set_selected(false);
+		self.options[3].set_selected(false);
+		self.options[4].set_selected(false);
+		self.options[5].set_selected(false);
+		self.options[6].set_selected(false);
+		self.options[i].set_selected(true);
+		self.selected_class = i as u8;
+		let newtype = 
+			match self.selected_class {
+				0 => if self.selected_gender { CharacterDisplayType::MaleRoyal } else { CharacterDisplayType::FemaleRoyal}
+				1 => if self.selected_gender { CharacterDisplayType::MaleKnight } else { CharacterDisplayType::FemaleKnight}
+				2 => if self.selected_gender { CharacterDisplayType::MaleElf } else { CharacterDisplayType::FemaleElf}
+				3 => if self.selected_gender { CharacterDisplayType::MaleWizard } else { CharacterDisplayType::FemaleWizard}
+				4 => if self.selected_gender { CharacterDisplayType::MaleDarkElf } else { CharacterDisplayType::FemaleDarkElf}
+				5 => if self.selected_gender { CharacterDisplayType::MaleDragonKnight } else { CharacterDisplayType::FemaleDragonKnight}
+				_ => if self.selected_gender { CharacterDisplayType::MaleIllusionist } else { CharacterDisplayType::FemaleIllusionist}
+			};
+		self.c.set_type(newtype);
+	    }
+	}
+	for i in 7..=8 {
+		if self.options[i].was_clicked() {
+		self.options[7].set_selected(false);
+		self.options[8].set_selected(false);
+		self.options[i].set_selected(true);
+		self.selected_gender = if i == 7 { true } else { false };
+		let newtype = match self.selected_class {
+			0 => if self.selected_gender { CharacterDisplayType::MaleRoyal } else { CharacterDisplayType::FemaleRoyal}
+			1 => if self.selected_gender { CharacterDisplayType::MaleKnight } else { CharacterDisplayType::FemaleKnight}
+			2 => if self.selected_gender { CharacterDisplayType::MaleElf } else { CharacterDisplayType::FemaleElf}
+			3 => if self.selected_gender { CharacterDisplayType::MaleWizard } else { CharacterDisplayType::FemaleWizard}
+			4 => if self.selected_gender { CharacterDisplayType::MaleDarkElf } else { CharacterDisplayType::FemaleDarkElf}
+			5 => if self.selected_gender { CharacterDisplayType::MaleDragonKnight } else { CharacterDisplayType::FemaleDragonKnight}
+			_ => if self.selected_gender { CharacterDisplayType::MaleIllusionist } else { CharacterDisplayType::FemaleIllusionist}
+		};
+		self.c.set_type(newtype);
+	    }
+	}
+    }
 
     fn draw(
         &mut self,
@@ -1890,6 +2052,9 @@ impl<'a> GameMode for NewCharacterMode<'a> {
         for w in &mut self.b {
             w.draw(canvas, cursor, r, send);
         }
+	for w in &mut self.options {
+	    w.draw(canvas, cursor, r, send);
+	}
 	self.c.draw(canvas, cursor, r, send);
     }
 
