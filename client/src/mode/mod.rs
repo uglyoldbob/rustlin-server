@@ -2244,18 +2244,83 @@ impl<'a, T> GameMode for NewCharacterMode<'a, T> {
 		requests.push_back(DrawModeRequest::ChangeDrawMode(DrawMode::CharacterSelect));
 	}
 	
-	let remain = self.compute_remain();
 	if self.b[3].was_clicked() {
-		println!("Click button str up");
+		let remain = self.compute_remain();
 		if remain > 0 && self.current_stats.str < self.max_stats.str {
 			self.current_stats.str += 1;
 			self.update_stats(r);
 		}
 	}
 	if self.b[2].was_clicked() {
-		println!("Click button str down");
 		if self.current_stats.str > self.base_stats.str {
 			self.current_stats.str -= 1;
+			self.update_stats(r);
+		}
+	}
+	if self.b[5].was_clicked() {
+		let remain = self.compute_remain();
+		if remain > 0 && self.current_stats.dex < self.max_stats.dex {
+			self.current_stats.dex += 1;
+			self.update_stats(r);
+		}
+	}
+	if self.b[4].was_clicked() {
+		if self.current_stats.dex > self.base_stats.dex {
+			self.current_stats.dex -= 1;
+			self.update_stats(r);
+		}
+	}
+	
+	if self.b[7].was_clicked() {
+		let remain = self.compute_remain();
+		if remain > 0 && self.current_stats.con < self.max_stats.con {
+			self.current_stats.con += 1;
+			self.update_stats(r);
+		}
+	}
+	if self.b[6].was_clicked() {
+		if self.current_stats.con > self.base_stats.con {
+			self.current_stats.con -= 1;
+			self.update_stats(r);
+		}
+	}
+	if self.b[9].was_clicked() {
+		let remain = self.compute_remain();
+		if remain > 0 && self.current_stats.wis < self.max_stats.wis {
+			self.current_stats.wis += 1;
+			self.update_stats(r);
+		}
+	}
+	if self.b[8].was_clicked() {
+		if self.current_stats.wis > self.base_stats.wis {
+			self.current_stats.wis -= 1;
+			self.update_stats(r);
+		}
+	}
+	if self.b[11].was_clicked() {
+		let remain = self.compute_remain();
+		if remain > 0 && self.current_stats.cha < self.max_stats.cha {
+			self.current_stats.cha += 1;
+			self.update_stats(r);
+		}
+	}
+	if self.b[10].was_clicked() {
+		if self.current_stats.cha > self.base_stats.cha {
+			self.current_stats.cha -= 1;
+			self.update_stats(r);
+		}
+	}
+	
+	if self.b[13].was_clicked() {
+		let remain = self.compute_remain();
+		if remain > 0 && self.current_stats.int < self.max_stats.int {
+			self.current_stats.int += 1;
+			self.update_stats(r);
+		}
+	}
+	if self.b[12].was_clicked() {
+		if self.current_stats.int > self.base_stats.int {
+			self.current_stats.int -= 1;
 			self.update_stats(r);
 		}
 	}
