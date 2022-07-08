@@ -417,9 +417,9 @@ pub struct DynamicTextWidget<'a> {
 
 impl<'a> DynamicTextWidget<'a> {
     fn new<T>(tc: &'a TextureCreator<T>, x: u16, y: u16, text: &str,
-	font: &sdl2::ttf::Font) -> Self {
+	font: &sdl2::ttf::Font, color: sdl2::pixels::Color) -> Self {
 	let pr = font.render(text);
-	let ft = pr.solid(sdl2::pixels::Color::RED).unwrap();
+	let ft = pr.solid(color).unwrap();
 	
         Self {
             t: Texture::from_surface(&ft, tc).unwrap(),
@@ -1564,7 +1564,7 @@ impl<'a, T> PngExplorer<'a, T> {
 	b.push(Box::new(TextButton::new(
 	    tc, 320, 400, "Go Back", &r.font)));
 	let mut disp = Vec::new();
-	disp.push(DynamicTextWidget::new(tc, 320, 386, "Displaying 0.png", &r.font));
+	disp.push(DynamicTextWidget::new(tc, 320, 386, "Displaying 0.png", &r.font, sdl2::pixels::Color::RED));
 	
         Self { b: b,
 		disp: disp,
@@ -1708,7 +1708,7 @@ impl<'a, T> ImgExplorer<'a, T> {
 	b.push(Box::new(TextButton::new(
 	    tc, 320, 400, "Go Back", &r.font)));
 	let mut disp = Vec::new();
-	disp.push(DynamicTextWidget::new(tc, 320, 386, "Displaying 0.img", &r.font));
+	disp.push(DynamicTextWidget::new(tc, 320, 386, "Displaying 0.img", &r.font, sdl2::pixels::Color::RED));
 	
         Self { b: b,
 		disp: disp,
@@ -1884,6 +1884,7 @@ pub struct NewCharacterMode<'a> {
     selected_class: u8,
     /// true is male, false is female
     selected_gender: bool,
+    disp: Vec<DynamicTextWidget<'a>>,
 }
 
 impl<'a> NewCharacterMode<'a> {
@@ -1917,11 +1918,20 @@ impl<'a> NewCharacterMode<'a> {
 	o.push(SelectableWidget::new(306, 348, 248));
 	o.push(SelectableWidget::new(304, 533, 248));
 	o[7].set_selected(true);
+	let mut d = Vec::new();
+	d.push(DynamicTextWidget::new(tc, 468, 334, "0", &r.font, sdl2::pixels::Color::WHITE));
+	d.push(DynamicTextWidget::new(tc, 406, 317, "1", &r.font, sdl2::pixels::Color::WHITE));
+	d.push(DynamicTextWidget::new(tc, 406, 332, "2", &r.font, sdl2::pixels::Color::WHITE));
+	d.push(DynamicTextWidget::new(tc, 406, 347, "3", &r.font, sdl2::pixels::Color::WHITE));
+	d.push(DynamicTextWidget::new(tc, 525, 317, "4", &r.font, sdl2::pixels::Color::WHITE));
+	d.push(DynamicTextWidget::new(tc, 525, 332, "5", &r.font, sdl2::pixels::Color::WHITE));
+	d.push(DynamicTextWidget::new(tc, 525, 347, "6", &r.font, sdl2::pixels::Color::WHITE));
         Self { b: b,
 	    c: c,
 	    options: o,
 	    selected_class: 0,
 	    selected_gender: true,
+	    disp: d,
 	}
     }
     
@@ -2053,6 +2063,9 @@ impl<'a> GameMode for NewCharacterMode<'a> {
             w.draw(canvas, cursor, r, send);
         }
 	for w in &mut self.options {
+	    w.draw(canvas, cursor, r, send);
+	}
+	for w in &mut self.disp {
 	    w.draw(canvas, cursor, r, send);
 	}
 	self.c.draw(canvas, cursor, r, send);
