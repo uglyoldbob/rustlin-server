@@ -412,6 +412,7 @@ pub struct DynamicTextWidget<'a> {
     x: u16,
     y: u16,
     s: String,
+    color: sdl2::pixels::Color,
     last_draw: Option<ImageBox>,
 }
 
@@ -426,6 +427,7 @@ impl<'a> DynamicTextWidget<'a> {
             x: x,
             y: y,
             s: text.to_string(),
+	    color: color,
 	    last_draw: None,
         }
     }
@@ -435,7 +437,7 @@ impl<'a> DynamicTextWidget<'a> {
 	font: &sdl2::ttf::Font) {
 	if (text != self.s) {
 	    let pr = font.render(text);
-	    let ft = pr.solid(sdl2::pixels::Color::RED).unwrap();
+	    let ft = pr.solid(self.color).unwrap();
 	    self.t = Texture::from_surface(&ft, tc).unwrap();
 	    self.s = text.to_string();
 	}
@@ -501,6 +503,188 @@ pub enum CharacterDisplayType {
 	FemaleDragonKnight,
 	MaleIllusionist,
 	FemaleIllusionist,
+}
+
+#[derive(Clone,Copy)]
+struct CharacterStats {
+	pub str: u8,
+	pub dex: u8,
+	pub con: u8,
+	pub wis: u8,
+	pub cha: u8,
+	pub int: u8,
+}
+
+impl CharacterDisplayType {
+	fn get_base_stats(&self) -> CharacterStats {
+		match self {
+			CharacterDisplayType::MaleRoyal | CharacterDisplayType::FemaleRoyal => {
+				CharacterStats {
+					str: 13,
+					dex: 10,
+					con: 10,
+					wis: 11,
+					cha: 13,
+					int: 10,
+				}
+			}
+			CharacterDisplayType::MaleKnight | CharacterDisplayType::FemaleKnight => {
+				CharacterStats {
+					str: 16,
+					dex: 12,
+					con: 14,
+					wis: 9,
+					cha: 12,
+					int: 8,
+				}
+			}
+			CharacterDisplayType::MaleElf | CharacterDisplayType::FemaleElf => {
+				CharacterStats {
+					str: 11,
+					dex: 12,
+					con: 12,
+					wis: 12,
+					cha: 9,
+					int: 12,
+				}
+			}
+			CharacterDisplayType::MaleWizard | CharacterDisplayType::FemaleWizard => {
+				CharacterStats {
+					str: 8,
+					dex: 7,
+					con: 12,
+					wis: 12,
+					cha: 8,
+					int: 12,
+				}
+			}
+			CharacterDisplayType::MaleDarkElf | CharacterDisplayType::FemaleDarkElf => {
+				CharacterStats {
+					str: 12,
+					dex: 15,
+					con: 8,
+					wis: 10,
+					cha: 9,
+					int: 11,
+				}
+			}
+			CharacterDisplayType::MaleDragonKnight | CharacterDisplayType::FemaleDragonKnight => {
+				CharacterStats {
+					str: 13,
+					dex: 11,
+					con: 14,
+					wis: 12,
+					cha: 8,
+					int: 11,
+				}
+			}
+			CharacterDisplayType::MaleIllusionist | CharacterDisplayType::FemaleIllusionist => {
+				CharacterStats {
+					str: 11,
+					dex: 10,
+					con: 12,
+					wis: 12,
+					cha: 8,
+					int: 12,
+				}
+			}
+			_ => {
+				CharacterStats {
+					str: 0,
+					dex: 0,
+					con: 0,
+					wis: 0,
+					cha: 0,
+					int: 0,
+				}
+			}
+		}
+	}
+	
+	fn get_max_stats(&self) -> CharacterStats {
+		match self {
+			CharacterDisplayType::MaleRoyal | CharacterDisplayType::FemaleRoyal => {
+				CharacterStats {
+					str: 18,
+					dex: 18,
+					con: 18,
+					wis: 18,
+					cha: 18,
+					int: 18,
+				}
+			}
+			CharacterDisplayType::MaleKnight | CharacterDisplayType::FemaleKnight => {
+				CharacterStats {
+					str: 20,
+					dex: 18,
+					con: 18,
+					wis: 18,
+					cha: 18,
+					int: 18,
+				}
+			}
+			CharacterDisplayType::MaleElf | CharacterDisplayType::FemaleElf => {
+				CharacterStats {
+					str: 18,
+					dex: 18,
+					con: 18,
+					wis: 18,
+					cha: 18,
+					int: 18,
+				}
+			}
+			CharacterDisplayType::MaleWizard | CharacterDisplayType::FemaleWizard => {
+				CharacterStats {
+					str: 18,
+					dex: 18,
+					con: 18,
+					wis: 18,
+					cha: 18,
+					int: 18,
+				}
+			}
+			CharacterDisplayType::MaleDarkElf | CharacterDisplayType::FemaleDarkElf => {
+				CharacterStats {
+					str: 18,
+					dex: 18,
+					con: 18,
+					wis: 18,
+					cha: 18,
+					int: 18,
+				}
+			}
+			CharacterDisplayType::MaleDragonKnight | CharacterDisplayType::FemaleDragonKnight => {
+				CharacterStats {
+					str: 18,
+					dex: 18,
+					con: 18,
+					wis: 18,
+					cha: 18,
+					int: 18,
+				}
+			}
+			CharacterDisplayType::MaleIllusionist | CharacterDisplayType::FemaleIllusionist => {
+				CharacterStats {
+					str: 18,
+					dex: 18,
+					con: 18,
+					wis: 18,
+					cha: 18,
+					int: 18,
+				}
+			}
+			_ => {
+				CharacterStats {
+					str: 18,
+					dex: 18,
+					con: 18,
+					wis: 18,
+					cha: 18,
+					int: 18,
+				}
+			}
+		}
+	}
 }
 
 pub struct CharacterSelectWidget {
@@ -1877,7 +2061,8 @@ impl<'a, T> GameMode for ImgExplorer<'a, T> {
 }
 
 /// This is for exploring the resources of the game client
-pub struct NewCharacterMode<'a> {
+pub struct NewCharacterMode<'a, T> {
+    tc: &'a TextureCreator<T>,
     b: Vec<Box<dyn Widget + 'a>>,
     c: CharacterSelectWidget,
     options: Vec<SelectableWidget>,
@@ -1885,10 +2070,13 @@ pub struct NewCharacterMode<'a> {
     /// true is male, false is female
     selected_gender: bool,
     disp: Vec<DynamicTextWidget<'a>>,
+    base_stats: CharacterStats,
+    current_stats: CharacterStats,
+    max_stats: CharacterStats,
 }
 
-impl<'a> NewCharacterMode<'a> {
-    pub fn new<T>(tc: &'a TextureCreator<T>,
+impl<'a, T> NewCharacterMode<'a, T> {
+    pub fn new(tc: &'a TextureCreator<T>,
 	r: &mut GameResources) -> Self {
         let mut b : Vec<Box<dyn Widget>>= Vec::new();
 	b.push(Box::new(ImgButton::new(825,476,403)));
@@ -1926,13 +2114,47 @@ impl<'a> NewCharacterMode<'a> {
 	d.push(DynamicTextWidget::new(tc, 525, 317, "4", &r.font, sdl2::pixels::Color::WHITE));
 	d.push(DynamicTextWidget::new(tc, 525, 332, "5", &r.font, sdl2::pixels::Color::WHITE));
 	d.push(DynamicTextWidget::new(tc, 525, 347, "6", &r.font, sdl2::pixels::Color::WHITE));
-        Self { b: b,
+	let bs = c.t.get_base_stats();
+	let ms = c.t.get_max_stats();
+        let mut s = Self { 
+	    tc: tc,
+	    b: b,
 	    c: c,
 	    options: o,
 	    selected_class: 0,
 	    selected_gender: true,
 	    disp: d,
-	}
+	    base_stats: bs,
+	    current_stats: bs,
+	    max_stats: ms,
+	};
+	s.update_stats(r);
+	s
+    }
+    
+    fn update_stats(&mut self,
+	r: &mut GameResources) {
+	let remain = 75 - self.current_stats.str -
+		self.current_stats.dex -
+		self.current_stats.con -
+		self.current_stats.wis -
+		self.current_stats.cha -
+		self.current_stats.int;
+	let word = format!("{}", remain);
+	self.disp[0].update_text(self.tc, &word, &r.font);
+	
+	let word = format!("{}", self.current_stats.str);
+	self.disp[1].update_text(self.tc, &word, &r.font);
+	let word = format!("{}", self.current_stats.dex);
+	self.disp[2].update_text(self.tc, &word, &r.font);
+	let word = format!("{}", self.current_stats.con);
+	self.disp[3].update_text(self.tc, &word, &r.font);
+	let word = format!("{}", self.current_stats.wis);
+	self.disp[4].update_text(self.tc, &word, &r.font);
+	let word = format!("{}", self.current_stats.cha);
+	self.disp[5].update_text(self.tc, &word, &r.font);
+	let word = format!("{}", self.current_stats.int);
+	self.disp[6].update_text(self.tc, &word, &r.font);
     }
     
     fn update_selected_char(&mut self) {
@@ -1947,11 +2169,14 @@ impl<'a> NewCharacterMode<'a> {
 		_ => if self.selected_gender { CharacterDisplayType::MaleIllusionist } else { CharacterDisplayType::FemaleIllusionist}
 	};
 	self.c.set_type(newtype);
+	self.base_stats = self.c.t.get_base_stats();
+	self.current_stats = self.base_stats;
+	self.max_stats = self.c.t.get_max_stats();
     }
     
 }
 
-impl<'a> GameMode for NewCharacterMode<'a> {
+impl<'a, T> GameMode for NewCharacterMode<'a, T> {
     fn process_mouse(
         &mut self,
         events: &Vec<MouseEventOutput>,
@@ -2027,6 +2252,7 @@ impl<'a> GameMode for NewCharacterMode<'a> {
 		self.options[i].set_selected(true);
 		self.selected_class = i as u8;
 		self.update_selected_char();
+		self.update_stats(r);
 	    }
 	}
 	for i in 7..=8 {
@@ -2036,6 +2262,7 @@ impl<'a> GameMode for NewCharacterMode<'a> {
 		self.options[i].set_selected(true);
 		self.selected_gender = if i == 7 { true } else { false };
 		self.update_selected_char();
+		self.update_stats(r);
 	    }
 	}
     }
