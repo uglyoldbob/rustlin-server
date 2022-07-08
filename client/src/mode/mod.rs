@@ -1916,6 +1916,7 @@ impl<'a> NewCharacterMode<'a> {
 	o.push(SelectableWidget::new(1751, 332, 166));
 	o.push(SelectableWidget::new(306, 348, 248));
 	o.push(SelectableWidget::new(304, 533, 248));
+	o[7].set_selected(true);
         Self { b: b,
 	    c: c,
 	    options: o,
@@ -1999,6 +2000,11 @@ impl<'a> GameMode for NewCharacterMode<'a> {
 	r: &mut GameResources,
         send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
 	requests: &mut VecDeque<DrawModeRequest>,) {
+	
+	if self.b[1].was_clicked() {
+		requests.push_back(DrawModeRequest::ChangeDrawMode(DrawMode::CharacterSelect));
+	}
+	
 	for i in 0..=6 {
 	    if self.options[i].was_clicked() {
 		self.options[0].set_selected(false);
