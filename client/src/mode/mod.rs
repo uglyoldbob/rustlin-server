@@ -512,6 +512,7 @@ pub struct CharacterSelectWidget {
     animate_quantity: u16,
     animate_index: u16,
     animating: bool,
+    drawn: bool,
     x: u16,
     y: u16,
     clicked: bool,
@@ -528,6 +529,7 @@ impl CharacterSelectWidget {
 	    last_png: 0,
 	    t: CharacterDisplayType::Blank,
 	    animating: false,
+	    drawn: false,
 	    animate_start: 1,
 	    animate_quantity: 24,
 	    animate_index: 0,
@@ -547,15 +549,18 @@ impl CharacterSelectWidget {
 			if !self.animating {
 				self.animate_index = 0;
 				self.animating = true;
+				self.drawn = false;
 			}
 		}
 		else {
 			self.animating = false;
+			self.drawn = false;
 		}
 	}
 
 	fn set_type(&mut self, t: CharacterDisplayType) {
 		if self.t != t {
+			self.drawn = false;
 			self.t = t;
 			self.animate_index = 0;
 			match t {
@@ -718,23 +723,6 @@ impl Widget for CharacterSelectWidget {
     ) {
 	let value = if self.animating {
 		let val: u16 = self.animate_start + self.animate_index;
-		
-		let mut check_val = self.animate_index + 1;
-		if check_val == self.animate_quantity {
-			check_val = 0;
-		}
-		if let Some(i) = r.pngs.get(&check_val) {
-			if let Loaded(_) = i {
-				self.animate_index += 1;
-			}
-		}
-		else {
-			r.pngs.insert(check_val, Loading);
-			let _e = send.blocking_send(MessageToAsync::LoadPng(check_val));
-		}
-		if self.animate_index == self.animate_quantity {
-			self.animate_index = 0;
-		}
 		val
 	}
 	else {
@@ -754,6 +742,28 @@ impl Widget for CharacterSelectWidget {
 			}
 		} else { self.plain }
 	};
+	if self.animating {
+		let mut check_val = self.animate_index + 1;
+		if check_val == self.animate_quantity {
+			check_val = 0;
+		}
+		if let Some(i) = r.pngs.get(&check_val) {
+			if let Loaded(_) = i {
+				if self.drawn {
+					self.drawn = false;
+					self.animate_index += 1;
+				}
+			}
+		}
+		else {
+			r.pngs.insert(check_val, Loading);
+			let _e = send.blocking_send(MessageToAsync::LoadPng(check_val));
+		}
+		if self.animate_index == self.animate_quantity {
+			self.animate_index = 0;
+		}
+	}
+	
 	self.last_draw = if !self.no_draw {
 	    if self.locked {
 		let value = 1764;
@@ -777,6 +787,7 @@ impl Widget for CharacterSelectWidget {
                 if let Loaded(t) = &r.pngs[&value] {
                     let q = t.query();
 		    self.last_png = value;
+		    self.drawn = true;
                     let _e = canvas.copy(
 			    t,
 			    None,
@@ -935,11 +946,9 @@ impl<'a> GameMode for ExplorerMenu<'a> {
 
         if self.b[0].was_clicked() {
             requests.push_back(DrawModeRequest::ChangeDrawMode(DrawMode::PngExplorer));
-            println!("You clicked the button");
         }
 	if self.b[1].was_clicked() {
             requests.push_back(DrawModeRequest::ChangeDrawMode(DrawMode::ImgExplorer));
-            println!("You clicked the button");
         }
     }
     
@@ -1044,7 +1053,6 @@ impl<'a> GameMode for GameLoader<'a> {
 
         if self.b[0].was_clicked() {
             requests.push_back(DrawModeRequest::ChangeDrawMode(DrawMode::Login));
-            println!("You clicked the button");
         }
     }
     
@@ -1164,7 +1172,6 @@ impl<'a> GameMode for Login<'a> {
 
         if self.b[0].was_clicked() {
             requests.push_back(DrawModeRequest::ChangeDrawMode(DrawMode::CharacterSelect));
-            println!("You clicked the button");
         }
     }
     
@@ -1376,11 +1383,9 @@ impl<'a> GameMode for CharacterSelect<'a> {
 	    if let Some(c) = self.selection {
 		match r.characters[c as usize].t {
 			CharacterDisplayType::NewCharacter => {
-				println!("Create new character {}", c);
 				requests.push_back(DrawModeRequest::ChangeDrawMode(DrawMode::NewCharacter));
 			}
 			_ => {
-				println!("Select existing character {}", c);
 				requests.push_back(DrawModeRequest::ChangeDrawMode(DrawMode::Game));
 			}
 		}
@@ -1508,7 +1513,6 @@ impl<'a> GameMode for Game<'a> {
 
         if self.b[0].was_clicked() {
             requests.push_back(DrawModeRequest::ChangeDrawMode(DrawMode::CharacterSelect));
-            println!("You clicked the button");
         }
     }
     
@@ -1613,7 +1617,6 @@ impl<'a, T> GameMode for PngExplorer<'a, T> {
 
         if self.b[0].was_clicked() {
             requests.push_back(DrawModeRequest::ChangeDrawMode(DrawMode::Explorer));
-            println!("You clicked the button");
         }
     }
     
@@ -1632,7 +1635,6 @@ impl<'a, T> GameMode for PngExplorer<'a, T> {
 					let words = format!("Displaying {}.png", self.current_png);
 					self.disp[0].update_text(self.tc, &words, &r.font);
 				}
-				println!("Pressed left");
 			}
 			sdl2::keyboard::Keycode::Right => {
 				if self.current_png < 65534 {
@@ -1641,7 +1643,6 @@ impl<'a, T> GameMode for PngExplorer<'a, T> {
 					let words = format!("Displaying {}.png", self.current_png);
 					self.disp[0].update_text(self.tc, &words, &r.font);
 				}
-				println!("Pressed right");
 			}
 			_ => {}
 		}
@@ -1762,7 +1763,6 @@ impl<'a, T> GameMode for ImgExplorer<'a, T> {
 
         if self.b[0].was_clicked() {
             requests.push_back(DrawModeRequest::ChangeDrawMode(DrawMode::Explorer));
-            println!("You clicked the button");
         }
     }
     
@@ -1784,7 +1784,6 @@ impl<'a, T> GameMode for ImgExplorer<'a, T> {
 						self.displayed = false;
 					}
 				}
-				println!("Pressed left");
 			}
 			sdl2::keyboard::Keycode::Right => {
 				if self.current_img < 65534 {
@@ -1796,7 +1795,6 @@ impl<'a, T> GameMode for ImgExplorer<'a, T> {
 						self.displayed = false;
 					}
 				}
-				println!("Pressed right");
 			}
 			_ => {}
 		}
@@ -1925,6 +1923,21 @@ impl<'a> NewCharacterMode<'a> {
 	    selected_gender: true,
 	}
     }
+    
+    fn update_selected_char(&mut self) {
+        let newtype = 
+	match self.selected_class {
+		0 => if self.selected_gender { CharacterDisplayType::MaleRoyal } else { CharacterDisplayType::FemaleRoyal}
+		1 => if self.selected_gender { CharacterDisplayType::MaleKnight } else { CharacterDisplayType::FemaleKnight}
+		2 => if self.selected_gender { CharacterDisplayType::MaleElf } else { CharacterDisplayType::FemaleElf}
+		3 => if self.selected_gender { CharacterDisplayType::MaleWizard } else { CharacterDisplayType::FemaleWizard}
+		4 => if self.selected_gender { CharacterDisplayType::MaleDarkElf } else { CharacterDisplayType::FemaleDarkElf}
+		5 => if self.selected_gender { CharacterDisplayType::MaleDragonKnight } else { CharacterDisplayType::FemaleDragonKnight}
+		_ => if self.selected_gender { CharacterDisplayType::MaleIllusionist } else { CharacterDisplayType::FemaleIllusionist}
+	};
+	self.c.set_type(newtype);
+    }
+    
 }
 
 impl<'a> GameMode for NewCharacterMode<'a> {
@@ -1997,17 +2010,7 @@ impl<'a> GameMode for NewCharacterMode<'a> {
 		self.options[6].set_selected(false);
 		self.options[i].set_selected(true);
 		self.selected_class = i as u8;
-		let newtype = 
-			match self.selected_class {
-				0 => if self.selected_gender { CharacterDisplayType::MaleRoyal } else { CharacterDisplayType::FemaleRoyal}
-				1 => if self.selected_gender { CharacterDisplayType::MaleKnight } else { CharacterDisplayType::FemaleKnight}
-				2 => if self.selected_gender { CharacterDisplayType::MaleElf } else { CharacterDisplayType::FemaleElf}
-				3 => if self.selected_gender { CharacterDisplayType::MaleWizard } else { CharacterDisplayType::FemaleWizard}
-				4 => if self.selected_gender { CharacterDisplayType::MaleDarkElf } else { CharacterDisplayType::FemaleDarkElf}
-				5 => if self.selected_gender { CharacterDisplayType::MaleDragonKnight } else { CharacterDisplayType::FemaleDragonKnight}
-				_ => if self.selected_gender { CharacterDisplayType::MaleIllusionist } else { CharacterDisplayType::FemaleIllusionist}
-			};
-		self.c.set_type(newtype);
+		self.update_selected_char();
 	    }
 	}
 	for i in 7..=8 {
@@ -2016,16 +2019,7 @@ impl<'a> GameMode for NewCharacterMode<'a> {
 		self.options[8].set_selected(false);
 		self.options[i].set_selected(true);
 		self.selected_gender = if i == 7 { true } else { false };
-		let newtype = match self.selected_class {
-			0 => if self.selected_gender { CharacterDisplayType::MaleRoyal } else { CharacterDisplayType::FemaleRoyal}
-			1 => if self.selected_gender { CharacterDisplayType::MaleKnight } else { CharacterDisplayType::FemaleKnight}
-			2 => if self.selected_gender { CharacterDisplayType::MaleElf } else { CharacterDisplayType::FemaleElf}
-			3 => if self.selected_gender { CharacterDisplayType::MaleWizard } else { CharacterDisplayType::FemaleWizard}
-			4 => if self.selected_gender { CharacterDisplayType::MaleDarkElf } else { CharacterDisplayType::FemaleDarkElf}
-			5 => if self.selected_gender { CharacterDisplayType::MaleDragonKnight } else { CharacterDisplayType::FemaleDragonKnight}
-			_ => if self.selected_gender { CharacterDisplayType::MaleIllusionist } else { CharacterDisplayType::FemaleIllusionist}
-		};
-		self.c.set_type(newtype);
+		self.update_selected_char();
 	    }
 	}
     }
