@@ -2132,14 +2132,18 @@ impl<'a, T> NewCharacterMode<'a, T> {
 	s
     }
     
-    fn update_stats(&mut self,
-	r: &mut GameResources) {
-	let remain = 75 - self.current_stats.str -
+    fn compute_remain(&self) -> u8 {
+	75 - self.current_stats.str -
 		self.current_stats.dex -
 		self.current_stats.con -
 		self.current_stats.wis -
 		self.current_stats.cha -
-		self.current_stats.int;
+		self.current_stats.int
+    }
+    
+    fn update_stats(&mut self,
+	r: &mut GameResources) {
+	let remain = self.compute_remain();
 	let word = format!("{}", remain);
 	self.disp[0].update_text(self.tc, &word, &r.font);
 	
@@ -2238,6 +2242,22 @@ impl<'a, T> GameMode for NewCharacterMode<'a, T> {
 	
 	if self.b[1].was_clicked() {
 		requests.push_back(DrawModeRequest::ChangeDrawMode(DrawMode::CharacterSelect));
+	}
+	
+	let remain = self.compute_remain();
+	if self.b[3].was_clicked() {
+		println!("Click button str up");
+		if remain > 0 && self.current_stats.str < self.max_stats.str {
+			self.current_stats.str += 1;
+			self.update_stats(r);
+		}
+	}
+	if self.b[2].was_clicked() {
+		println!("Click button str down");
+		if self.current_stats.str > self.base_stats.str {
+			self.current_stats.str -= 1;
+			self.update_stats(r);
+		}
 	}
 	
 	for i in 0..=6 {
