@@ -1642,15 +1642,23 @@ impl<'a> GameMode for CharacterSelect<'a> {
 /// The screen that allows for selection of which character to play
 pub struct Game<'a> {
     b: Vec<Box<dyn Widget +'a>>,
+    disp: Vec<DynamicTextWidget<'a>>,
 }
 
 impl<'a> Game<'a> {
-    pub fn new<T>(tc: &'a TextureCreator<T>) -> Self {
+    pub fn new<T>(tc: &'a TextureCreator<T>,
+	r: &mut GameResources) -> Self {
         let mut b : Vec<Box<dyn Widget + 'a>>= Vec::new();
         b.push(Box::new(PlainColorButton::new(
             tc, 50, 50, 50, 50,
         )));
-        Self { b: b }
+	let mut d = Vec::new();
+	d.push(DynamicTextWidget::new(tc, 35,390, "0", &r.font, sdl2::pixels::Color::WHITE));
+	d.push(DynamicTextWidget::new(tc, 35,407, "1", &r.font, sdl2::pixels::Color::WHITE));
+	d.push(DynamicTextWidget::new(tc, 35,426, "2", &r.font, sdl2::pixels::Color::WHITE));
+        Self { b: b,
+		disp: d,
+	}
     }
 }
 
@@ -1797,6 +1805,10 @@ impl<'a> GameMode for Game<'a> {
             r.imgs.insert(value, Loading);
             let _e = send.blocking_send(MessageToAsync::LoadImg(value));
         }
+	
+	for w in &mut self.disp {
+	    w.draw(canvas, cursor, r, send);
+	}
 
         for w in &mut self.b {
             w.draw(canvas, cursor, r, send);
