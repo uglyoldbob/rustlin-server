@@ -15,6 +15,9 @@ use crate::mode::CharacterDisplayType;
 pub mod character_data;
 use crate::resources::character_data::*;
 
+pub mod sprite;
+use crate::resources::sprite::*;
+
 use async_trait::async_trait;
 /// Represents data and code that can be transferred to the async runtime for execution.
 #[async_trait]

@@ -1039,6 +1039,50 @@ impl Widget for CharacterSelectWidget {
     }
 }
 
+pub struct SpriteWidget {
+    clicked: bool,
+    last_draw: Option<ImageBox>,
+}
+
+impl SpriteWidget {
+    fn new<T>(tc: &TextureCreator<T>, x: u16, y: u16, text: &str,
+	font: &sdl2::ttf::Font) -> Self {
+	
+        Self {
+            clicked: false,
+	    last_draw: None,
+        }
+    }
+}
+
+impl Widget for SpriteWidget {
+
+    fn last_draw(&self) -> Option<ImageBox> {
+	self.last_draw
+    }
+
+    fn was_clicked(&mut self) -> bool {
+        let ret = self.clicked;
+        self.clicked = false;
+        ret
+    }
+
+    fn clicked(&mut self) {
+        self.clicked = true;
+    }
+
+    fn draw_hover(
+        &mut self,
+        canvas: &mut sdl2::render::WindowCanvas,
+	cursor: bool,
+        r: &mut GameResources,
+        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+    ){
+	self.last_draw = None;
+    }
+}
+
+
 
 /// This trait is used to determine what mode of operation the program is in
 pub trait GameMode {
@@ -1643,6 +1687,7 @@ impl<'a> GameMode for CharacterSelect<'a> {
 pub struct Game<'a> {
     b: Vec<Box<dyn Widget +'a>>,
     disp: Vec<DynamicTextWidget<'a>>,
+    sprites: Vec<SpriteWidget>,
 }
 
 impl<'a> Game<'a> {
@@ -1656,8 +1701,10 @@ impl<'a> Game<'a> {
 	d.push(DynamicTextWidget::new(tc, 35,390, "0", &r.font, sdl2::pixels::Color::WHITE));
 	d.push(DynamicTextWidget::new(tc, 35,407, "1", &r.font, sdl2::pixels::Color::WHITE));
 	d.push(DynamicTextWidget::new(tc, 35,426, "2", &r.font, sdl2::pixels::Color::WHITE));
+	
         Self { b: b,
 		disp: d,
+		sprites: Vec::new(),
 	}
     }
 }
