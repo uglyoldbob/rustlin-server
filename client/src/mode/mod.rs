@@ -1722,6 +1722,81 @@ impl<'a> GameMode for Game<'a> {
     ) {
         canvas.set_draw_color(Color::RGB(0, 0, 0));
         canvas.clear();
+	
+	let value = 1028;
+        if r.imgs.contains_key(&value) {
+            if let Loaded(t) = &r.imgs[&value] {
+                let q = t.query();
+                let _e = canvas.copy(
+                    t,
+                    None,
+                    Rect::new(0, 368, q.width.into(), q.height.into()),
+                );
+            }
+        } else {
+            r.imgs.insert(value, Loading);
+            let _e = send.blocking_send(MessageToAsync::LoadImg(value));
+        }
+	
+	let value = 1019;
+        if r.imgs.contains_key(&value) {
+            if let Loaded(t) = &r.imgs[&value] {
+                let q = t.query();
+                let _e = canvas.copy(
+                    t,
+                    None,
+                    Rect::new(485, 366, q.width.into(), q.height.into()),
+                );
+            }
+        } else {
+            r.imgs.insert(value, Loading);
+            let _e = send.blocking_send(MessageToAsync::LoadImg(value));
+        }
+	
+	let value = 1029;
+        if r.imgs.contains_key(&value) {
+            if let Loaded(t) = &r.imgs[&value] {
+                let q = t.query();
+                let _e = canvas.copy(
+                    t,
+                    None,
+                    Rect::new(3, 386, q.width.into(), q.height.into()),
+                );
+            }
+        } else {
+            r.imgs.insert(value, Loading);
+            let _e = send.blocking_send(MessageToAsync::LoadImg(value));
+        }
+	
+	let value = 1030;
+        if r.imgs.contains_key(&value) {
+            if let Loaded(t) = &r.imgs[&value] {
+                let q = t.query();
+                let _e = canvas.copy(
+                    t,
+                    None,
+                    Rect::new(3, 402, q.width.into(), q.height.into()),
+                );
+            }
+        } else {
+            r.imgs.insert(value, Loading);
+            let _e = send.blocking_send(MessageToAsync::LoadImg(value));
+        }
+	
+	let value = 1031;
+        if r.imgs.contains_key(&value) {
+            if let Loaded(t) = &r.imgs[&value] {
+                let q = t.query();
+                let _e = canvas.copy(
+                    t,
+                    None,
+                    Rect::new(3, 423, q.width.into(), q.height.into()),
+                );
+            }
+        } else {
+            r.imgs.insert(value, Loading);
+            let _e = send.blocking_send(MessageToAsync::LoadImg(value));
+        }
 
         for w in &mut self.b {
             w.draw(canvas, cursor, r, send);
@@ -2240,8 +2315,15 @@ impl<'a, T> GameMode for NewCharacterMode<'a, T> {
         send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
 	requests: &mut VecDeque<DrawModeRequest>,) {
 	
+	
 	if self.b[1].was_clicked() {
 		requests.push_back(DrawModeRequest::ChangeDrawMode(DrawMode::CharacterSelect));
+	}
+	if self.b[0].was_clicked() {
+		let remain = self.compute_remain();
+		if remain == 0 {
+			requests.push_back(DrawModeRequest::ChangeDrawMode(DrawMode::CharacterSelect));
+		}
 	}
 	
 	if self.b[3].was_clicked() {
