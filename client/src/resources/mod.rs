@@ -40,7 +40,7 @@ impl Img {
         let height = cursor.read_u16_le().await.ok()?;
         let unknown = cursor.read_u16_le().await.ok()?;
         let colorkey = cursor.read_u16_le().await.ok()?;
-        println!("IMG is {} x {} {} {}", width, height, unknown, colorkey);	
+        println!("IMG is {} x {} {} {}", width, height, unknown, colorkey);
 
         let mut data = Vec::new();
         cursor.read_to_end(&mut data).await.ok()?;
@@ -62,9 +62,12 @@ impl Img {
             PixelFormatEnum::RGB555,
         )
         .unwrap();
-	let color = sdl2::pixels::Color::from_u32(&sdl2::pixels::PixelFormat::try_from(PixelFormatEnum::RGB555).unwrap(), self.colorkey.into());
-	surface.set_color_key(true, color);
-	
+        let color = sdl2::pixels::Color::from_u32(
+            &sdl2::pixels::PixelFormat::try_from(PixelFormatEnum::RGB555).unwrap(),
+            self.colorkey.into(),
+        );
+        surface.set_color_key(true, color);
+
         //TODO set colorkey
         let text = Texture::from_surface(&surface, t).unwrap();
         Some(text)
@@ -109,19 +112,17 @@ impl PackFiles {
         let mut contents = self.sprites[hash as usize]
             .raw_file_contents(name.clone())
             .await;
-	if let None = contents {
-		contents = self.sprite
-                    .raw_file_contents(name.clone())
-                    .await;
-	}
+        if let None = contents {
+            contents = self.sprite.raw_file_contents(name.clone()).await;
+        }
         if let Some(c) = &mut contents {
             if c[3] == 0x58 {
                 println!("Need to fixup this png resource");
                 c[3] = 0x47;
                 let size = c.len();
-                for i in 1..=size-5 {
-                    c[size-i] ^= c[size-i-1];
-                    c[size-i] ^= 0x52;
+                for i in 1..=size - 5 {
+                    c[size - i] ^= c[size - i - 1];
+                    c[size - i] ^= 0x52;
                 }
             }
         }
@@ -204,26 +205,32 @@ pub enum Loadable<T> {
     Loaded(T),
 }
 
-pub struct GameResources<'a,'b,'c> {
+pub struct GameResources<'a, 'b, 'c> {
     pub pngs: HashMap<u16, Loadable<Texture<'a>>>,
     pub imgs: HashMap<u16, Loadable<Texture<'a>>>,
-    pub font: sdl2::ttf::Font<'b,'c>,
+    pub font: sdl2::ttf::Font<'b, 'c>,
     pub characters: [CharacterData; 8],
 }
 
-impl<'a,'b,'c> GameResources<'a,'b,'c> {
-    pub fn new(font: sdl2::ttf::Font<'b,'c>) -> Self {
-	let mut chars = [CharacterData::new(),
-		CharacterData::new(),CharacterData::new(),CharacterData::new(),
-		CharacterData::new(),CharacterData::new(),CharacterData::new(),
-		CharacterData::new()];
-	chars[1].t = CharacterDisplayType::MaleDarkElf;
-	chars[2].t = CharacterDisplayType::Locked;
+impl<'a, 'b, 'c> GameResources<'a, 'b, 'c> {
+    pub fn new(font: sdl2::ttf::Font<'b, 'c>) -> Self {
+        let mut chars = [
+            CharacterData::new(),
+            CharacterData::new(),
+            CharacterData::new(),
+            CharacterData::new(),
+            CharacterData::new(),
+            CharacterData::new(),
+            CharacterData::new(),
+            CharacterData::new(),
+        ];
+        chars[1].t = CharacterDisplayType::MaleDarkElf;
+        chars[2].t = CharacterDisplayType::Locked;
         Self {
             pngs: HashMap::new(),
             imgs: HashMap::new(),
-	    font: font,
-	    characters: chars,
+            font: font,
+            characters: chars,
         }
     }
 }
@@ -273,7 +280,7 @@ pub async fn async_main(
                     let font = Font::load(path).await;
                 }
                 MessageToAsync::LoadSpriteTable => {
-                    let data = include_bytes!("sprite_table.txt");
+                    let st = SpriteTableEntry::load_embedded_table().await;
                 }
                 MessageToAsync::LoadTable(name) => {
                     if let Some(p) = &mut res.packs {

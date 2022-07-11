@@ -96,14 +96,12 @@ impl Mouse {
             }
         }
     }
-    
-    pub fn cursor(&self) -> Option<(i16,i16)> {
-	match self.state {
-		MouseState::Normal => {
-                        Some(self.position)
-                    }
-		_ => { None }
-	}
+
+    pub fn cursor(&self) -> Option<(i16, i16)> {
+        match self.state {
+            MouseState::Normal => Some(self.position),
+            _ => None,
+        }
     }
 
     /// Indicates that all events so far have been processed

@@ -1,7 +1,7 @@
-use crate::Loadable::Loaded;
 use crate::mode::*;
 use crate::mouse::*;
 use crate::resources::*;
+use crate::Loadable::Loaded;
 use sdl2::event::Event;
 use sdl2::image::LoadTexture;
 use sdl2::keyboard::Keycode;
@@ -18,22 +18,22 @@ mod settings;
 
 const embedded_font: &[u8] = include_bytes!("cmsltt10.ttf");
 
-fn make_dummy_texture<'a,T>(tc: &'a TextureCreator<T>) -> Texture<'a> {
-	let mut data : Vec<u8>= vec![0; (4 * 4 * 2) as usize];
-        let mut surf = sdl2::surface::Surface::from_data(
-            data.as_mut_slice(),
-            4,
-            4,
-            (2 * 4) as u32,
-            PixelFormatEnum::RGB555,
-        )
-        .unwrap();
-	surf.set_color_key(true, sdl2::pixels::Color::BLACK);
-        Texture::from_surface(&surf, tc).unwrap()
+fn make_dummy_texture<'a, T>(tc: &'a TextureCreator<T>) -> Texture<'a> {
+    let mut data: Vec<u8> = vec![0; (4 * 4 * 2) as usize];
+    let mut surf = sdl2::surface::Surface::from_data(
+        data.as_mut_slice(),
+        4,
+        4,
+        (2 * 4) as u32,
+        PixelFormatEnum::RGB555,
+    )
+    .unwrap();
+    surf.set_color_key(true, sdl2::pixels::Color::BLACK);
+    Texture::from_surface(&surf, tc).unwrap()
 }
 
 pub fn startup(mode: DrawMode) {
-        let settings_file = fs::read_to_string("./client-settings.ini");
+    let settings_file = fs::read_to_string("./client-settings.ini");
     let settings_con = match settings_file {
         Ok(con) => con,
         Err(_) => "".to_string(),
@@ -47,7 +47,7 @@ pub fn startup(mode: DrawMode) {
     let ttf_context = sdl2::ttf::init().unwrap();
     let efont = sdl2::rwops::RWops::from_bytes(embedded_font).unwrap();
     let font = ttf_context.load_font_from_rwops(efont, 14).unwrap();
-    
+
     let sdl_context = sdl2::init().unwrap();
     let mut event_pump = sdl_context.event_pump().unwrap();
     let video_subsystem = sdl_context.video().unwrap();
@@ -70,31 +70,21 @@ pub fn startup(mode: DrawMode) {
 
     let mut game_resources = GameResources::new(font);
     let mut mode: Box<dyn GameMode> = match mode {
-	DrawMode::Explorer => {
-	    let t = ExplorerMenu::new(&texture_creator, &mut game_resources);
-	    Box::new(t)
-	}
-	DrawMode::PngExplorer => {
-	    Box::new(PngExplorer::new(&texture_creator, &mut game_resources))
-	}
-	DrawMode::ImgExplorer => {
-	    Box::new(ImgExplorer::new(&texture_creator, &mut game_resources))
-	}
-	DrawMode::GameLoader => {
-	    Box::new(GameLoader::new(&texture_creator, &mut game_resources))
-	}
-	DrawMode::Login => {
-	    Box::new(Login::new(&texture_creator))
-	}
-	DrawMode::CharacterSelect => {
-	    Box::new(CharacterSelect::new(&texture_creator, &mut game_resources))
-	}
-	DrawMode::NewCharacter => {
-	    Box::new(NewCharacterMode::new(&texture_creator, &mut game_resources))
-	}
-	DrawMode::Game => {
-	    Box::new(Game::new(&texture_creator, &mut game_resources))
-	}
+        DrawMode::Explorer => {
+            let t = ExplorerMenu::new(&texture_creator, &mut game_resources);
+            Box::new(t)
+        }
+        DrawMode::PngExplorer => Box::new(PngExplorer::new(&texture_creator, &mut game_resources)),
+        DrawMode::ImgExplorer => Box::new(ImgExplorer::new(&texture_creator, &mut game_resources)),
+        DrawMode::GameLoader => Box::new(GameLoader::new(&texture_creator, &mut game_resources)),
+        DrawMode::Login => Box::new(Login::new(&texture_creator)),
+        DrawMode::CharacterSelect => {
+            Box::new(CharacterSelect::new(&texture_creator, &mut game_resources))
+        }
+        DrawMode::NewCharacter => {
+            Box::new(NewCharacterMode::new(&texture_creator, &mut game_resources))
+        }
+        DrawMode::Game => Box::new(Game::new(&texture_creator, &mut game_resources)),
     };
 
     let windowed = match settings.get("general", "window").unwrap().as_str() {
@@ -128,7 +118,7 @@ pub fn startup(mode: DrawMode) {
     canvas.set_draw_color(Color::RGB(0, 0, 0));
     canvas.clear();
     canvas.present();
-    
+
     let dummy_texture = make_dummy_texture(&texture_creator);
 
     let flags = sdl2::image::InitFlag::all();
@@ -178,7 +168,7 @@ pub fn startup(mode: DrawMode) {
                     let mut png = texture_creator.load_texture_bytes(data);
                     match png {
                         Ok(mut a) => {
-			    a.set_blend_mode(sdl2::render::BlendMode::Add);
+                            a.set_blend_mode(sdl2::render::BlendMode::Add);
                             game_resources.pngs.insert(*name, Loaded(a));
                             println!("PNG {} success", name);
                         }
@@ -279,73 +269,73 @@ pub fn startup(mode: DrawMode) {
                 } => {
                     mouse.event(MouseEventInput::Scrolling(y));
                 }
-		Event::KeyDown {
-		    timestamp: _,
-		    window_id: _,
-		    keycode,
-		    scancode: _,
-		    keymod: _,
-		    repeat: _} => {
-		    println!("Key down event");
-		    if let Some(key) = keycode {
-			mode.process_button(key, true, &mut game_resources);
-		    }
-		}
-		Event::KeyUp {
-		    timestamp: _,
-		    window_id: _,
-		    keycode,
-		    scancode: _,
-		    keymod: _,
-		    repeat: _} => {
-		    println!("Key up event");
-		    if let Some(key) = keycode {
-			mode.process_button(key, false, &mut game_resources);
-		    }
-		}
+                Event::KeyDown {
+                    timestamp: _,
+                    window_id: _,
+                    keycode,
+                    scancode: _,
+                    keymod: _,
+                    repeat: _,
+                } => {
+                    println!("Key down event");
+                    if let Some(key) = keycode {
+                        mode.process_button(key, true, &mut game_resources);
+                    }
+                }
+                Event::KeyUp {
+                    timestamp: _,
+                    window_id: _,
+                    keycode,
+                    scancode: _,
+                    keymod: _,
+                    repeat: _,
+                } => {
+                    println!("Key up event");
+                    if let Some(key) = keycode {
+                        mode.process_button(key, false, &mut game_resources);
+                    }
+                }
                 _ => {}
             }
         }
         mouse.parse();
         mode.process_mouse(mouse.events(), &mut drawmode_commands);
         mouse.clear();
-	mode.process_frame(&mut game_resources, &mut s1, &mut drawmode_commands);
+        mode.process_frame(&mut game_resources, &mut s1, &mut drawmode_commands);
         while let Some(m) = drawmode_commands.pop_front() {
             match m {
                 DrawModeRequest::ChangeDrawMode(m) => {
                     println!("Requested to change the drawmode");
                     mode = match m {
                         DrawMode::Explorer => {
-			    let t = ExplorerMenu::new(&texture_creator, &mut game_resources);
+                            let t = ExplorerMenu::new(&texture_creator, &mut game_resources);
                             Box::new(t)
                         }
-			DrawMode::PngExplorer => {
-			    Box::new(PngExplorer::new(&texture_creator, &mut game_resources))
-			}
-			DrawMode::ImgExplorer => {
-			    Box::new(ImgExplorer::new(&texture_creator, &mut game_resources))
-			}
-			DrawMode::GameLoader => {
-			    Box::new(GameLoader::new(&texture_creator, &mut game_resources))
-	                }
-                        DrawMode::Login => {
-                            Box::new(Login::new(&texture_creator))
+                        DrawMode::PngExplorer => {
+                            Box::new(PngExplorer::new(&texture_creator, &mut game_resources))
                         }
-			DrawMode::CharacterSelect => {
-			    Box::new(CharacterSelect::new(&texture_creator, &mut game_resources))
-			}
-			DrawMode::NewCharacter => {
-			    Box::new(NewCharacterMode::new(&texture_creator, &mut game_resources))
-			}
-			DrawMode::Game => {
-			    Box::new(Game::new(&texture_creator, &mut game_resources))
-			}
+                        DrawMode::ImgExplorer => {
+                            Box::new(ImgExplorer::new(&texture_creator, &mut game_resources))
+                        }
+                        DrawMode::GameLoader => {
+                            Box::new(GameLoader::new(&texture_creator, &mut game_resources))
+                        }
+                        DrawMode::Login => Box::new(Login::new(&texture_creator)),
+                        DrawMode::CharacterSelect => {
+                            Box::new(CharacterSelect::new(&texture_creator, &mut game_resources))
+                        }
+                        DrawMode::NewCharacter => {
+                            Box::new(NewCharacterMode::new(&texture_creator, &mut game_resources))
+                        }
+                        DrawMode::Game => {
+                            Box::new(Game::new(&texture_creator, &mut game_resources))
+                        }
                     };
                 }
             }
         }
         mode.draw(&mut canvas, mouse.cursor(), &mut game_resources, &mut s1);
-	canvas.copy(&dummy_texture, None, None);
+        canvas.copy(&dummy_texture, None, None);
         canvas.present();
         let framerate = mode.framerate() as u64;
         ::std::thread::sleep(Duration::from_nanos(1_000_000_000u64 / framerate));
