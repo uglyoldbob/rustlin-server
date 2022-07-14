@@ -5,6 +5,7 @@ use sdl2::render::Texture;
 use sdl2::render::TextureCreator;
 use sdl2::surface::Surface;
 use std::collections::HashMap;
+use std::io::Write;
 use tokio::io::AsyncReadExt;
 
 pub mod stringtable;

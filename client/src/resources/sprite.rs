@@ -5,6 +5,17 @@ const embedded_sprite_table: &[u8] = include_bytes!("sprite_table.txt");
 
 async fn get_integer(c: &mut Cursor<Vec<u8>>) -> (Option<u8>, i32) {
     let mut last_byte = c.read_u8().await;
+    loop {
+        match last_byte {
+            Ok(last) => match last {
+                b'0'..=b'9' => break,
+                _ => {
+                    last_byte = c.read_u8().await;
+                }
+            },
+            Err(_) => break,
+        }
+    }
     let mut collected_value: i32 = 0;
     let mut index = 0;
     let mut found_minus = false;
@@ -49,11 +60,28 @@ impl SpriteTableEntry {
             }
         }
         let mut cursor = Cursor::new(data);
-        cursor.read_u8().await; //first byte is ignored
+        let _e = cursor.read_u8().await; //first byte is ignored
+        let sprite_val = 0;
+        let mut last_byte: Option<u8> = None;
         let (b, val) = get_integer(&mut cursor).await;
-        println!("SPR: {} {:?}", val, b);
+        last_byte = b;
+        println!("SPR: {} {:?}", val, last_byte);
+        println!("Sprite {} has {} frames", sprite_val, val);
+        if let Some(b) = last_byte {
+            if b == b'=' {
+                let (v, val) = get_integer(&mut cursor).await;
+                println!("Sprite {} has alias {}", sprite_val, val);
+            }
+        }
         Self {}
     }
 }
 
 struct Sprite {}
+
+impl Sprite {
+    ///Contents of %d-%d.spr is given to this function in a cursor
+    pub async fn parse_sprite(cursor: &mut std::io::Cursor<&Vec<u8>>) -> Option<Self> {
+        Some(Self {})
+    }
+}

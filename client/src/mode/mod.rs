@@ -13,6 +13,7 @@ pub enum DrawMode {
     Explorer,
     PngExplorer,
     ImgExplorer,
+    SprExplorer,
     GameLoader,
     Login,
     CharacterSelect,
@@ -1142,6 +1143,13 @@ impl<'a> ExplorerMenu<'a> {
             "Img browser",
             &r.font,
         )));
+        b.push(Box::new(TextButton::new(
+            tc,
+            50,
+            128,
+            "Sprite browser",
+            &r.font,
+        )));
         Self { b: b }
     }
 }
@@ -1185,6 +1193,9 @@ impl<'a> GameMode for ExplorerMenu<'a> {
         }
         if self.b[1].was_clicked() {
             requests.push_back(DrawModeRequest::ChangeDrawMode(DrawMode::ImgExplorer));
+        }
+        if self.b[2].was_clicked() {
+            requests.push_back(DrawModeRequest::ChangeDrawMode(DrawMode::SprExplorer));
         }
     }
 
@@ -2582,6 +2593,175 @@ impl<'a, T> GameMode for NewCharacterMode<'a, T> {
             w.draw(canvas, cursor, r, send);
         }
         self.c.draw(canvas, cursor, r, send);
+    }
+
+    fn framerate(&self) -> u8 {
+        20
+    }
+}
+
+pub struct SprExplorer<'a, T> {
+    b: Vec<Box<dyn Widget + 'a>>,
+    disp: Vec<DynamicTextWidget<'a>>,
+    current_spr_a: u16,
+    current_spr_b: u16,
+    tc: &'a TextureCreator<T>,
+    displayed: bool,
+}
+
+impl<'a, T> SprExplorer<'a, T> {
+    pub fn new(tc: &'a TextureCreator<T>, r: &mut GameResources) -> Self {
+        let mut b: Vec<Box<dyn Widget + 'a>> = Vec::new();
+        b.push(Box::new(TextButton::new(tc, 320, 400, "Go Back", &r.font)));
+        let mut disp = Vec::new();
+        disp.push(DynamicTextWidget::new(
+            tc,
+            320,
+            386,
+            "Displaying 0-0.spr",
+            &r.font,
+            sdl2::pixels::Color::RED,
+        ));
+
+        Self {
+            b: b,
+            disp: disp,
+            current_spr_a: 0,
+            current_spr_b: 0,
+            tc: tc,
+            displayed: false,
+        }
+    }
+}
+
+impl<'a, T> GameMode for SprExplorer<'a, T> {
+    fn process_mouse(
+        &mut self,
+        events: &Vec<MouseEventOutput>,
+        requests: &mut VecDeque<DrawModeRequest>,
+    ) {
+        for e in events {
+            match e {
+                MouseEventOutput::Move((x, y)) => {}
+                MouseEventOutput::LeftDrag { from, to } => {
+                    let (x, y) = to;
+                }
+                MouseEventOutput::MiddleDrag { from, to } => {
+                    let (x, y) = to;
+                }
+                MouseEventOutput::RightDrag { from, to } => {
+                    let (x, y) = to;
+                }
+                MouseEventOutput::DragStop => {}
+                MouseEventOutput::LeftClick((x, y)) => {
+                    for w in &mut self.b {
+                        if w.contains(*x, *y) {
+                            w.clicked();
+                        }
+                    }
+                }
+                MouseEventOutput::MiddleClick((x, y)) => {}
+                MouseEventOutput::RightClick((x, y)) => {}
+                MouseEventOutput::ExtraClick => {}
+                MouseEventOutput::Extra2Click => {}
+                MouseEventOutput::Scrolling(amount) => {}
+            }
+        }
+
+        if self.b[0].was_clicked() {
+            requests.push_back(DrawModeRequest::ChangeDrawMode(DrawMode::Explorer));
+        }
+    }
+
+    fn process_button(
+        &mut self,
+        button: sdl2::keyboard::Keycode,
+        down: bool,
+        r: &mut GameResources,
+    ) {
+        if down {
+            match button {
+                sdl2::keyboard::Keycode::Left => {
+                    if self.current_spr_a > 0 {
+                        if true {
+                            self.current_spr_a -= 1;
+                            let words = format!(
+                                "Displaying {}-{}.spr",
+                                self.current_spr_a, self.current_spr_b
+                            );
+                            self.disp[0].update_text(self.tc, &words, &r.font);
+                            self.displayed = false;
+                        }
+                    }
+                }
+                sdl2::keyboard::Keycode::Right => {
+                    if self.current_spr_a < 65534 {
+                        if true {
+                            self.current_spr_a += 1;
+                            let words = format!(
+                                "Displaying {}-{}.spr",
+                                self.current_spr_a, self.current_spr_b
+                            );
+                            self.disp[0].update_text(self.tc, &words, &r.font);
+                            self.displayed = false;
+                        }
+                    }
+                }
+                sdl2::keyboard::Keycode::Down => {
+                    if self.current_spr_b > 0 {
+                        if true {
+                            self.current_spr_b -= 1;
+                            let words = format!(
+                                "Displaying {}-{}.spr",
+                                self.current_spr_a, self.current_spr_b
+                            );
+                            self.disp[0].update_text(self.tc, &words, &r.font);
+                            self.displayed = false;
+                        }
+                    }
+                }
+                sdl2::keyboard::Keycode::Up => {
+                    if self.current_spr_b < 65534 {
+                        if true {
+                            self.current_spr_b += 1;
+                            let words = format!(
+                                "Displaying {}-{}.spr",
+                                self.current_spr_a, self.current_spr_b
+                            );
+                            self.disp[0].update_text(self.tc, &words, &r.font);
+                            self.displayed = false;
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
+    fn process_frame(
+        &mut self,
+        r: &mut GameResources,
+        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+        requests: &mut VecDeque<DrawModeRequest>,
+    ) {
+    }
+
+    fn draw(
+        &mut self,
+        canvas: &mut sdl2::render::WindowCanvas,
+        cursor: Option<(i16, i16)>,
+        r: &mut GameResources,
+        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+    ) {
+        canvas.set_draw_color(Color::RGB(0, 0, 0));
+        canvas.clear();
+
+        for w in &mut self.b {
+            w.draw(canvas, cursor, r, send);
+        }
+        for w in &mut self.disp {
+            w.draw(canvas, cursor, r, send);
+        }
     }
 
     fn framerate(&self) -> u8 {
