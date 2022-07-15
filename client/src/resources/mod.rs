@@ -82,6 +82,7 @@ pub enum MessageToAsync {
     LoadPng(u16),
     LoadImg(u16),
     LoadRunner(Box<dyn AsyncRunner + Send>),
+    LoadSprite(u16, u16),
 }
 
 pub enum MessageFromAsync {
@@ -89,6 +90,7 @@ pub enum MessageFromAsync {
     StringTable(String, StringTable),
     Png(u16, Vec<u8>),
     Img(u16, Img),
+    Sprite(u32, Sprite),
 }
 
 struct PackFiles {
@@ -210,7 +212,7 @@ pub struct GameResources<'a, 'b, 'c> {
     pub imgs: HashMap<u16, Loadable<Texture<'a>>>,
     pub font: sdl2::ttf::Font<'b, 'c>,
     pub characters: [CharacterData; 8],
-    pub sprites: HashMap<u32, Loadable<SpriteGui>>,
+    pub sprites: HashMap<u32, Loadable<SpriteGui<'a>>>,
 }
 
 impl<'a, 'b, 'c> GameResources<'a, 'b, 'c> {
@@ -323,6 +325,26 @@ pub async fn async_main(
                             }
                             None => {
                                 println!("{} failed to load", name);
+                            }
+                        }
+                    }
+                }
+                MessageToAsync::LoadSprite(a, b) => {
+                    let name = format!("{}-{}.spr", a, b);
+                    let id = (a as u32) << 16 | (b as u32);
+                    if let Some(p) = &mut res.packs {
+                        let hash = PackFiles::get_hash_index(name.clone());
+                        let mut contents = p.sprites[hash as usize]
+                            .raw_file_contents(name.clone())
+                            .await;
+                        if let None = contents {
+                            contents = p.sprite.raw_file_contents(name.clone()).await;
+                        }
+                        if let Some(c) = &contents {
+                            let mut cursor = std::io::Cursor::new(c);
+                            let spr = Sprite::parse_sprite(&mut cursor).await;
+                            if let Some(spr) = spr {
+                                let _e = s.send(MessageFromAsync::Sprite(id, spr)).await;
                             }
                         }
                     }

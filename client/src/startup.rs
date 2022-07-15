@@ -188,6 +188,10 @@ pub fn startup(mode: DrawMode) {
                         }
                     }
                 }
+                MessageFromAsync::Sprite(id, spr) => {
+                    let sprite = spr.to_gui(&texture_creator);
+                    game_resources.sprites.insert(0, Loaded(sprite));
+                }
             }
         }
         for event in event_pump.poll_iter() {

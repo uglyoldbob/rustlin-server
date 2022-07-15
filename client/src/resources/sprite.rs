@@ -1,3 +1,7 @@
+use sdl2::pixels::PixelFormatEnum;
+use sdl2::render::Texture;
+use sdl2::render::TextureCreator;
+use sdl2::surface::Surface;
 use std::io::Cursor;
 use tokio::io::AsyncReadExt;
 use tokio::io::AsyncSeekExt;
@@ -137,18 +141,28 @@ impl SpriteFrame {
         }
     }
 }
-struct Sprite {
+pub struct Sprite {
     pallete: Option<Vec<u16>>,
     frames: Vec<SpriteFrame>,
     tiles: Vec<SpriteTile>,
 }
 
 /// The sprite struct used by the gui thread
-pub struct SpriteGui {}
+pub struct SpriteGui<'a> {
+    frames: Vec<Texture<'a>>,
+}
 
 impl Sprite {
-    pub fn to_gui(&self) -> SpriteGui {
-        SpriteGui {}
+    pub fn to_gui<'a, T>(&self, t: &'a TextureCreator<T>) -> SpriteGui<'a> {
+        let mut frames = Vec::with_capacity(self.frames.len());
+        for f in &self.frames {
+            for _t in &f.tiles {
+                let surface = Surface::new(16 as u32, 16 as u32, PixelFormatEnum::RGB555).unwrap();
+                let txt = Texture::from_surface(&surface, t).unwrap();
+                frames.push(txt);
+            }
+        }
+        SpriteGui { frames: frames }
     }
 
     ///Contents of %d-%d.spr is given to this function in a cursor
