@@ -1,5 +1,6 @@
 use std::io::Cursor;
 use tokio::io::AsyncReadExt;
+use tokio::io::AsyncSeekExt;
 
 const embedded_sprite_table: &[u8] = include_bytes!("sprite_table.txt");
 
@@ -77,11 +78,159 @@ impl SpriteTableEntry {
     }
 }
 
-struct Sprite {}
+struct SpriteTile {
+    x: i8,
+    y: i8,
+    width: u8,
+    height: u8,
+    data: Vec<u16>,
+}
+
+impl SpriteTile {
+    fn new() -> Self {
+        Self {
+            x: 0,
+            y: 0,
+            width: 0,
+            height: 0,
+            data: Vec::new(),
+        }
+    }
+}
+
+struct SpriteTileInfo {
+    x: u8,
+    y: u8,
+    h: u8,
+    tile: u16,
+}
+
+impl SpriteTileInfo {
+    fn new() -> Self {
+        Self {
+            x: 0,
+            y: 0,
+            h: 0,
+            tile: 0,
+        }
+    }
+}
+
+struct SpriteFrame {
+    x1: u16,
+    x2: u16,
+    y1: u16,
+    y2: u16,
+    mystery1: u32,
+    tiles: Vec<SpriteTileInfo>,
+}
+
+impl SpriteFrame {
+    fn new() -> Self {
+        Self {
+            x1: 0,
+            x2: 0,
+            y1: 0,
+            y2: 0,
+            mystery1: 0,
+            tiles: Vec::new(),
+        }
+    }
+}
+struct Sprite {
+    pallete: Option<Vec<u16>>,
+    frames: Vec<SpriteFrame>,
+    tiles: Vec<SpriteTile>,
+}
 
 impl Sprite {
     ///Contents of %d-%d.spr is given to this function in a cursor
     pub async fn parse_sprite(cursor: &mut std::io::Cursor<&Vec<u8>>) -> Option<Self> {
-        Some(Self {})
+        println!("Parsing sprite");
+        let mut pallete = None;
+        let temp = cursor.read_i8().await.unwrap();
+        let num_frames = if (temp < 0) {
+            println!("Reading pallete for sprite");
+            let mut num_pallete_entries: u16 = cursor.read_u8().await.unwrap() as u16;
+            if num_pallete_entries == 0 {
+                num_pallete_entries = 0x100;
+            }
+            let mut p = Vec::new();
+            for _ in 0..=num_pallete_entries {
+                p.push(cursor.read_u16().await.unwrap());
+            }
+            pallete = Some(p);
+            cursor.read_u8().await.unwrap()
+        } else {
+            temp as u8
+        };
+        let mut frames = Vec::new();
+        for _ in 0..=num_frames {
+            let mut frame: SpriteFrame = SpriteFrame::new();
+            frame.x1 = cursor.read_u16().await.unwrap();
+            frame.x2 = cursor.read_u16().await.unwrap();
+            frame.y1 = cursor.read_u16().await.unwrap();
+            frame.y2 = cursor.read_u16().await.unwrap();
+            frame.mystery1 = cursor.read_u32().await.unwrap();
+            let num_tiles = cursor.read_u16().await.unwrap();
+            for _ in 0..=num_tiles {
+                let mut tile = SpriteTileInfo::new();
+                tile.x = cursor.read_u8().await.unwrap();
+                tile.y = cursor.read_u8().await.unwrap();
+                tile.h = cursor.read_u8().await.unwrap();
+                tile.tile = cursor.read_u16().await.unwrap();
+                frame.tiles.push(tile);
+            }
+            frames.push(frame);
+        }
+        let num_tiles = cursor.read_u32().await.unwrap();
+        let mut tile_offset = Vec::with_capacity(num_tiles as usize);
+        for _ in 0..=num_tiles {
+            tile_offset.push(cursor.read_u32().await.unwrap());
+        }
+        let tile_position = cursor.stream_position().await.unwrap();
+        if let Some(p) = &pallete {
+            for i in 0..=num_tiles {
+                let _e = cursor
+                    .seek(tokio::io::SeekFrom::Start(
+                        tile_position + tile_offset[i as usize] as u64,
+                    ))
+                    .await;
+                let mut t: SpriteTile = SpriteTile::new();
+            }
+        } else {
+            for i in 0..=num_tiles {
+                let _e = cursor
+                    .seek(tokio::io::SeekFrom::Start(
+                        tile_position + tile_offset[i as usize] as u64,
+                    ))
+                    .await;
+                let mut t: SpriteTile = SpriteTile::new();
+                t.x = cursor.read_i8().await.unwrap();
+                t.y = cursor.read_i8().await.unwrap();
+                t.width = cursor.read_u8().await.unwrap();
+                t.height = cursor.read_u8().await.unwrap();
+                t.data = Vec::with_capacity(t.width as usize * t.height as usize);
+                for row in 0..=t.height {
+                    let row_segments = cursor.read_u8().await.unwrap();
+                    let mut row_offset = 0;
+                    for segment in 0..=row_segments {
+                        let skip = cursor.read_u8().await.unwrap() / 2;
+                        let w = cursor.read_u8().await.unwrap();
+                        row_offset += skip;
+                        for _ in 0..=w {
+                            t.data[row as usize * t.width as usize + row_offset as usize] =
+                                cursor.read_u16().await.unwrap();
+                        }
+                    }
+                }
+            }
+        }
+
+        Some(Self {
+            pallete: pallete,
+            frames: frames,
+            tiles: Vec::new(),
+        })
     }
 }
