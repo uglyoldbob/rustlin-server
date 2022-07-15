@@ -16,7 +16,7 @@ use std::time::Duration;
 
 mod settings;
 
-const embedded_font: &[u8] = include_bytes!("cmsltt10.ttf");
+const EMBEDDED_FONT: &[u8] = include_bytes!("cmsltt10.ttf");
 
 fn make_dummy_texture<'a, T>(tc: &'a TextureCreator<T>) -> Texture<'a> {
     let mut data: Vec<u8> = vec![0; (4 * 4 * 2) as usize];
@@ -28,7 +28,7 @@ fn make_dummy_texture<'a, T>(tc: &'a TextureCreator<T>) -> Texture<'a> {
         PixelFormatEnum::RGB555,
     )
     .unwrap();
-    surf.set_color_key(true, sdl2::pixels::Color::BLACK);
+    let _e = surf.set_color_key(true, sdl2::pixels::Color::BLACK);
     Texture::from_surface(&surf, tc).unwrap()
 }
 
@@ -45,7 +45,7 @@ pub fn startup(mode: DrawMode) {
     }
 
     let ttf_context = sdl2::ttf::init().unwrap();
-    let efont = sdl2::rwops::RWops::from_bytes(embedded_font).unwrap();
+    let efont = sdl2::rwops::RWops::from_bytes(EMBEDDED_FONT).unwrap();
     let font = ttf_context.load_font_from_rwops(efont, 14).unwrap();
 
     let sdl_context = sdl2::init().unwrap();
@@ -102,16 +102,11 @@ pub fn startup(mode: DrawMode) {
 
     println!("Loading resources from {}", resources);
 
-    s1.blocking_send(MessageToAsync::LoadResources(resources.clone()));
-    s1.blocking_send(MessageToAsync::LoadTable("obscene-e.tbl".to_string()));
-    s1.blocking_send(MessageToAsync::LoadFont("Font/eng.fnt".to_string()));
-    s1.blocking_send(MessageToAsync::LoadSpriteTable);
+    let _e = s1.blocking_send(MessageToAsync::LoadResources(resources.clone()));
+    let _e = s1.blocking_send(MessageToAsync::LoadTable("obscene-e.tbl".to_string()));
+    let _e = s1.blocking_send(MessageToAsync::LoadFont("Font/eng.fnt".to_string()));
+    let _e = s1.blocking_send(MessageToAsync::LoadSpriteTable);
     //load Font/SMALL.FNT
-
-    //load program settings, including where to find resources
-    let game_settings = settings::Settings {
-        game_resources: "/nowhere".to_string(),
-    };
 
     //load pack files
     //Text, Tile, Sprite0-Sprite15
@@ -123,7 +118,7 @@ pub fn startup(mode: DrawMode) {
     let dummy_texture = make_dummy_texture(&texture_creator);
 
     let flags = sdl2::image::InitFlag::all();
-    let sdl2_image = sdl2::image::init(flags).unwrap();
+    let _sdl2_image = sdl2::image::init(flags).unwrap();
 
     let mut mouse = Mouse::new();
     let mut drawmode_commands: VecDeque<DrawModeRequest> = VecDeque::new();
@@ -162,11 +157,11 @@ pub fn startup(mode: DrawMode) {
                         break 'running;
                     }
                 }
-                MessageFromAsync::StringTable(name, data) => {
+                MessageFromAsync::StringTable(name, _data) => {
                     println!("Loaded string table {}", name);
                 }
                 MessageFromAsync::Png(name, data) => {
-                    let mut png = texture_creator.load_texture_bytes(data);
+                    let png = texture_creator.load_texture_bytes(data);
                     match png {
                         Ok(mut a) => {
                             a.set_blend_mode(sdl2::render::BlendMode::Add);
@@ -339,7 +334,7 @@ pub fn startup(mode: DrawMode) {
             }
         }
         mode.draw(&mut canvas, mouse.cursor(), &mut game_resources, &mut s1);
-        canvas.copy(&dummy_texture, None, None);
+        let _e = canvas.copy(&dummy_texture, None, None);
         canvas.present();
         let framerate = mode.framerate() as u64;
         ::std::thread::sleep(Duration::from_nanos(1_000_000_000u64 / framerate));

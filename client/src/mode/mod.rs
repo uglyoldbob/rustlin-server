@@ -128,9 +128,9 @@ impl<'a> Widget for PlainColorButton<'a> {
     fn draw_hover(
         &mut self,
         canvas: &mut sdl2::render::WindowCanvas,
-        cursor: bool,
-        r: &mut GameResources,
-        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+        _cursor: bool,
+        _r: &mut GameResources,
+        _send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
     ) {
         let q = self.t.query();
         let _e = canvas.copy(
@@ -204,8 +204,8 @@ impl<'a> Widget for TextButton<'a> {
         &mut self,
         canvas: &mut sdl2::render::WindowCanvas,
         cursor: bool,
-        r: &mut GameResources,
-        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+        _r: &mut GameResources,
+        _send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
     ) {
         let t = if cursor { &self.t2 } else { &self.t };
         let q = t.query();
@@ -364,7 +364,7 @@ impl Widget for SelectableWidget {
     fn draw_hover(
         &mut self,
         canvas: &mut sdl2::render::WindowCanvas,
-        cursor: bool,
+        _cursor: bool,
         r: &mut GameResources,
         send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
     ) {
@@ -446,7 +446,7 @@ impl<'a> DynamicTextWidget<'a> {
     }
 
     fn update_text<T>(&mut self, tc: &'a TextureCreator<T>, text: &str, font: &sdl2::ttf::Font) {
-        if (text != self.s) {
+        if text != self.s {
             let pr = font.render(text);
             let ft = pr.solid(self.color).unwrap();
             self.t = Texture::from_surface(&ft, tc).unwrap();
@@ -469,9 +469,9 @@ impl<'a> Widget for DynamicTextWidget<'a> {
     fn draw_hover(
         &mut self,
         canvas: &mut sdl2::render::WindowCanvas,
-        cursor: bool,
-        r: &mut GameResources,
-        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+        _cursor: bool,
+        _r: &mut GameResources,
+        _send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
     ) {
         let t = &self.t;
         let q = t.query();
@@ -1055,7 +1055,13 @@ pub struct SpriteWidget {
 }
 
 impl SpriteWidget {
-    fn new<T>(tc: &TextureCreator<T>, x: u16, y: u16, text: &str, font: &sdl2::ttf::Font) -> Self {
+    fn new<T>(
+        _tc: &TextureCreator<T>,
+        _x: u16,
+        _y: u16,
+        _text: &str,
+        _font: &sdl2::ttf::Font,
+    ) -> Self {
         Self {
             clicked: false,
             last_draw: None,
@@ -1080,10 +1086,10 @@ impl Widget for SpriteWidget {
 
     fn draw_hover(
         &mut self,
-        canvas: &mut sdl2::render::WindowCanvas,
-        cursor: bool,
-        r: &mut GameResources,
-        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+        _canvas: &mut sdl2::render::WindowCanvas,
+        _cursor: bool,
+        _r: &mut GameResources,
+        _send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
     ) {
         self.last_draw = None;
     }
@@ -1162,15 +1168,15 @@ impl<'a> GameMode for ExplorerMenu<'a> {
     ) {
         for e in events {
             match e {
-                MouseEventOutput::Move((x, y)) => {}
-                MouseEventOutput::LeftDrag { from, to } => {
-                    let (x, y) = to;
+                MouseEventOutput::Move((_x, _y)) => {}
+                MouseEventOutput::LeftDrag { from: _, to } => {
+                    let (_x, _y) = to;
                 }
-                MouseEventOutput::MiddleDrag { from, to } => {
-                    let (x, y) = to;
+                MouseEventOutput::MiddleDrag { from: _, to } => {
+                    let (_x, _y) = to;
                 }
-                MouseEventOutput::RightDrag { from, to } => {
-                    let (x, y) = to;
+                MouseEventOutput::RightDrag { from: _, to } => {
+                    let (_x, _y) = to;
                 }
                 MouseEventOutput::DragStop => {}
                 MouseEventOutput::LeftClick((x, y)) => {
@@ -1180,11 +1186,11 @@ impl<'a> GameMode for ExplorerMenu<'a> {
                         }
                     }
                 }
-                MouseEventOutput::MiddleClick((x, y)) => {}
-                MouseEventOutput::RightClick((x, y)) => {}
+                MouseEventOutput::MiddleClick((_x, _y)) => {}
+                MouseEventOutput::RightClick((_x, _y)) => {}
                 MouseEventOutput::ExtraClick => {}
                 MouseEventOutput::Extra2Click => {}
-                MouseEventOutput::Scrolling(amount) => {}
+                MouseEventOutput::Scrolling(_amount) => {}
             }
         }
 
@@ -1201,17 +1207,17 @@ impl<'a> GameMode for ExplorerMenu<'a> {
 
     fn process_button(
         &mut self,
-        button: sdl2::keyboard::Keycode,
-        down: bool,
-        r: &mut GameResources,
+        _button: sdl2::keyboard::Keycode,
+        _down: bool,
+        _r: &mut GameResources,
     ) {
     }
 
     fn process_frame(
         &mut self,
-        r: &mut GameResources,
-        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
-        requests: &mut VecDeque<DrawModeRequest>,
+        _r: &mut GameResources,
+        _send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+        _requests: &mut VecDeque<DrawModeRequest>,
     ) {
     }
 
@@ -1250,7 +1256,7 @@ pub struct GameLoader<'a> {
 }
 
 impl<'a> GameLoader<'a> {
-    pub fn new<T>(tc: &'a TextureCreator<T>, r: &mut GameResources) -> Self {
+    pub fn new<T>(tc: &'a TextureCreator<T>, _r: &mut GameResources) -> Self {
         let mut b: Vec<Box<dyn Widget + 'a>> = Vec::new();
         b.push(Box::new(PlainColorButton::new(tc, 50, 50, 50, 50)));
         Self { b: b }
@@ -1265,15 +1271,15 @@ impl<'a> GameMode for GameLoader<'a> {
     ) {
         for e in events {
             match e {
-                MouseEventOutput::Move((x, y)) => {}
-                MouseEventOutput::LeftDrag { from, to } => {
-                    let (x, y) = to;
+                MouseEventOutput::Move((_x, _y)) => {}
+                MouseEventOutput::LeftDrag { from: _, to } => {
+                    let (_x, _y) = to;
                 }
-                MouseEventOutput::MiddleDrag { from, to } => {
-                    let (x, y) = to;
+                MouseEventOutput::MiddleDrag { from: _, to } => {
+                    let (_x, _y) = to;
                 }
-                MouseEventOutput::RightDrag { from, to } => {
-                    let (x, y) = to;
+                MouseEventOutput::RightDrag { from: _, to } => {
+                    let (_x, _y) = to;
                 }
                 MouseEventOutput::DragStop => {}
                 MouseEventOutput::LeftClick((x, y)) => {
@@ -1283,11 +1289,11 @@ impl<'a> GameMode for GameLoader<'a> {
                         }
                     }
                 }
-                MouseEventOutput::MiddleClick((x, y)) => {}
-                MouseEventOutput::RightClick((x, y)) => {}
+                MouseEventOutput::MiddleClick((_x, _y)) => {}
+                MouseEventOutput::RightClick((_x, _y)) => {}
                 MouseEventOutput::ExtraClick => {}
                 MouseEventOutput::Extra2Click => {}
-                MouseEventOutput::Scrolling(amount) => {}
+                MouseEventOutput::Scrolling(_amount) => {}
             }
         }
 
@@ -1298,17 +1304,17 @@ impl<'a> GameMode for GameLoader<'a> {
 
     fn process_button(
         &mut self,
-        button: sdl2::keyboard::Keycode,
-        down: bool,
-        r: &mut GameResources,
+        _button: sdl2::keyboard::Keycode,
+        _down: bool,
+        _r: &mut GameResources,
     ) {
     }
 
     fn process_frame(
         &mut self,
-        r: &mut GameResources,
-        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
-        requests: &mut VecDeque<DrawModeRequest>,
+        _r: &mut GameResources,
+        _send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+        _requests: &mut VecDeque<DrawModeRequest>,
     ) {
     }
 
@@ -1361,7 +1367,7 @@ pub struct Login<'a> {
 }
 
 impl<'a> Login<'a> {
-    pub fn new<T>(tc: &'a TextureCreator<T>) -> Self {
+    pub fn new<T>(_tc: &'a TextureCreator<T>) -> Self {
         let mut b: Vec<Box<dyn Widget + 'a>> = Vec::new();
         b.push(Box::new(ImgButton::new(53, 0x213, 0x183)));
         b.push(Box::new(ImgButton::new(65, 0x213, 0x195)));
@@ -1379,15 +1385,15 @@ impl<'a> GameMode for Login<'a> {
     ) {
         for e in events {
             match e {
-                MouseEventOutput::Move((x, y)) => {}
-                MouseEventOutput::LeftDrag { from, to } => {
-                    let (x, y) = to;
+                MouseEventOutput::Move((_x, _y)) => {}
+                MouseEventOutput::LeftDrag { from: _, to } => {
+                    let (_x, _y) = to;
                 }
-                MouseEventOutput::MiddleDrag { from, to } => {
-                    let (x, y) = to;
+                MouseEventOutput::MiddleDrag { from: _, to } => {
+                    let (_x, _y) = to;
                 }
-                MouseEventOutput::RightDrag { from, to } => {
-                    let (x, y) = to;
+                MouseEventOutput::RightDrag { from: _, to } => {
+                    let (_x, _y) = to;
                 }
                 MouseEventOutput::DragStop => {}
                 MouseEventOutput::LeftClick((x, y)) => {
@@ -1397,11 +1403,11 @@ impl<'a> GameMode for Login<'a> {
                         }
                     }
                 }
-                MouseEventOutput::MiddleClick((x, y)) => {}
-                MouseEventOutput::RightClick((x, y)) => {}
+                MouseEventOutput::MiddleClick((_x, _y)) => {}
+                MouseEventOutput::RightClick((_x, _y)) => {}
                 MouseEventOutput::ExtraClick => {}
                 MouseEventOutput::Extra2Click => {}
-                MouseEventOutput::Scrolling(amount) => {}
+                MouseEventOutput::Scrolling(_amount) => {}
             }
         }
 
@@ -1412,17 +1418,17 @@ impl<'a> GameMode for Login<'a> {
 
     fn process_button(
         &mut self,
-        button: sdl2::keyboard::Keycode,
-        down: bool,
-        r: &mut GameResources,
+        _button: sdl2::keyboard::Keycode,
+        _down: bool,
+        _r: &mut GameResources,
     ) {
     }
 
     fn process_frame(
         &mut self,
-        r: &mut GameResources,
-        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
-        requests: &mut VecDeque<DrawModeRequest>,
+        _r: &mut GameResources,
+        _send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+        _requests: &mut VecDeque<DrawModeRequest>,
     ) {
     }
 
@@ -1480,7 +1486,7 @@ pub struct CharacterSelect<'a> {
 }
 
 impl<'a> CharacterSelect<'a> {
-    pub fn new<T>(tc: &'a TextureCreator<T>, r: &mut GameResources) -> Self {
+    pub fn new<T>(_tc: &'a TextureCreator<T>, _r: &mut GameResources) -> Self {
         let mut b: Vec<Box<dyn Widget + 'a>> = Vec::new();
         b.push(Box::new(ImgButton::new(0x6e5, 0x0f7, 0x10b)));
         b.push(Box::new(ImgButton::new(0x6e7, 0x16c, 0x10b)));
@@ -1506,19 +1512,19 @@ impl<'a> GameMode for CharacterSelect<'a> {
     fn process_mouse(
         &mut self,
         events: &Vec<MouseEventOutput>,
-        requests: &mut VecDeque<DrawModeRequest>,
+        _requests: &mut VecDeque<DrawModeRequest>,
     ) {
         for e in events {
             match e {
-                MouseEventOutput::Move((x, y)) => {}
-                MouseEventOutput::LeftDrag { from, to } => {
-                    let (x, y) = to;
+                MouseEventOutput::Move((_x, _y)) => {}
+                MouseEventOutput::LeftDrag { from: _, to } => {
+                    let (_x, _y) = to;
                 }
-                MouseEventOutput::MiddleDrag { from, to } => {
-                    let (x, y) = to;
+                MouseEventOutput::MiddleDrag { from: _, to } => {
+                    let (_x, _y) = to;
                 }
-                MouseEventOutput::RightDrag { from, to } => {
-                    let (x, y) = to;
+                MouseEventOutput::RightDrag { from: _, to } => {
+                    let (_x, _y) = to;
                 }
                 MouseEventOutput::DragStop => {}
                 MouseEventOutput::LeftClick((x, y)) => {
@@ -1533,27 +1539,27 @@ impl<'a> GameMode for CharacterSelect<'a> {
                         }
                     }
                 }
-                MouseEventOutput::MiddleClick((x, y)) => {}
-                MouseEventOutput::RightClick((x, y)) => {}
+                MouseEventOutput::MiddleClick((_x, _y)) => {}
+                MouseEventOutput::RightClick((_x, _y)) => {}
                 MouseEventOutput::ExtraClick => {}
                 MouseEventOutput::Extra2Click => {}
-                MouseEventOutput::Scrolling(amount) => {}
+                MouseEventOutput::Scrolling(_amount) => {}
             }
         }
     }
 
     fn process_button(
         &mut self,
-        button: sdl2::keyboard::Keycode,
-        down: bool,
-        r: &mut GameResources,
+        _button: sdl2::keyboard::Keycode,
+        _down: bool,
+        _r: &mut GameResources,
     ) {
     }
 
     fn process_frame(
         &mut self,
         r: &mut GameResources,
-        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+        _send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
         requests: &mut VecDeque<DrawModeRequest>,
     ) {
         self.char_sel[0].set_type(r.characters[(0 + self.page * 4) as usize].t);
@@ -1739,15 +1745,15 @@ impl<'a> GameMode for Game<'a> {
     ) {
         for e in events {
             match e {
-                MouseEventOutput::Move((x, y)) => {}
-                MouseEventOutput::LeftDrag { from, to } => {
-                    let (x, y) = to;
+                MouseEventOutput::Move((_x, _y)) => {}
+                MouseEventOutput::LeftDrag { from: _, to } => {
+                    let (_x, _y) = to;
                 }
-                MouseEventOutput::MiddleDrag { from, to } => {
-                    let (x, y) = to;
+                MouseEventOutput::MiddleDrag { from: _, to } => {
+                    let (_x, _y) = to;
                 }
-                MouseEventOutput::RightDrag { from, to } => {
-                    let (x, y) = to;
+                MouseEventOutput::RightDrag { from: _, to } => {
+                    let (_x, _y) = to;
                 }
                 MouseEventOutput::DragStop => {}
                 MouseEventOutput::LeftClick((x, y)) => {
@@ -1757,11 +1763,11 @@ impl<'a> GameMode for Game<'a> {
                         }
                     }
                 }
-                MouseEventOutput::MiddleClick((x, y)) => {}
-                MouseEventOutput::RightClick((x, y)) => {}
+                MouseEventOutput::MiddleClick((_x, _y)) => {}
+                MouseEventOutput::RightClick((_x, _y)) => {}
                 MouseEventOutput::ExtraClick => {}
                 MouseEventOutput::Extra2Click => {}
-                MouseEventOutput::Scrolling(amount) => {}
+                MouseEventOutput::Scrolling(_amount) => {}
             }
         }
 
@@ -1772,17 +1778,17 @@ impl<'a> GameMode for Game<'a> {
 
     fn process_button(
         &mut self,
-        button: sdl2::keyboard::Keycode,
-        down: bool,
-        r: &mut GameResources,
+        _button: sdl2::keyboard::Keycode,
+        _down: bool,
+        _r: &mut GameResources,
     ) {
     }
 
     fn process_frame(
         &mut self,
-        r: &mut GameResources,
-        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
-        requests: &mut VecDeque<DrawModeRequest>,
+        _r: &mut GameResources,
+        _send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+        _requests: &mut VecDeque<DrawModeRequest>,
     ) {
     }
 
@@ -1908,15 +1914,15 @@ impl<'a, T> GameMode for PngExplorer<'a, T> {
     ) {
         for e in events {
             match e {
-                MouseEventOutput::Move((x, y)) => {}
-                MouseEventOutput::LeftDrag { from, to } => {
-                    let (x, y) = to;
+                MouseEventOutput::Move((_x, _y)) => {}
+                MouseEventOutput::LeftDrag { from: _, to } => {
+                    let (_x, _y) = to;
                 }
-                MouseEventOutput::MiddleDrag { from, to } => {
-                    let (x, y) = to;
+                MouseEventOutput::MiddleDrag { from: _, to } => {
+                    let (_x, _y) = to;
                 }
-                MouseEventOutput::RightDrag { from, to } => {
-                    let (x, y) = to;
+                MouseEventOutput::RightDrag { from: _, to } => {
+                    let (_x, _y) = to;
                 }
                 MouseEventOutput::DragStop => {}
                 MouseEventOutput::LeftClick((x, y)) => {
@@ -1926,11 +1932,11 @@ impl<'a, T> GameMode for PngExplorer<'a, T> {
                         }
                     }
                 }
-                MouseEventOutput::MiddleClick((x, y)) => {}
-                MouseEventOutput::RightClick((x, y)) => {}
+                MouseEventOutput::MiddleClick((_x, _y)) => {}
+                MouseEventOutput::RightClick((_x, _y)) => {}
                 MouseEventOutput::ExtraClick => {}
                 MouseEventOutput::Extra2Click => {}
-                MouseEventOutput::Scrolling(amount) => {}
+                MouseEventOutput::Scrolling(_amount) => {}
             }
         }
 
@@ -1970,9 +1976,9 @@ impl<'a, T> GameMode for PngExplorer<'a, T> {
 
     fn process_frame(
         &mut self,
-        r: &mut GameResources,
-        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
-        requests: &mut VecDeque<DrawModeRequest>,
+        _r: &mut GameResources,
+        _send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+        _requests: &mut VecDeque<DrawModeRequest>,
     ) {
     }
 
@@ -2052,15 +2058,15 @@ impl<'a, T> GameMode for ImgExplorer<'a, T> {
     ) {
         for e in events {
             match e {
-                MouseEventOutput::Move((x, y)) => {}
-                MouseEventOutput::LeftDrag { from, to } => {
-                    let (x, y) = to;
+                MouseEventOutput::Move((_x, _y)) => {}
+                MouseEventOutput::LeftDrag { from: _, to } => {
+                    let (_x, _y) = to;
                 }
-                MouseEventOutput::MiddleDrag { from, to } => {
-                    let (x, y) = to;
+                MouseEventOutput::MiddleDrag { from: _, to } => {
+                    let (_x, _y) = to;
                 }
-                MouseEventOutput::RightDrag { from, to } => {
-                    let (x, y) = to;
+                MouseEventOutput::RightDrag { from: _, to } => {
+                    let (_x, _y) = to;
                 }
                 MouseEventOutput::DragStop => {}
                 MouseEventOutput::LeftClick((x, y)) => {
@@ -2070,11 +2076,11 @@ impl<'a, T> GameMode for ImgExplorer<'a, T> {
                         }
                     }
                 }
-                MouseEventOutput::MiddleClick((x, y)) => {}
-                MouseEventOutput::RightClick((x, y)) => {}
+                MouseEventOutput::MiddleClick((_x, _y)) => {}
+                MouseEventOutput::RightClick((_x, _y)) => {}
                 MouseEventOutput::ExtraClick => {}
                 MouseEventOutput::Extra2Click => {}
-                MouseEventOutput::Scrolling(amount) => {}
+                MouseEventOutput::Scrolling(_amount) => {}
             }
         }
 
@@ -2120,9 +2126,9 @@ impl<'a, T> GameMode for ImgExplorer<'a, T> {
 
     fn process_frame(
         &mut self,
-        r: &mut GameResources,
-        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
-        requests: &mut VecDeque<DrawModeRequest>,
+        _r: &mut GameResources,
+        _send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+        _requests: &mut VecDeque<DrawModeRequest>,
     ) {
     }
 
@@ -2396,19 +2402,19 @@ impl<'a, T> GameMode for NewCharacterMode<'a, T> {
     fn process_mouse(
         &mut self,
         events: &Vec<MouseEventOutput>,
-        requests: &mut VecDeque<DrawModeRequest>,
+        _requests: &mut VecDeque<DrawModeRequest>,
     ) {
         for e in events {
             match e {
-                MouseEventOutput::Move((x, y)) => {}
-                MouseEventOutput::LeftDrag { from, to } => {
-                    let (x, y) = to;
+                MouseEventOutput::Move((_x, _y)) => {}
+                MouseEventOutput::LeftDrag { from: _, to } => {
+                    let (_x, _y) = to;
                 }
-                MouseEventOutput::MiddleDrag { from, to } => {
-                    let (x, y) = to;
+                MouseEventOutput::MiddleDrag { from: _, to } => {
+                    let (_x, _y) = to;
                 }
-                MouseEventOutput::RightDrag { from, to } => {
-                    let (x, y) = to;
+                MouseEventOutput::RightDrag { from: _, to } => {
+                    let (_x, _y) = to;
                 }
                 MouseEventOutput::DragStop => {}
                 MouseEventOutput::LeftClick((x, y)) => {
@@ -2423,27 +2429,27 @@ impl<'a, T> GameMode for NewCharacterMode<'a, T> {
                         }
                     }
                 }
-                MouseEventOutput::MiddleClick((x, y)) => {}
-                MouseEventOutput::RightClick((x, y)) => {}
+                MouseEventOutput::MiddleClick((_x, _y)) => {}
+                MouseEventOutput::RightClick((_x, _y)) => {}
                 MouseEventOutput::ExtraClick => {}
                 MouseEventOutput::Extra2Click => {}
-                MouseEventOutput::Scrolling(amount) => {}
+                MouseEventOutput::Scrolling(_amount) => {}
             }
         }
     }
 
     fn process_button(
         &mut self,
-        button: sdl2::keyboard::Keycode,
-        down: bool,
-        r: &mut GameResources,
+        _button: sdl2::keyboard::Keycode,
+        _down: bool,
+        _r: &mut GameResources,
     ) {
     }
 
     fn process_frame(
         &mut self,
         r: &mut GameResources,
-        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+        _send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
         requests: &mut VecDeque<DrawModeRequest>,
     ) {
         if self.b[1].was_clicked() {
@@ -2642,15 +2648,15 @@ impl<'a, T> GameMode for SprExplorer<'a, T> {
     ) {
         for e in events {
             match e {
-                MouseEventOutput::Move((x, y)) => {}
-                MouseEventOutput::LeftDrag { from, to } => {
-                    let (x, y) = to;
+                MouseEventOutput::Move((_x, _y)) => {}
+                MouseEventOutput::LeftDrag { from: _, to } => {
+                    let (_x, _y) = to;
                 }
-                MouseEventOutput::MiddleDrag { from, to } => {
-                    let (x, y) = to;
+                MouseEventOutput::MiddleDrag { from: _, to } => {
+                    let (_x, _y) = to;
                 }
-                MouseEventOutput::RightDrag { from, to } => {
-                    let (x, y) = to;
+                MouseEventOutput::RightDrag { from: _, to } => {
+                    let (_x, _y) = to;
                 }
                 MouseEventOutput::DragStop => {}
                 MouseEventOutput::LeftClick((x, y)) => {
@@ -2660,11 +2666,11 @@ impl<'a, T> GameMode for SprExplorer<'a, T> {
                         }
                     }
                 }
-                MouseEventOutput::MiddleClick((x, y)) => {}
-                MouseEventOutput::RightClick((x, y)) => {}
+                MouseEventOutput::MiddleClick((_x, _y)) => {}
+                MouseEventOutput::RightClick((_x, _y)) => {}
                 MouseEventOutput::ExtraClick => {}
                 MouseEventOutput::Extra2Click => {}
-                MouseEventOutput::Scrolling(amount) => {}
+                MouseEventOutput::Scrolling(_amount) => {}
             }
         }
 
@@ -2740,9 +2746,9 @@ impl<'a, T> GameMode for SprExplorer<'a, T> {
 
     fn process_frame(
         &mut self,
-        r: &mut GameResources,
-        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
-        requests: &mut VecDeque<DrawModeRequest>,
+        _r: &mut GameResources,
+        _send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+        _requests: &mut VecDeque<DrawModeRequest>,
     ) {
     }
 

@@ -2,7 +2,7 @@ use std::io::Cursor;
 use tokio::io::AsyncReadExt;
 use tokio::io::AsyncSeekExt;
 
-const embedded_sprite_table: &[u8] = include_bytes!("sprite_table.txt");
+const EMBEDDED_SPRITE_TABLE: &[u8] = include_bytes!("sprite_table.txt");
 
 async fn get_integer(c: &mut Cursor<Vec<u8>>) -> (Option<u8>, i32) {
     let mut last_byte = c.read_u8().await;
@@ -54,7 +54,7 @@ pub struct SpriteTableEntry {}
 
 impl SpriteTableEntry {
     pub async fn load_embedded_table() -> Self {
-        let mut data = embedded_sprite_table.to_vec();
+        let mut data = EMBEDDED_SPRITE_TABLE.to_vec();
         for d in data.iter_mut() {
             if *d == 0xd {
                 *d = b' ';
@@ -63,14 +63,14 @@ impl SpriteTableEntry {
         let mut cursor = Cursor::new(data);
         let _e = cursor.read_u8().await; //first byte is ignored
         let sprite_val = 0;
-        let mut last_byte: Option<u8> = None;
+        let last_byte: Option<u8>;
         let (b, val) = get_integer(&mut cursor).await;
         last_byte = b;
         println!("SPR: {} {:?}", val, last_byte);
         println!("Sprite {} has {} frames", sprite_val, val);
         if let Some(b) = last_byte {
             if b == b'=' {
-                let (v, val) = get_integer(&mut cursor).await;
+                let (_v, val) = get_integer(&mut cursor).await;
                 println!("Sprite {} has alias {}", sprite_val, val);
             }
         }
@@ -143,13 +143,20 @@ struct Sprite {
     tiles: Vec<SpriteTile>,
 }
 
+/// The sprite struct used by the gui thread
+pub struct SpriteGui {}
+
 impl Sprite {
+    pub fn to_gui(&self) -> SpriteGui {
+        SpriteGui {}
+    }
+
     ///Contents of %d-%d.spr is given to this function in a cursor
     pub async fn parse_sprite(cursor: &mut std::io::Cursor<&Vec<u8>>) -> Option<Self> {
         println!("Parsing sprite");
         let mut pallete = None;
         let temp = cursor.read_i8().await.unwrap();
-        let num_frames = if (temp < 0) {
+        let num_frames = if temp < 0 {
             println!("Reading pallete for sprite");
             let mut num_pallete_entries: u16 = cursor.read_u8().await.unwrap() as u16;
             if num_pallete_entries == 0 {
@@ -189,14 +196,14 @@ impl Sprite {
             tile_offset.push(cursor.read_u32().await.unwrap());
         }
         let tile_position = cursor.stream_position().await.unwrap();
-        if let Some(p) = &pallete {
+        if let Some(_p) = &pallete {
             for i in 0..=num_tiles {
                 let _e = cursor
                     .seek(tokio::io::SeekFrom::Start(
                         tile_position + tile_offset[i as usize] as u64,
                     ))
                     .await;
-                let mut t: SpriteTile = SpriteTile::new();
+                let mut _t: SpriteTile = SpriteTile::new();
             }
         } else {
             for i in 0..=num_tiles {
@@ -211,10 +218,13 @@ impl Sprite {
                 t.width = cursor.read_u8().await.unwrap();
                 t.height = cursor.read_u8().await.unwrap();
                 t.data = Vec::with_capacity(t.width as usize * t.height as usize);
+                for i in t.data.iter_mut() {
+                    *i = 0;
+                }
                 for row in 0..=t.height {
                     let row_segments = cursor.read_u8().await.unwrap();
                     let mut row_offset = 0;
-                    for segment in 0..=row_segments {
+                    for _segment in 0..=row_segments {
                         let skip = cursor.read_u8().await.unwrap() / 2;
                         let w = cursor.read_u8().await.unwrap();
                         row_offset += skip;
@@ -222,6 +232,7 @@ impl Sprite {
                             t.data[row as usize * t.width as usize + row_offset as usize] =
                                 cursor.read_u16().await.unwrap();
                         }
+                        row_offset += w;
                     }
                 }
             }

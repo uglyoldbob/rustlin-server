@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use std::collections::HashMap;
 use std::fs;
 
@@ -28,13 +30,13 @@ impl Sprites {
         let path = format!("{}/sprite_table.txt", s);
         println!("Load from {}", path);
         let mut file = fs::read(path).unwrap();
-        for mut b in &mut file {
+        for b in &mut file {
             if *b == (0xd as u8) {
                 *b = ' ' as u8;
             }
         }
         let sprites: HashMap<u16, Sprite> = HashMap::new();
-        for mut i in 1..file.len() {
+        for _i in 1..file.len() {
             unimplemented!();
         }
 

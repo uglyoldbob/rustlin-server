@@ -5,7 +5,6 @@ use sdl2::render::Texture;
 use sdl2::render::TextureCreator;
 use sdl2::surface::Surface;
 use std::collections::HashMap;
-use std::io::Write;
 use tokio::io::AsyncReadExt;
 
 pub mod stringtable;
@@ -67,7 +66,7 @@ impl Img {
             &sdl2::pixels::PixelFormat::try_from(PixelFormatEnum::RGB555).unwrap(),
             self.colorkey.into(),
         );
-        surface.set_color_key(true, color);
+        let _e = surface.set_color_key(true, color);
 
         //TODO set colorkey
         let text = Texture::from_surface(&surface, t).unwrap();
@@ -172,21 +171,21 @@ impl PackFiles {
             packs.push(pack);
         }
         let mut tile = Pack::new(format!("{}/Tile", path), false);
-        tile.load().await;
+        let _e = tile.load().await;
         println!("TILE");
         for (key, v) in tile.file_extensions().iter() {
             println!("Contains {} {}", key, v);
         }
         println!("Time elapsed is {:?}", start.elapsed());
         let mut text = Pack::new(format!("{}/Text", path), true);
-        text.load().await;
+        let _e = text.load().await;
         println!("TEXT");
         for (key, v) in text.file_extensions().iter() {
             println!("Contains {} {}", key, v);
         }
         println!("Time elapsed is {:?}", start.elapsed());
         let mut sprite = Pack::new(format!("{}/Sprite", path), false);
-        sprite.load().await;
+        let _e = sprite.load().await;
         println!("SPRITE");
         for (key, v) in sprite.file_extensions().iter() {
             println!("Contains {} {}", key, v);
@@ -211,6 +210,7 @@ pub struct GameResources<'a, 'b, 'c> {
     pub imgs: HashMap<u16, Loadable<Texture<'a>>>,
     pub font: sdl2::ttf::Font<'b, 'c>,
     pub characters: [CharacterData; 8],
+    pub sprites: HashMap<u32, Loadable<SpriteGui>>,
 }
 
 impl<'a, 'b, 'c> GameResources<'a, 'b, 'c> {
@@ -232,6 +232,7 @@ impl<'a, 'b, 'c> GameResources<'a, 'b, 'c> {
             imgs: HashMap::new(),
             font: font,
             characters: chars,
+            sprites: HashMap::new(),
         }
     }
 }
@@ -248,7 +249,7 @@ impl Resources {
 
 pub async fn async_main(
     mut r: tokio::sync::mpsc::Receiver<MessageToAsync>,
-    mut s: tokio::sync::mpsc::Sender<MessageFromAsync>,
+    s: tokio::sync::mpsc::Sender<MessageFromAsync>,
 ) {
     println!("Async main");
 
@@ -269,19 +270,19 @@ pub async fn async_main(
                     match PackFiles::load(path).await {
                         Ok(p) => {
                             res.packs = Some(p);
-                            s.send(MessageFromAsync::ResourceStatus(true)).await;
+                            let _e = s.send(MessageFromAsync::ResourceStatus(true)).await;
                         }
                         Err(()) => {
-                            s.send(MessageFromAsync::ResourceStatus(false)).await;
+                            let _e = s.send(MessageFromAsync::ResourceStatus(false)).await;
                         }
                     }
                 }
                 MessageToAsync::LoadFont(file) => {
                     let path = format!("{}/{}", resource_path, file);
-                    let font = Font::load(path).await;
+                    let _font = Font::load(path).await;
                 }
                 MessageToAsync::LoadSpriteTable => {
-                    let st = SpriteTableEntry::load_embedded_table().await;
+                    let _st = SpriteTableEntry::load_embedded_table().await;
                 }
                 MessageToAsync::LoadTable(name) => {
                     if let Some(p) = &mut res.packs {
