@@ -1052,20 +1052,28 @@ impl Widget for CharacterSelectWidget {
 pub struct SpriteWidget {
     clicked: bool,
     last_draw: Option<ImageBox>,
+    id_major: u16,
+    id_minor: u16,
+    frame_index: u16,
 }
 
 impl SpriteWidget {
-    fn new<T>(
-        _tc: &TextureCreator<T>,
-        _x: u16,
-        _y: u16,
-        _text: &str,
-        _font: &sdl2::ttf::Font,
-    ) -> Self {
+    fn new<T>(_tc: &TextureCreator<T>, _x: u16, _y: u16) -> Self {
         Self {
             clicked: false,
             last_draw: None,
+            id_major: 0,
+            id_minor: 0,
+            frame_index: 0,
         }
+    }
+
+    fn set_sprite_major(&mut self, m: u16) {
+        self.id_major = m;
+    }
+
+    fn set_sprite_minor(&mut self, m: u16) {
+        self.id_minor = m;
     }
 }
 
@@ -1086,12 +1094,37 @@ impl Widget for SpriteWidget {
 
     fn draw_hover(
         &mut self,
-        _canvas: &mut sdl2::render::WindowCanvas,
+        canvas: &mut sdl2::render::WindowCanvas,
         _cursor: bool,
-        _r: &mut GameResources,
-        _send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+        r: &mut GameResources,
+        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
     ) {
-        self.last_draw = None;
+        let id = (self.id_major as u32) << 16 | self.id_minor as u32;
+        if let Some(i) = r.sprites.get(&id) {
+            match i {
+                Loading => {
+                    self.last_draw = None;
+                }
+                Loaded(spr) => {
+                    let t = &spr.frames[self.frame_index as usize];
+                    let q = t.query();
+                    let _e = canvas.copy(
+                        t,
+                        None,
+                        Rect::new(0 as i32, 0 as i32, q.width.into(), q.height.into()),
+                    );
+                    self.last_draw = Some(ImageBox {
+                        x: 0,
+                        y: 0,
+                        w: q.width as u16,
+                        h: q.height as u16,
+                    });
+                }
+            }
+        } else {
+            let _e = send.blocking_send(MessageToAsync::LoadSprite(self.id_major, self.id_minor));
+            self.last_draw = None;
+        }
     }
 }
 
@@ -2611,6 +2644,7 @@ pub struct SprExplorer<'a, T> {
     disp: Vec<DynamicTextWidget<'a>>,
     current_spr_a: u16,
     current_spr_b: u16,
+    sprite: SpriteWidget,
     tc: &'a TextureCreator<T>,
     displayed: bool,
 }
@@ -2629,8 +2663,11 @@ impl<'a, T> SprExplorer<'a, T> {
             sdl2::pixels::Color::RED,
         ));
 
+        let spr = SpriteWidget::new(tc, 0, 0);
+
         Self {
             b: b,
+            sprite: spr,
             disp: disp,
             current_spr_a: 0,
             current_spr_b: 0,
@@ -2768,6 +2805,7 @@ impl<'a, T> GameMode for SprExplorer<'a, T> {
         for w in &mut self.disp {
             w.draw(canvas, cursor, r, send);
         }
+        self.sprite.draw(canvas, cursor, r, send);
     }
 
     fn framerate(&self) -> u8 {

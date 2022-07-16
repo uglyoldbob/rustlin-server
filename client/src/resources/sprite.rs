@@ -149,7 +149,7 @@ pub struct Sprite {
 
 /// The sprite struct used by the gui thread
 pub struct SpriteGui<'a> {
-    frames: Vec<Texture<'a>>,
+    pub frames: Vec<Texture<'a>>,
 }
 
 impl Sprite {
