@@ -1122,6 +1122,7 @@ impl Widget for SpriteWidget {
                 }
             }
         } else {
+            r.sprites.insert(id, Loading);
             let _e = send.blocking_send(MessageToAsync::LoadSprite(self.id_major, self.id_minor));
             self.last_draw = None;
         }
@@ -2663,8 +2664,7 @@ impl<'a, T> SprExplorer<'a, T> {
             sdl2::pixels::Color::RED,
         ));
 
-        let spr = SpriteWidget::new(tc, 0, 0);
-
+        let mut spr = SpriteWidget::new(tc, 0, 0);
         Self {
             b: b,
             sprite: spr,
@@ -2732,6 +2732,7 @@ impl<'a, T> GameMode for SprExplorer<'a, T> {
                                 "Displaying {}-{}.spr",
                                 self.current_spr_a, self.current_spr_b
                             );
+                            self.sprite.set_sprite_major(self.current_spr_a);
                             self.disp[0].update_text(self.tc, &words, &r.font);
                             self.displayed = false;
                         }
@@ -2745,6 +2746,7 @@ impl<'a, T> GameMode for SprExplorer<'a, T> {
                                 "Displaying {}-{}.spr",
                                 self.current_spr_a, self.current_spr_b
                             );
+                            self.sprite.set_sprite_major(self.current_spr_a);
                             self.disp[0].update_text(self.tc, &words, &r.font);
                             self.displayed = false;
                         }
@@ -2758,6 +2760,7 @@ impl<'a, T> GameMode for SprExplorer<'a, T> {
                                 "Displaying {}-{}.spr",
                                 self.current_spr_a, self.current_spr_b
                             );
+                            self.sprite.set_sprite_minor(self.current_spr_b);
                             self.disp[0].update_text(self.tc, &words, &r.font);
                             self.displayed = false;
                         }
@@ -2771,6 +2774,7 @@ impl<'a, T> GameMode for SprExplorer<'a, T> {
                                 "Displaying {}-{}.spr",
                                 self.current_spr_a, self.current_spr_b
                             );
+                            self.sprite.set_sprite_minor(self.current_spr_b);
                             self.disp[0].update_text(self.tc, &words, &r.font);
                             self.displayed = false;
                         }

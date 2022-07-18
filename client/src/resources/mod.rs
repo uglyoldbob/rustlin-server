@@ -331,6 +331,7 @@ pub async fn async_main(
                 }
                 MessageToAsync::LoadSprite(a, b) => {
                     let name = format!("{}-{}.spr", a, b);
+                    println!("Loading sprite {}", name);
                     let id = (a as u32) << 16 | (b as u32);
                     if let Some(p) = &mut res.packs {
                         let hash = PackFiles::get_hash_index(name.clone());
@@ -341,10 +342,15 @@ pub async fn async_main(
                             contents = p.sprite.raw_file_contents(name.clone()).await;
                         }
                         if let Some(c) = &contents {
+                            println!("Sprite file is {} file", c.len());
                             let mut cursor = std::io::Cursor::new(c);
                             let spr = Sprite::parse_sprite(&mut cursor).await;
                             if let Some(spr) = spr {
+                                println!("Success {}", name);
                                 let _e = s.send(MessageFromAsync::Sprite(id, spr)).await;
+                            }
+                            else {
+                                println!("Failed to load sprite file {}", name);
                             }
                         }
                     }
