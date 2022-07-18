@@ -348,8 +348,7 @@ pub async fn async_main(
                             if let Some(spr) = spr {
                                 println!("Success {}", name);
                                 let _e = s.send(MessageFromAsync::Sprite(id, spr)).await;
-                            }
-                            else {
+                            } else {
                                 println!("Failed to load sprite file {}", name);
                             }
                         }

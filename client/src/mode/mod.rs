@@ -2664,7 +2664,8 @@ impl<'a, T> SprExplorer<'a, T> {
             sdl2::pixels::Color::RED,
         ));
 
-        let mut spr = SpriteWidget::new(tc, 0, 0);
+        let mut spr = SpriteWidget::new(tc, 320, 240);
+        spr.set_sprite_major(0);
         Self {
             b: b,
             sprite: spr,
