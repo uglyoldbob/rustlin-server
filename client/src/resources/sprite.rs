@@ -196,7 +196,7 @@ impl Sprite {
             frame.y2 = cursor.read_i16_le().await.ok()?;
             frame.mystery1 = cursor.read_u32_le().await.ok()?;
             let num_tiles = cursor.read_u16_le().await.ok()?;
-            for i in 0..num_tiles {
+            for _i in 0..num_tiles {
                 let mut tile = SpriteTileInfo::new();
                 tile.x = cursor.read_u8().await.ok()?;
                 tile.y = cursor.read_u8().await.ok()?;
@@ -209,8 +209,11 @@ impl Sprite {
         let num_tiles = cursor.read_u32_le().await.ok()?;
         let mut tile_offset = Vec::with_capacity(num_tiles as usize);
         for _ in 0..num_tiles {
-            tile_offset.push(cursor.read_u32_le().await.ok()?);
+            let val = cursor.read_u32_le().await.ok()?;
+            println!("Tile offset {}", val);
+            tile_offset.push(val);
         }
+        let _tile_size = cursor.read_u32_le().await.ok()?;
         let tile_position = cursor.stream_position().await.ok()?;
         let mut tiles = Vec::with_capacity(num_tiles as usize);
         if let Some(p) = &pallete {
@@ -220,34 +223,22 @@ impl Sprite {
                         tile_position + tile_offset[i as usize] as u64,
                     ))
                     .await;
-                println!("At offset {} for tile {}", cursor.stream_position().await.ok()?, i);
                 let mut t: SpriteTile = SpriteTile::new();
                 t.x = cursor.read_i8().await.ok()?;
                 t.y = cursor.read_i8().await.ok()?;
                 t.width = cursor.read_u8().await.ok()?;
                 t.height = cursor.read_u8().await.ok()?;
-                println!(
-                    "Tile {} x {} y {} w {} h {}",
-                    i, t.x, t.y, t.width, t.height
-                );
                 let size = t.width as usize * t.height as usize;
                 t.data = Vec::with_capacity(size);
-                for i in 0..size {
+                for _i in 0..size {
                     t.data.push(0);
                 }
                 for row in 0..t.height {
                     let row_segments = cursor.read_u8().await.ok()?;
-                    println!("{} {}", row_segments, t.data.len());
                     let mut row_offset = 0;
                     for _segment in 0..row_segments {
                         let skip = cursor.read_u8().await.ok()? / 2;
                         let w = cursor.read_u8().await.ok()?;
-                        for _ in 0..skip {
-                            print!(".");
-                        }
-                        for _ in 0..w {
-                            print!("8");
-                        }
                         row_offset += skip;
                         for _ in 0..w {
                             let index = cursor.read_u8().await.ok()?;
@@ -256,7 +247,6 @@ impl Sprite {
                         }
                         row_offset += w;
                     }
-                    println!("");
                 }
                 tiles.push(t);
             }
@@ -274,7 +264,7 @@ impl Sprite {
                 t.height = cursor.read_u8().await.ok()?;
                 let size = t.width as usize * t.height as usize;
                 t.data = Vec::with_capacity(size);
-                for i in 0..size {
+                for _i in 0..size {
                     t.data.push(0);
                 }
                 for row in 0..t.height {
