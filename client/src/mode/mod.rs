@@ -1106,7 +1106,12 @@ impl Widget for SpriteWidget {
                     self.last_draw = None;
                 }
                 Loaded(spr) => {
-                    spr.draw(0, 0, 0, canvas);
+                    spr.draw(320, 240, self.frame_index as usize, canvas);
+                    if (self.frame_index + 1) < spr.num_frames() as u16 {
+                        self.frame_index += 1;
+                    } else {
+                        self.frame_index = 0;
+                    }
                 }
             }
         } else {

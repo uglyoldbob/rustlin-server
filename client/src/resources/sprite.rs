@@ -110,7 +110,7 @@ impl SpriteTile {
         }
         let mut surface =
             Surface::from_data(&mut data[..], w, h, w * 2, PixelFormatEnum::RGB555).unwrap();
-        surface.set_color_key(true, sdl2::pixels::Color::BLACK);
+        let _e = surface.set_color_key(true, sdl2::pixels::Color::BLACK);
         let txt = Texture::from_surface(&surface, t).unwrap();
         txt
     }
@@ -167,38 +167,38 @@ pub struct Sprite {
 pub struct SpriteGui<'a> {
     frames: Vec<SpriteFrame>,
     tiles: Vec<Texture<'a>>,
-    tile_offset: Vec<(i16,i16)>,
+    tile_offset: Vec<(i16, i16)>,
 }
 
 impl<'a> SpriteGui<'a> {
+    pub fn num_frames(&self) -> usize {
+        self.frames.len()
+    }
+
     pub fn draw(&self, x: i16, y: i16, frame: usize, canvas: &mut sdl2::render::WindowCanvas) {
         let f = &self.frames[frame];
-        for (i,tdata) in f.tiles.iter().enumerate() {
+        for (i, tdata) in f.tiles.iter().enumerate() {
             let tx = tdata.x as i32 - 4;
             let ty = tdata.y as i32 + 1;
-            let mut x2 = 24 * (tx/2 + ty);
-            let mut y2 = 12 * (ty - tx/2);
+            let mut x2 = 24 * (tx / 2 + ty);
+            let mut y2 = 12 * (ty - tx / 2);
             if (tx % 2) == 1 {
                 x2 += 24;
-            }
-            else if (tx % 2) == -1 {
+            } else if (tx % 2) == -1 {
                 y2 += 12;
             }
             let t = &self.tiles[tdata.tile as usize];
-            let (x3,y3) = &self.tile_offset[tdata.tile as usize];
+            let (x3, y3) = &self.tile_offset[tdata.tile as usize];
             let x3 = *x3 as i32;
             let y3 = *y3 as i32;
             let q = t.query();
             let i = i as i32;
-            let xsum = 320 as i32 + x2 + x3;
-            let ysum = 240 as i32 + y2 + y3;
+            let xsum = x as i32 + x2 + x3;
+            let ysum = y as i32 + y2 + y3;
             let _e = canvas.copy(
                 t,
                 None,
-                sdl2::rect::Rect::new(xsum,
-                    ysum, 
-                    q.width.into(), 
-                    q.height.into()),
+                sdl2::rect::Rect::new(xsum, ysum, q.width.into(), q.height.into()),
             );
         }
     }
