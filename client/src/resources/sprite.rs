@@ -100,11 +100,26 @@ impl SpriteTile {
             data: Vec::new(),
         }
     }
+
+    pub fn to_gui<'a, T>(&self, t: &'a TextureCreator<T>) -> Texture<'a> {
+        let w = self.width as u32;
+        let h = self.height as u32;
+        let mut data: Vec<u8> = Vec::with_capacity((w * h * 2) as usize);
+        for v in &self.data {
+            data.extend_from_slice(&v.to_be_bytes());
+        }
+        let mut surface =
+            Surface::from_data(&mut data[..], w, h, w * 2, PixelFormatEnum::RGB555).unwrap();
+        surface.set_color_key(true, sdl2::pixels::Color::BLACK);
+        let txt = Texture::from_surface(&surface, t).unwrap();
+        txt
+    }
 }
 
+#[derive(Copy, Clone)]
 struct SpriteTileInfo {
-    x: u8,
-    y: u8,
+    x: i8,
+    y: i8,
     h: u8,
     tile: u16,
 }
@@ -120,6 +135,7 @@ impl SpriteTileInfo {
     }
 }
 
+#[derive(Clone)]
 struct SpriteFrame {
     x1: i16,
     x2: i16,
@@ -149,31 +165,67 @@ pub struct Sprite {
 
 /// The sprite struct used by the gui thread
 pub struct SpriteGui<'a> {
-    pub frames: Vec<Texture<'a>>,
+    frames: Vec<SpriteFrame>,
+    tiles: Vec<Texture<'a>>,
+    tile_offset: Vec<(i16,i16)>,
+}
+
+impl<'a> SpriteGui<'a> {
+    pub fn draw(&self, x: i16, y: i16, frame: usize, canvas: &mut sdl2::render::WindowCanvas) {
+        let f = &self.frames[frame];
+        for (i,tdata) in f.tiles.iter().enumerate() {
+            let tx = tdata.x as i32 - 4;
+            let ty = tdata.y as i32 + 1;
+            let mut x2 = 24 * (tx/2 + ty);
+            let mut y2 = 12 * (ty - tx/2);
+            if (tx % 2) == 1 {
+                x2 += 24;
+            }
+            else if (tx % 2) == -1 {
+                y2 += 12;
+            }
+            let t = &self.tiles[tdata.tile as usize];
+            let (x3,y3) = &self.tile_offset[tdata.tile as usize];
+            let x3 = *x3 as i32;
+            let y3 = *y3 as i32;
+            let q = t.query();
+            let i = i as i32;
+            let xsum = 320 as i32 + x2 + x3;
+            let ysum = 240 as i32 + y2 + y3;
+            let _e = canvas.copy(
+                t,
+                None,
+                sdl2::rect::Rect::new(xsum,
+                    ysum, 
+                    q.width.into(), 
+                    q.height.into()),
+            );
+        }
+    }
 }
 
 impl Sprite {
     pub fn to_gui<'a, T>(&self, t: &'a TextureCreator<T>) -> SpriteGui<'a> {
-        let mut frames = Vec::with_capacity(self.frames.len());
-        for f in &self.frames {
-            for _t in &f.tiles {
-                let surface = Surface::new(16 as u32, 16 as u32, PixelFormatEnum::RGB555).unwrap();
-                let txt = Texture::from_surface(&surface, t).unwrap();
-                frames.push(txt);
-            }
+        let len = self.tiles.len();
+        let mut tiles = Vec::with_capacity(len);
+        let mut tile_data = Vec::with_capacity(len);
+        for tile in &self.tiles {
+            tiles.push(tile.to_gui(t));
+            tile_data.push((tile.x as i16, tile.y as i16));
         }
-        SpriteGui { frames: frames }
+        SpriteGui {
+            frames: self.frames.clone(),
+            tiles: tiles,
+            tile_offset: tile_data,
+        }
     }
 
     ///Contents of %d-%d.spr is given to this function in a cursor
     pub async fn parse_sprite(cursor: &mut std::io::Cursor<&Vec<u8>>) -> Option<Self> {
-        println!("Parsing sprite");
         let mut pallete = None;
         let temp = cursor.read_i8().await.ok()?;
         let num_frames = if temp < 0 {
-            println!("Reading pallete for sprite");
             let mut num_pallete_entries: u16 = cursor.read_u8().await.ok()? as u16;
-            println!("Reading {} pallete entries", num_pallete_entries);
             if num_pallete_entries == 0 {
                 num_pallete_entries = 0x100;
             }
@@ -182,7 +234,6 @@ impl Sprite {
                 p.push(cursor.read_u16().await.ok()?);
             }
             pallete = Some(p);
-            println!("Finished reading pallete data");
             cursor.read_u8().await.ok()?
         } else {
             temp as u8
@@ -198,8 +249,8 @@ impl Sprite {
             let num_tiles = cursor.read_u16_le().await.ok()?;
             for _i in 0..num_tiles {
                 let mut tile = SpriteTileInfo::new();
-                tile.x = cursor.read_u8().await.ok()?;
-                tile.y = cursor.read_u8().await.ok()?;
+                tile.x = cursor.read_i8().await.ok()?;
+                tile.y = cursor.read_i8().await.ok()?;
                 tile.h = cursor.read_u8().await.ok()?;
                 tile.tile = cursor.read_u16_le().await.ok()?;
                 frame.tiles.push(tile);
@@ -210,7 +261,6 @@ impl Sprite {
         let mut tile_offset = Vec::with_capacity(num_tiles as usize);
         for _ in 0..num_tiles {
             let val = cursor.read_u32_le().await.ok()?;
-            println!("Tile offset {}", val);
             tile_offset.push(val);
         }
         let _tile_size = cursor.read_u32_le().await.ok()?;
@@ -240,10 +290,11 @@ impl Sprite {
                         let skip = cursor.read_u8().await.ok()? / 2;
                         let w = cursor.read_u8().await.ok()?;
                         row_offset += skip;
-                        for _ in 0..w {
+                        for i in 0..w {
+                            let i: usize = i as usize;
                             let index = cursor.read_u8().await.ok()?;
                             let val = p[index as usize];
-                            t.data[row as usize * t.width as usize + row_offset as usize] = val;
+                            t.data[row as usize * t.width as usize + row_offset as usize + i] = val;
                         }
                         row_offset += w;
                     }
@@ -274,9 +325,10 @@ impl Sprite {
                         let skip = cursor.read_u8().await.ok()? / 2;
                         let w = cursor.read_u8().await.ok()?;
                         row_offset += skip;
-                        for _ in 0..w {
-                            let val = cursor.read_u16_le().await.ok()?;
-                            t.data[row as usize * t.width as usize + row_offset as usize] = val;
+                        for i in 0..w {
+                            let i: usize = i as usize;
+                            let val = cursor.read_u16().await.ok()?;
+                            t.data[row as usize * t.width as usize + row_offset as usize + i] = val;
                         }
                         row_offset += w;
                     }
@@ -284,7 +336,6 @@ impl Sprite {
                 tiles.push(t);
             }
         }
-
         Some(Self {
             pallete: pallete,
             frames: frames,

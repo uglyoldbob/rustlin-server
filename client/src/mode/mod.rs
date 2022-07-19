@@ -1106,19 +1106,7 @@ impl Widget for SpriteWidget {
                     self.last_draw = None;
                 }
                 Loaded(spr) => {
-                    let t = &spr.frames[self.frame_index as usize];
-                    let q = t.query();
-                    let _e = canvas.copy(
-                        t,
-                        None,
-                        Rect::new(0 as i32, 0 as i32, q.width.into(), q.height.into()),
-                    );
-                    self.last_draw = Some(ImageBox {
-                        x: 0,
-                        y: 0,
-                        w: q.width as u16,
-                        h: q.height as u16,
-                    });
+                    spr.draw(0, 0, 0, canvas);
                 }
             }
         } else {
@@ -2665,12 +2653,13 @@ impl<'a, T> SprExplorer<'a, T> {
         ));
 
         let mut spr = SpriteWidget::new(tc, 320, 240);
-        spr.set_sprite_major(0);
+        let initial_id = 0;
+        spr.set_sprite_major(initial_id);
         Self {
             b: b,
             sprite: spr,
             disp: disp,
-            current_spr_a: 0,
+            current_spr_a: initial_id,
             current_spr_b: 0,
             tc: tc,
             displayed: false,
