@@ -68,6 +68,9 @@ pub fn startup(mode: DrawMode) {
     let mut canvas = window.into_canvas().build().unwrap();
     let texture_creator = canvas.texture_creator();
 
+    let i = sdl2::mixer::InitFlag::MP3;
+    let _sdl2mixer = sdl2::mixer::init(i).unwrap();
+
     let mut game_resources = GameResources::new(font);
     let mut mode: Box<dyn GameMode> = match mode {
         DrawMode::Explorer => {
@@ -86,6 +89,7 @@ pub fn startup(mode: DrawMode) {
             Box::new(NewCharacterMode::new(&texture_creator, &mut game_resources))
         }
         DrawMode::Game => Box::new(Game::new(&texture_creator, &mut game_resources)),
+        DrawMode::WavPlayer => Box::new(WavPlayer::new(&texture_creator, &mut game_resources)),
     };
 
     let windowed = match settings.get("general", "window").unwrap().as_str() {
@@ -332,6 +336,9 @@ pub fn startup(mode: DrawMode) {
                         }
                         DrawMode::Game => {
                             Box::new(Game::new(&texture_creator, &mut game_resources))
+                        }
+                        DrawMode::WavPlayer => {
+                            Box::new(WavPlayer::new(&texture_creator, &mut game_resources))
                         }
                     };
                 }

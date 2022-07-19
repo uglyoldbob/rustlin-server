@@ -14,6 +14,7 @@ pub enum DrawMode {
     PngExplorer,
     ImgExplorer,
     SprExplorer,
+    WavPlayer,
     GameLoader,
     Login,
     CharacterSelect,
@@ -1183,6 +1184,13 @@ impl<'a> ExplorerMenu<'a> {
             "Sprite browser",
             &r.font,
         )));
+        b.push(Box::new(TextButton::new(
+            tc,
+            50,
+            142,
+            "Wav player",
+            &r.font,
+        )));
         Self { b: b }
     }
 }
@@ -1229,6 +1237,9 @@ impl<'a> GameMode for ExplorerMenu<'a> {
         }
         if self.b[2].was_clicked() {
             requests.push_back(DrawModeRequest::ChangeDrawMode(DrawMode::SprExplorer));
+        }
+        if self.b[3].was_clicked() {
+            requests.push_back(DrawModeRequest::ChangeDrawMode(DrawMode::WavPlayer));
         }
     }
 
@@ -2805,6 +2816,134 @@ impl<'a, T> GameMode for SprExplorer<'a, T> {
             w.draw(canvas, cursor, r, send);
         }
         self.sprite.draw(canvas, cursor, r, send);
+    }
+
+    fn framerate(&self) -> u8 {
+        20
+    }
+}
+
+/// The screen that allows for user login
+pub struct WavPlayer<'a, T> {
+    b: Vec<Box<dyn Widget + 'a>>,
+    disp: Vec<DynamicTextWidget<'a>>,
+    current_wav: u16,
+    tc: &'a TextureCreator<T>,
+}
+
+impl<'a, T> WavPlayer<'a, T> {
+    pub fn new(tc: &'a TextureCreator<T>, r: &mut GameResources) -> Self {
+        let mut b: Vec<Box<dyn Widget + 'a>> = Vec::new();
+        b.push(Box::new(TextButton::new(tc, 320, 400, "Go Back", &r.font)));
+        let mut disp = Vec::new();
+        disp.push(DynamicTextWidget::new(
+            tc,
+            320,
+            386,
+            "Ready to play 0.wav",
+            &r.font,
+            sdl2::pixels::Color::RED,
+        ));
+
+        Self {
+            b: b,
+            disp: disp,
+            current_wav: 0,
+            tc: tc,
+        }
+    }
+}
+
+impl<'a, T> GameMode for WavPlayer<'a, T> {
+    fn process_mouse(
+        &mut self,
+        events: &Vec<MouseEventOutput>,
+        requests: &mut VecDeque<DrawModeRequest>,
+    ) {
+        for e in events {
+            match e {
+                MouseEventOutput::Move((_x, _y)) => {}
+                MouseEventOutput::LeftDrag { from: _, to } => {
+                    let (_x, _y) = to;
+                }
+                MouseEventOutput::MiddleDrag { from: _, to } => {
+                    let (_x, _y) = to;
+                }
+                MouseEventOutput::RightDrag { from: _, to } => {
+                    let (_x, _y) = to;
+                }
+                MouseEventOutput::DragStop => {}
+                MouseEventOutput::LeftClick((x, y)) => {
+                    for w in &mut self.b {
+                        if w.contains(*x, *y) {
+                            w.clicked();
+                        }
+                    }
+                }
+                MouseEventOutput::MiddleClick((_x, _y)) => {}
+                MouseEventOutput::RightClick((_x, _y)) => {}
+                MouseEventOutput::ExtraClick => {}
+                MouseEventOutput::Extra2Click => {}
+                MouseEventOutput::Scrolling(_amount) => {}
+            }
+        }
+
+        if self.b[0].was_clicked() {
+            requests.push_back(DrawModeRequest::ChangeDrawMode(DrawMode::Explorer));
+        }
+    }
+
+    fn process_button(
+        &mut self,
+        button: sdl2::keyboard::Keycode,
+        down: bool,
+        r: &mut GameResources,
+    ) {
+        if down {
+            match button {
+                sdl2::keyboard::Keycode::Left => {
+                    if self.current_wav > 0 {
+                        self.current_wav -= 1;
+                        let words = format!("Ready to play {}.wav", self.current_wav);
+                        self.disp[0].update_text(self.tc, &words, &r.font);
+                    }
+                }
+                sdl2::keyboard::Keycode::Right => {
+                    if self.current_wav < 65534 {
+                        self.current_wav += 1;
+                        let words = format!("Ready to play {}.wav", self.current_wav);
+                        self.disp[0].update_text(self.tc, &words, &r.font);
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
+    fn process_frame(
+        &mut self,
+        _r: &mut GameResources,
+        _send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+        _requests: &mut VecDeque<DrawModeRequest>,
+    ) {
+    }
+
+    fn draw(
+        &mut self,
+        canvas: &mut sdl2::render::WindowCanvas,
+        cursor: Option<(i16, i16)>,
+        r: &mut GameResources,
+        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+    ) {
+        canvas.set_draw_color(Color::RGB(0, 0, 0));
+        canvas.clear();
+
+        for w in &mut self.b {
+            w.draw(canvas, cursor, r, send);
+        }
+        for w in &mut self.disp {
+            w.draw(canvas, cursor, r, send);
+        }
     }
 
     fn framerate(&self) -> u8 {

@@ -177,7 +177,7 @@ impl<'a> SpriteGui<'a> {
 
     pub fn draw(&self, x: i16, y: i16, frame: usize, canvas: &mut sdl2::render::WindowCanvas) {
         let f = &self.frames[frame];
-        for (i, tdata) in f.tiles.iter().enumerate() {
+        for tdata in f.tiles.iter() {
             let tx = tdata.x as i32 - 4;
             let ty = tdata.y as i32 + 1;
             let mut x2 = 24 * (tx / 2 + ty);
@@ -192,7 +192,6 @@ impl<'a> SpriteGui<'a> {
             let x3 = *x3 as i32;
             let y3 = *y3 as i32;
             let q = t.query();
-            let i = i as i32;
             let xsum = x as i32 + x2 + x3;
             let ysum = y as i32 + y2 + y3;
             let _e = canvas.copy(
