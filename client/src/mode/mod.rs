@@ -2828,6 +2828,7 @@ pub struct WavPlayer<'a, T> {
     b: Vec<Box<dyn Widget + 'a>>,
     disp: Vec<DynamicTextWidget<'a>>,
     current_wav: u16,
+    play_wav: bool,
     tc: &'a TextureCreator<T>,
 }
 
@@ -2840,7 +2841,7 @@ impl<'a, T> WavPlayer<'a, T> {
             tc,
             320,
             386,
-            "Ready to play 0.wav",
+            "Ready to play 1.wav",
             &r.font,
             sdl2::pixels::Color::RED,
         ));
@@ -2848,8 +2849,21 @@ impl<'a, T> WavPlayer<'a, T> {
         Self {
             b: b,
             disp: disp,
-            current_wav: 0,
+            current_wav: 1,
             tc: tc,
+            play_wav: false,
+        }
+    }
+
+    fn check_sfx(
+        &mut self,
+        r: &mut GameResources,
+        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+    ) {
+        if r.sfx.contains_key(&self.current_wav) {
+        } else {
+            r.sfx.insert(self.current_wav, Loading);
+            let _e = send.blocking_send(MessageToAsync::LoadSfx(self.current_wav));
         }
     }
 }
@@ -2902,7 +2916,8 @@ impl<'a, T> GameMode for WavPlayer<'a, T> {
         if down {
             match button {
                 sdl2::keyboard::Keycode::Left => {
-                    if self.current_wav > 0 {
+                    if self.current_wav > 1 {
+                        r.sfx.remove(&self.current_wav);
                         self.current_wav -= 1;
                         let words = format!("Ready to play {}.wav", self.current_wav);
                         self.disp[0].update_text(self.tc, &words, &r.font);
@@ -2910,10 +2925,14 @@ impl<'a, T> GameMode for WavPlayer<'a, T> {
                 }
                 sdl2::keyboard::Keycode::Right => {
                     if self.current_wav < 65534 {
+                        r.sfx.remove(&self.current_wav);
                         self.current_wav += 1;
                         let words = format!("Ready to play {}.wav", self.current_wav);
                         self.disp[0].update_text(self.tc, &words, &r.font);
                     }
+                }
+                sdl2::keyboard::Keycode::P => {
+                    self.play_wav = true;
                 }
                 _ => {}
             }
@@ -2922,10 +2941,23 @@ impl<'a, T> GameMode for WavPlayer<'a, T> {
 
     fn process_frame(
         &mut self,
-        _r: &mut GameResources,
-        _send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+        r: &mut GameResources,
+        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
         _requests: &mut VecDeque<DrawModeRequest>,
     ) {
+        self.check_sfx(r, send);
+        if self.play_wav {
+            if r.sfx.contains_key(&self.current_wav) {
+                match &r.sfx[&self.current_wav] {
+                    Loading => {}
+                    Loaded(s) => {
+                        let chan = sdl2::mixer::Channel::all();
+                        let _e = chan.play(s, 0);
+                    }
+                }
+            }
+            self.play_wav = false;
+        }
     }
 
     fn draw(

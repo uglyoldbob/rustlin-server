@@ -1,5 +1,6 @@
 use crate::Font;
 use crate::Pack;
+use sdl2::mixer::Chunk;
 use sdl2::pixels::PixelFormatEnum;
 use sdl2::render::Texture;
 use sdl2::render::TextureCreator;
@@ -83,6 +84,7 @@ pub enum MessageToAsync {
     LoadImg(u16),
     LoadRunner(Box<dyn AsyncRunner + Send>),
     LoadSprite(u16, u16),
+    LoadSfx(u16),
 }
 
 pub enum MessageFromAsync {
@@ -91,6 +93,7 @@ pub enum MessageFromAsync {
     Png(u16, Vec<u8>),
     Img(u16, Img),
     Sprite(u32, Sprite),
+    Sfx(u16, Vec<u8>),
 }
 
 struct PackFiles {
@@ -213,6 +216,7 @@ pub struct GameResources<'a, 'b, 'c> {
     pub font: sdl2::ttf::Font<'b, 'c>,
     pub characters: [CharacterData; 8],
     pub sprites: HashMap<u32, Loadable<SpriteGui<'a>>>,
+    pub sfx: HashMap<u16, Loadable<Chunk>>,
 }
 
 impl<'a, 'b, 'c> GameResources<'a, 'b, 'c> {
@@ -235,6 +239,7 @@ impl<'a, 'b, 'c> GameResources<'a, 'b, 'c> {
             font: font,
             characters: chars,
             sprites: HashMap::new(),
+            sfx: HashMap::new(),
         }
     }
 }
@@ -353,6 +358,14 @@ pub async fn async_main(
                             }
                         }
                     }
+                }
+                MessageToAsync::LoadSfx(id) => {
+                    let f = format!("{}\\sound\\{}.wav", resource_path, id);
+                    println!("I need to load {}", f);
+                    let mut data = tokio::fs::File::open(f).await.unwrap();
+                    let mut c = Vec::new();
+                    data.read_to_end(&mut c).await.unwrap();
+                    let _e = s.send(MessageFromAsync::Sfx(id, c.clone())).await;
                 }
             },
         }

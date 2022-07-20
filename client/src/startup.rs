@@ -5,6 +5,7 @@ use crate::Loadable::Loaded;
 use sdl2::event::Event;
 use sdl2::image::LoadTexture;
 use sdl2::keyboard::Keycode;
+use sdl2::mixer::LoaderRWops;
 use sdl2::mouse::MouseButton;
 use sdl2::pixels::Color;
 use sdl2::pixels::PixelFormatEnum;
@@ -70,6 +71,8 @@ pub fn startup(mode: DrawMode) {
 
     let i = sdl2::mixer::InitFlag::MP3;
     let _sdl2mixer = sdl2::mixer::init(i).unwrap();
+    let audio = sdl2::mixer::open_audio(44100, 16, 2, 1024);
+    println!("Audio is {:?}", audio);
 
     let mut game_resources = GameResources::new(font);
     let mut mode: Box<dyn GameMode> = match mode {
@@ -195,6 +198,11 @@ pub fn startup(mode: DrawMode) {
                 MessageFromAsync::Sprite(id, spr) => {
                     let sprite = spr.to_gui(&texture_creator);
                     game_resources.sprites.insert(*id, Loaded(sprite));
+                }
+                MessageFromAsync::Sfx(id, data) => {
+                    let rwops = sdl2::rwops::RWops::from_bytes(&data[..]).unwrap();
+                    let chnk = rwops.load_wav().unwrap();
+                    game_resources.sfx.insert(*id, Loaded(chnk));
                 }
             }
         }
