@@ -1070,11 +1070,17 @@ impl SpriteWidget {
     }
 
     fn set_sprite_major(&mut self, m: u16) {
-        self.id_major = m;
+        if self.id_major != m {
+            self.id_major = m;
+            self.frame_index = 0;
+        }
     }
 
     fn set_sprite_minor(&mut self, m: u16) {
-        self.id_minor = m;
+        if self.id_minor != m {
+            self.id_minor = m;
+            self.frame_index = 0;
+        }
     }
 }
 

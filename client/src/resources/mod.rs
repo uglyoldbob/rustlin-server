@@ -362,10 +362,12 @@ pub async fn async_main(
                 MessageToAsync::LoadSfx(id) => {
                     let f = format!("{}\\sound\\{}.wav", resource_path, id);
                     println!("I need to load {}", f);
-                    let mut data = tokio::fs::File::open(f).await.unwrap();
-                    let mut c = Vec::new();
-                    data.read_to_end(&mut c).await.unwrap();
-                    let _e = s.send(MessageFromAsync::Sfx(id, c.clone())).await;
+                    let data = tokio::fs::File::open(f).await;
+                    if let Ok(mut data) = data {
+                        let mut c = Vec::new();
+                        data.read_to_end(&mut c).await.unwrap();
+                        let _e = s.send(MessageFromAsync::Sfx(id, c.clone())).await;
+                    }
                 }
             },
         }
