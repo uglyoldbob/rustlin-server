@@ -6,6 +6,7 @@ use sdl2::render::Texture;
 use sdl2::render::TextureCreator;
 use sdl2::surface::Surface;
 use std::collections::HashMap;
+use std::path::PathBuf;
 use tokio::io::AsyncReadExt;
 
 pub mod stringtable;
@@ -260,7 +261,7 @@ pub async fn async_main(
 ) {
     println!("Async main");
 
-    let mut resource_path: String = "".to_string();
+    let mut resource_path: PathBuf = PathBuf::new();
     let mut res: Resources = Resources::new();
 
     loop {
@@ -272,7 +273,7 @@ pub async fn async_main(
                     r.do_stuff(&mut res).await;
                 }
                 MessageToAsync::LoadResources(path) => {
-                    resource_path = path.clone();
+                    resource_path = PathBuf::from(path.clone());
                     println!("Loading resources {}", path);
                     match PackFiles::load(path).await {
                         Ok(p) => {
@@ -285,7 +286,9 @@ pub async fn async_main(
                     }
                 }
                 MessageToAsync::LoadFont(file) => {
-                    let path = format!("{}/{}", resource_path, file);
+                    let mut f = resource_path.clone();
+                    f.push(file);
+                    let path = f.as_os_str().to_str().unwrap().to_string();
                     let _font = Font::load(path).await;
                 }
                 MessageToAsync::LoadSpriteTable => {
@@ -360,7 +363,10 @@ pub async fn async_main(
                     }
                 }
                 MessageToAsync::LoadSfx(id) => {
-                    let f = format!("{}\\sound\\{}.wav", resource_path, id);
+                    let mut f = resource_path.clone();
+                    f.push("sound");
+                    f.push(format!("{}.wav", id));
+                    let f = f.as_os_str().to_str().unwrap().to_string();
                     println!("I need to load {}", f);
                     let data = tokio::fs::File::open(f).await;
                     if let Ok(mut data) = data {
