@@ -1,7 +1,5 @@
 #![allow(dead_code)]
 
-mod sprites;
-
 mod pack;
 use crate::pack::*;
 

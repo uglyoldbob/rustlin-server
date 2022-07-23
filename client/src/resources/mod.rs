@@ -20,6 +20,9 @@ use crate::resources::character_data::*;
 pub mod sprite;
 use crate::resources::sprite::*;
 
+pub mod map;
+use crate::resources::map::*;
+
 use async_trait::async_trait;
 /// Represents data and code that can be transferred to the async runtime for execution.
 #[async_trait]
