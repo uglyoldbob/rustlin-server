@@ -386,8 +386,10 @@ pub async fn async_main(
                     if let Some(p) = &mut res.packs {
                         let name = format!("{}.til", id);
                         println!("Loading {}.til", id);
-                        let data = p.tile.raw_file_contents(name).await;
+                        let data = p.tile.raw_file_contents(name.clone()).await;
                         if let Some(data) = data {
+                            std::fs::write(name, &data);
+
                             println!("Decoding {}.til", id);
                             let mut cursor = std::io::Cursor::new(&data);
                             let tileset = TileSet::decode_tileset_data(&mut cursor).await;

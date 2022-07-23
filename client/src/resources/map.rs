@@ -1,17 +1,39 @@
 use tokio::io::AsyncReadExt;
+use tokio::io::AsyncSeekExt;
 
-#[derive(Copy, Clone)]
-pub struct TileSet {}
+#[derive(Clone)]
+pub struct TileSet {
+    tiles: Vec<Vec<u16>>,
+}
 
 impl TileSet {
     pub async fn decode_tileset_data(cursor: &mut std::io::Cursor<&Vec<u8>>) -> Option<Self> {
         let num_tiles = cursor.read_u16_le().await.ok()?;
+        cursor.read_u16_le().await.ok()?;
         let mut offsets = Vec::with_capacity(num_tiles as usize);
         for _ in 0..num_tiles {
             offsets.push(cursor.read_u32_le().await.ok()?);
         }
+        cursor.read_u32_le().await.ok()?;
+        let base_offset = cursor.position();
+        println!("Base offset is {}", base_offset);
+        for t in offsets {
+            let _e = cursor
+                .seek(tokio::io::SeekFrom::Start(base_offset + t as u64))
+                .await;
+            let v1 = cursor.read_u8().await.ok()?;
+            if (v1 & 2) != 0 {
+                println!("offset is {}", base_offset + t as u64);
 
-        Some(TileSet {})
+                unimplemented!();
+            } else {
+                let mut tile_data = Vec::with_capacity(288);
+                for _ in 0..288 {
+                    tile_data.push(cursor.read_u16_le().await.ok()?);
+                }
+            }
+        }
+        Some(TileSet { tiles: Vec::new() })
     }
 
     pub fn draw_tile(&self, x: u16, y: u16, subtile: u16, canvas: &mut sdl2::render::WindowCanvas) {
