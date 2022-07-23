@@ -89,6 +89,7 @@ pub enum MessageToAsync {
     LoadRunner(Box<dyn AsyncRunner + Send>),
     LoadSprite(u16, u16),
     LoadSfx(u16),
+    LoadTileset(u16),
 }
 
 pub enum MessageFromAsync {
@@ -98,6 +99,7 @@ pub enum MessageFromAsync {
     Img(u16, Img),
     Sprite(u32, Sprite),
     Sfx(u16, Vec<u8>),
+    Tileset(u16, TileSet),
 }
 
 struct PackFiles {
@@ -221,6 +223,7 @@ pub struct GameResources<'a, 'b, 'c> {
     pub characters: [CharacterData; 8],
     pub sprites: HashMap<u32, Loadable<SpriteGui<'a>>>,
     pub sfx: HashMap<u16, Loadable<Chunk>>,
+    pub tilesets: HashMap<u16, Loadable<TileSet>>,
 }
 
 impl<'a, 'b, 'c> GameResources<'a, 'b, 'c> {
@@ -244,6 +247,7 @@ impl<'a, 'b, 'c> GameResources<'a, 'b, 'c> {
             characters: chars,
             sprites: HashMap::new(),
             sfx: HashMap::new(),
+            tilesets: HashMap::new(),
         }
     }
 }
@@ -376,6 +380,22 @@ pub async fn async_main(
                         let mut c = Vec::new();
                         data.read_to_end(&mut c).await.unwrap();
                         let _e = s.send(MessageFromAsync::Sfx(id, c.clone())).await;
+                    }
+                }
+                MessageToAsync::LoadTileset(id) => {
+                    if let Some(p) = &mut res.packs {
+                        let name = format!("{}.til", id);
+                        println!("Loading {}.til", id);
+                        let data = p.tile.raw_file_contents(name).await;
+                        if let Some(data) = data {
+                            println!("Decoding {}.til", id);
+                            let mut cursor = std::io::Cursor::new(&data);
+                            let tileset = TileSet::decode_tileset_data(&mut cursor).await;
+                            if let Some(t) = tileset {
+                                println!("Submitting {}.til", id);
+                                let _e = s.send(MessageFromAsync::Tileset(id, t)).await;
+                            }
+                        }
                     }
                 }
             },

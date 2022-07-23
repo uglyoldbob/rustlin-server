@@ -83,6 +83,9 @@ pub fn startup(mode: DrawMode) {
         DrawMode::PngExplorer => Box::new(PngExplorer::new(&texture_creator, &mut game_resources)),
         DrawMode::ImgExplorer => Box::new(ImgExplorer::new(&texture_creator, &mut game_resources)),
         DrawMode::SprExplorer => Box::new(SprExplorer::new(&texture_creator, &mut game_resources)),
+        DrawMode::TileExplorer => {
+            Box::new(TileExplorer::new(&texture_creator, &mut game_resources))
+        }
         DrawMode::GameLoader => Box::new(GameLoader::new(&texture_creator, &mut game_resources)),
         DrawMode::Login => Box::new(Login::new(&texture_creator)),
         DrawMode::CharacterSelect => {
@@ -203,6 +206,9 @@ pub fn startup(mode: DrawMode) {
                     let rwops = sdl2::rwops::RWops::from_bytes(&data[..]).unwrap();
                     let chnk = rwops.load_wav().unwrap();
                     game_resources.sfx.insert(*id, Loaded(chnk));
+                }
+                MessageFromAsync::Tileset(id, tileset) => {
+                    game_resources.tilesets.insert(*id, Loaded(*tileset));
                 }
             }
         }
@@ -331,6 +337,9 @@ pub fn startup(mode: DrawMode) {
                         }
                         DrawMode::SprExplorer => {
                             Box::new(SprExplorer::new(&texture_creator, &mut game_resources))
+                        }
+                        DrawMode::TileExplorer => {
+                            Box::new(TileExplorer::new(&texture_creator, &mut game_resources))
                         }
                         DrawMode::GameLoader => {
                             Box::new(GameLoader::new(&texture_creator, &mut game_resources))

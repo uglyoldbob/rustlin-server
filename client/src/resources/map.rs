@@ -1,5 +1,23 @@
 use tokio::io::AsyncReadExt;
 
+#[derive(Copy, Clone)]
+pub struct TileSet {}
+
+impl TileSet {
+    pub async fn decode_tileset_data(cursor: &mut std::io::Cursor<&Vec<u8>>) -> Option<Self> {
+        let num_tiles = cursor.read_u16_le().await.ok()?;
+        let mut offsets = Vec::with_capacity(num_tiles as usize);
+        for _ in 0..num_tiles {
+            offsets.push(cursor.read_u32_le().await.ok()?);
+        }
+
+        Some(TileSet {})
+    }
+
+    pub fn draw_tile(&self, x: u16, y: u16, subtile: u16, canvas: &mut sdl2::render::WindowCanvas) {
+    }
+}
+
 pub struct TileData {
     x: i8,
     y: i8,
@@ -32,7 +50,7 @@ impl MapSegment {
             *t = cursor.read_u16_le().await.ok()? as u32;
         }
 
-        let mystery1 = cursor.read_u16_le().await.ok()?;
+        let _mystery1 = cursor.read_u16_le().await.ok()?;
 
         let mut t2 = [0; 64 * 128];
         for t in t2.iter_mut() {
@@ -42,18 +60,18 @@ impl MapSegment {
         let mystery2 = cursor.read_u32_le().await.ok()?;
         for _ in 0..mystery2 {
             cursor.read_u16_le().await.ok()?;
-            let m1 = cursor.read_u16_le().await.ok()?;
+            let _m1 = cursor.read_u16_le().await.ok()?;
         }
 
         let mystery3 = cursor.read_u32_le().await.ok()?;
         for _ in 0..mystery3 {
-            let m1 = cursor.read_u16_le().await.ok()?;
-            let m2 = cursor.read_u16_le().await.ok()?;
+            let _m1 = cursor.read_u16_le().await.ok()?;
+            let _m2 = cursor.read_u16_le().await.ok()?;
         }
 
         let num_tilesets = cursor.read_u8().await.ok()?;
         for _ in 0..num_tilesets {
-            let tileset = cursor.read_u8().await.ok()?;
+            let _tileset = cursor.read_u8().await.ok()?;
         }
 
         let num_portals = cursor.read_u16_le().await.ok()?;
@@ -103,7 +121,7 @@ impl MapSegment {
         let num_objects = cursor.read_u32_le().await.ok()?;
         let mut objs = Vec::with_capacity(num_objects as usize);
         for _ in 0..num_objects {
-            let index = cursor.read_u16_le().await.ok()?;
+            let _index = cursor.read_u16_le().await.ok()?;
             let num_tiles = cursor.read_u16_le().await.ok()?;
             let mut t = Vec::with_capacity(num_tiles as usize);
             for _ in 0..num_tiles {
