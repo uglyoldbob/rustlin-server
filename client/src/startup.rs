@@ -208,7 +208,9 @@ pub fn startup(mode: DrawMode) {
                     game_resources.sfx.insert(*id, Loaded(chnk));
                 }
                 MessageFromAsync::Tileset(id, tileset) => {
-                    game_resources.tilesets.insert(*id, Loaded(tileset.clone()));
+                    let ts = tileset.clone();
+                    let ts = ts.to_gui(&texture_creator);
+                    game_resources.tilesets.insert(*id, Loaded(ts));
                 }
             }
         }

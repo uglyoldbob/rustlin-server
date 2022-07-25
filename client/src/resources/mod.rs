@@ -223,7 +223,7 @@ pub struct GameResources<'a, 'b, 'c> {
     pub characters: [CharacterData; 8],
     pub sprites: HashMap<u32, Loadable<SpriteGui<'a>>>,
     pub sfx: HashMap<u16, Loadable<Chunk>>,
-    pub tilesets: HashMap<u16, Loadable<TileSet>>,
+    pub tilesets: HashMap<u16, Loadable<TileSetGui<'a>>>,
 }
 
 impl<'a, 'b, 'c> GameResources<'a, 'b, 'c> {
@@ -388,8 +388,6 @@ pub async fn async_main(
                         println!("Loading {}.til", id);
                         let data = p.tile.raw_file_contents(name.clone()).await;
                         if let Some(data) = data {
-                            std::fs::write(name, &data);
-
                             println!("Decoding {}.til", id);
                             let mut cursor = std::io::Cursor::new(&data);
                             let tileset = TileSet::decode_tileset_data(&mut cursor).await;

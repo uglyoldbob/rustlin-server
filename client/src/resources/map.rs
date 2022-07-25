@@ -1,9 +1,39 @@
+use sdl2::pixels::PixelFormatEnum;
+use sdl2::rect::Rect;
+use sdl2::render::Texture;
+use sdl2::render::TextureCreator;
 use tokio::io::AsyncReadExt;
 use tokio::io::AsyncSeekExt;
 
 #[derive(Clone)]
+pub struct Tile {
+    x: i8,
+    y: i8,
+    w: u8,
+    h: u8,
+    data: [u16; 288],
+}
+
+pub struct TileSetGui<'a> {
+    tiles: Vec<Texture<'a>>,
+}
+
+impl<'a> TileSetGui<'a> {
+    pub fn draw_tile(&self, x: u16, y: u16, subtile: u16, canvas: &mut sdl2::render::WindowCanvas) {
+        if let Some(t) = self.tiles.get(subtile as usize) {
+            let q = t.query();
+            let _e = canvas.copy(
+                t,
+                None,
+                Rect::new(x as i32, y as i32, q.width.into(), q.height.into()),
+            );
+        }
+    }
+}
+
+#[derive(Clone)]
 pub struct TileSet {
-    tiles: Vec<Vec<u16>>,
+    tiles: Vec<Tile>,
 }
 
 impl TileSet {
@@ -17,6 +47,7 @@ impl TileSet {
         cursor.read_u32_le().await.ok()?;
         let base_offset = cursor.position();
         println!("Base offset is {}", base_offset);
+        let mut tiles = Vec::new();
         for t in offsets {
             let _e = cursor
                 .seek(tokio::io::SeekFrom::Start(base_offset + t as u64))
@@ -25,18 +56,42 @@ impl TileSet {
             if (v1 & 2) != 0 {
                 println!("offset is {}", base_offset + t as u64);
 
-                unimplemented!();
+                //unimplemented!();
             } else {
-                let mut tile_data = Vec::with_capacity(288);
-                for _ in 0..288 {
-                    tile_data.push(cursor.read_u16_le().await.ok()?);
+                let mut tile_data: [u16; 288] = [0; 288];
+                for i in 0..288 {
+                    tile_data[i] = cursor.read_u16_le().await.ok()?;
                 }
+                tiles.push(Tile {
+                    x: 0,
+                    y: 0,
+                    w: 24,
+                    h: 24,
+                    data: tile_data,
+                });
             }
         }
-        Some(TileSet { tiles: Vec::new() })
+        Some(TileSet { tiles: tiles })
     }
 
-    pub fn draw_tile(&self, x: u16, y: u16, subtile: u16, canvas: &mut sdl2::render::WindowCanvas) {
+    pub fn to_gui<'a, T>(self, tc: &'a TextureCreator<T>) -> TileSetGui {
+        let mut t = Vec::new();
+        for tmp in &self.tiles {
+            let w = 48;
+            let h = 24;
+            let mut data: Vec<u8> = vec![0xff; (w * h * 2) as usize];
+            let surf = sdl2::surface::Surface::from_data(
+                data.as_mut_slice(),
+                w as u32,
+                h as u32,
+                (2 * w) as u32,
+                PixelFormatEnum::RGB555,
+            )
+            .unwrap();
+            let texture = Texture::from_surface(&surf, tc).unwrap();
+            t.push(texture);
+        }
+        TileSetGui { tiles: t }
     }
 }
 
