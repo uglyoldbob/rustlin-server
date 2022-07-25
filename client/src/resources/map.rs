@@ -53,33 +53,55 @@ impl TileSet {
                 .seek(tokio::io::SeekFrom::Start(base_offset + t as u64))
                 .await;
             let v1 = cursor.read_u8().await.ok()?;
-            let tile_data = if (v1 & 2) != 0 {
-                println!("offset is {}", base_offset + t as u64);
-                let mut tile_data: [u16; 288] = [0xffff; 288];
-                //unimplemented!();
-                tile_data
+            let mirrored_tile_data = if (v1 & 2) != 0 {
+                let mut mirrored_tile_data = [0 as u16; 24 * 48];
+                let x = cursor.read_u8().await.ok()?;
+                let y = cursor.read_u8().await.ok()?;
+                let w = cursor.read_u8().await.ok()?;
+                let h = cursor.read_u8().await.ok()?;
+                println!("x {} y {} w {} h {}", x, y, w, h);
+                for i in 0..h {
+                    let num_segments = cursor.read_u8().await.ok()?;
+                    let mut skip_index = 0;
+                    for _ in 0..num_segments {
+                        let skip = cursor.read_u8().await.ok()? / 2;
+                        let seg_width = cursor.read_u8().await.ok()?;
+                        skip_index += skip;
+                        for pixel in 0..seg_width {
+                            let val = cursor.read_u16_le().await.ok()?;
+                            let index = x as usize
+                                + (y + i) as usize * 48
+                                + skip_index as usize
+                                + pixel as usize;
+                            mirrored_tile_data[index] = val;
+                        }
+                        skip_index += seg_width;
+                    }
+                }
+                mirrored_tile_data
             } else {
                 let mut tile_data: [u16; 288] = [0; 288];
                 for i in 0..288 {
                     tile_data[i] = cursor.read_u16_le().await.ok()?;
                 }
-                tile_data
-            };
-            let mut mirrored_tile_data = [0 as u16; 24 * 48];
-            let mut ind_offset = 0;
+                let mut mirrored_tile_data = [0 as u16; 24 * 48];
+                let mut ind_offset = 0;
 
-            for i in 0..24 {
-                let mut width = 2 * (i + 1);
-                if i > 11 {
-                    width -= 4 * (i - 11);
+                for i in 0..24 {
+                    let mut width = 2 * (i + 1);
+                    if i > 11 {
+                        width -= 4 * (i - 11);
+                    }
+                    for j in 0..width {
+                        let d: u16 = tile_data[ind_offset];
+                        ind_offset += 1;
+                        mirrored_tile_data[i * 48 + 24 + j] = d;
+                        mirrored_tile_data[i * 48 + 23 - j] = d;
+                    }
                 }
-                for j in 0..width {
-                    let d: u16 = tile_data[ind_offset];
-                    ind_offset += 1;
-                    mirrored_tile_data[i * 48 + 24 + j] = d;
-                    mirrored_tile_data[i * 48 + 23 - j] = d;
-                }
-            }
+                mirrored_tile_data
+            };
+
             tiles.push(Tile {
                 x: 0,
                 y: 0,
