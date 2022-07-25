@@ -11,7 +11,7 @@ pub struct Tile {
     y: i8,
     w: u8,
     h: u8,
-    data: [u16; 288],
+    data: [u16; 24 * 48],
 }
 
 pub struct TileSetGui<'a> {
@@ -53,23 +53,40 @@ impl TileSet {
                 .seek(tokio::io::SeekFrom::Start(base_offset + t as u64))
                 .await;
             let v1 = cursor.read_u8().await.ok()?;
-            if (v1 & 2) != 0 {
+            let tile_data = if (v1 & 2) != 0 {
                 println!("offset is {}", base_offset + t as u64);
-
+                let mut tile_data: [u16; 288] = [0xffff; 288];
                 //unimplemented!();
+                tile_data
             } else {
                 let mut tile_data: [u16; 288] = [0; 288];
                 for i in 0..288 {
                     tile_data[i] = cursor.read_u16_le().await.ok()?;
                 }
-                tiles.push(Tile {
-                    x: 0,
-                    y: 0,
-                    w: 24,
-                    h: 24,
-                    data: tile_data,
-                });
+                tile_data
+            };
+            let mut mirrored_tile_data = [0 as u16; 24 * 48];
+            let mut ind_offset = 0;
+
+            for i in 0..24 {
+                let mut width = 2 * (i + 1);
+                if i > 11 {
+                    width -= 4 * (i - 11);
+                }
+                for j in 0..width {
+                    let d: u16 = tile_data[ind_offset];
+                    ind_offset += 1;
+                    mirrored_tile_data[i * 48 + 24 + j] = d;
+                    mirrored_tile_data[i * 48 + 23 - j] = d;
+                }
             }
+            tiles.push(Tile {
+                x: 0,
+                y: 0,
+                w: 24,
+                h: 24,
+                data: mirrored_tile_data,
+            });
         }
         Some(TileSet { tiles: tiles })
     }
@@ -79,9 +96,9 @@ impl TileSet {
         for tmp in &self.tiles {
             let w = 48;
             let h = 24;
-            let mut data: Vec<u8> = vec![0xff; (w * h * 2) as usize];
+            let mut data8: Vec<u8> = tmp.data.iter().flat_map(|val| val.to_le_bytes()).collect();
             let surf = sdl2::surface::Surface::from_data(
-                data.as_mut_slice(),
+                data8.as_mut_slice(),
                 w as u32,
                 h as u32,
                 (2 * w) as u32,
