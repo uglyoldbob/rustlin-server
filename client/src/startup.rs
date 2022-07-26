@@ -86,6 +86,7 @@ pub fn startup(mode: DrawMode) {
         DrawMode::TileExplorer => {
             Box::new(TileExplorer::new(&texture_creator, &mut game_resources))
         }
+        DrawMode::MapExplorer => Box::new(MapExplorer::new(&texture_creator, &mut game_resources)),
         DrawMode::GameLoader => Box::new(GameLoader::new(&texture_creator, &mut game_resources)),
         DrawMode::Login => Box::new(Login::new(&texture_creator)),
         DrawMode::CharacterSelect => {
@@ -337,6 +338,9 @@ pub fn startup(mode: DrawMode) {
                         }
                         DrawMode::TileExplorer => {
                             Box::new(TileExplorer::new(&texture_creator, &mut game_resources))
+                        }
+                        DrawMode::MapExplorer => {
+                            Box::new(MapExplorer::new(&texture_creator, &mut game_resources))
                         }
                         DrawMode::GameLoader => {
                             Box::new(GameLoader::new(&texture_creator, &mut game_resources))
