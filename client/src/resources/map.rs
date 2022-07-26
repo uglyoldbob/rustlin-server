@@ -46,7 +46,6 @@ impl TileSet {
         }
         cursor.read_u32_le().await.ok()?;
         let base_offset = cursor.position();
-        println!("Base offset is {}", base_offset);
         let mut tiles = Vec::new();
         for t in offsets {
             let _e = cursor
@@ -59,7 +58,6 @@ impl TileSet {
                 let y = cursor.read_u8().await.ok()?;
                 let w = cursor.read_u8().await.ok()?;
                 let h = cursor.read_u8().await.ok()?;
-                println!("x {} y {} w {} h {}", x, y, w, h);
                 for i in 0..h {
                     let num_segments = cursor.read_u8().await.ok()?;
                     let mut skip_index = 0;

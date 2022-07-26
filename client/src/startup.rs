@@ -176,7 +176,6 @@ pub fn startup(mode: DrawMode) {
                         Ok(mut a) => {
                             a.set_blend_mode(sdl2::render::BlendMode::Add);
                             game_resources.pngs.insert(*name, Loaded(a));
-                            println!("PNG {} success", name);
                         }
                         Err(e) => {
                             println!("PNG {} fail {}", name, e);
@@ -191,7 +190,6 @@ pub fn startup(mode: DrawMode) {
                     match img {
                         Some(a) => {
                             game_resources.imgs.insert(*name, Loaded(a));
-                            println!("IMG{} success", name);
                         }
                         None => {
                             println!("IMG {} fail", name);
@@ -297,7 +295,6 @@ pub fn startup(mode: DrawMode) {
                     keymod: _,
                     repeat: _,
                 } => {
-                    println!("Key down event");
                     if let Some(key) = keycode {
                         mode.process_button(key, true, &mut game_resources);
                     }
@@ -310,7 +307,6 @@ pub fn startup(mode: DrawMode) {
                     keymod: _,
                     repeat: _,
                 } => {
-                    println!("Key up event");
                     if let Some(key) = keycode {
                         mode.process_button(key, false, &mut game_resources);
                     }
@@ -325,7 +321,6 @@ pub fn startup(mode: DrawMode) {
         while let Some(m) = drawmode_commands.pop_front() {
             match m {
                 DrawModeRequest::ChangeDrawMode(m) => {
-                    println!("Requested to change the drawmode");
                     mode = match m {
                         DrawMode::Explorer => {
                             let t = ExplorerMenu::new(&texture_creator, &mut game_resources);
