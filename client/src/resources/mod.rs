@@ -12,7 +12,7 @@ use tokio::io::AsyncReadExt;
 pub mod stringtable;
 use crate::resources::stringtable::*;
 
-use crate::mode::CharacterDisplayType;
+use crate::mode::character_select::CharacterDisplayType;
 
 pub mod character_data;
 use crate::resources::character_data::*;

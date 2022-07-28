@@ -78,5 +78,3 @@ impl<'a> Widget for PlainColorButton<'a> {
         });
     }
 }
-
-
