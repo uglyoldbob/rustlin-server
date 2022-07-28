@@ -29,6 +29,28 @@ impl<'a> TileSetGui<'a> {
             );
         }
     }
+
+    pub fn draw_left(&self, x: u16, y: u16, subtile: u16, canvas: &mut sdl2::render::WindowCanvas) {
+        if let Some(t) = self.tiles.get(subtile as usize) {
+            let q = t.query();
+            let _e = canvas.copy(
+                t,
+                Rect::new(0, 0, q.width / 2, 24),
+                Rect::new(x as i32, y as i32, q.width / 2, q.height.into()),
+            );
+        }
+    }
+
+    pub fn draw_right(&self, x: u16, y: u16, subtile: u16, canvas: &mut sdl2::render::WindowCanvas) {
+        if let Some(t) = self.tiles.get(subtile as usize) {
+            let q = t.query();
+            let _e = canvas.copy(
+                t,
+                Rect::new(q.width as i32 / 2, 0, q.width / 2, 24),
+                Rect::new(x as i32 + q.width as i32 / 2, y as i32, q.width / 2, q.height.into()),
+            );
+        }
+    }
 }
 
 #[derive(Clone)]

@@ -3186,7 +3186,8 @@ impl<'a, T> GameMode for TileExplorer<'a, T> {
         match r.tilesets.get(&self.current_tile) {
             Some(ts) => match ts {
                 Loaded(t) => {
-                    t.draw_tile(320, 240, self.current_subtile, canvas);
+                    t.draw_left(320, 240, self.current_subtile, canvas);
+                    t.draw_right(320, 240, self.current_subtile, canvas);
                 }
                 _ => {}
             },
