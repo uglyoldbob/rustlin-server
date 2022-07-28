@@ -41,13 +41,24 @@ impl<'a> TileSetGui<'a> {
         }
     }
 
-    pub fn draw_right(&self, x: u16, y: u16, subtile: u16, canvas: &mut sdl2::render::WindowCanvas) {
+    pub fn draw_right(
+        &self,
+        x: u16,
+        y: u16,
+        subtile: u16,
+        canvas: &mut sdl2::render::WindowCanvas,
+    ) {
         if let Some(t) = self.tiles.get(subtile as usize) {
             let q = t.query();
             let _e = canvas.copy(
                 t,
                 Rect::new(q.width as i32 / 2, 0, q.width / 2, 24),
-                Rect::new(x as i32 + q.width as i32 / 2, y as i32, q.width / 2, q.height.into()),
+                Rect::new(
+                    x as i32 + q.width as i32 / 2,
+                    y as i32,
+                    q.width / 2,
+                    q.height.into(),
+                ),
             );
         }
     }
@@ -154,6 +165,7 @@ impl TileSet {
     }
 }
 
+#[derive(Clone)]
 pub struct TileData {
     x: i8,
     y: i8,
@@ -161,10 +173,12 @@ pub struct TileData {
     data: u32,
 }
 
+#[derive(Clone)]
 pub struct MapObject {
     tiles: Vec<TileData>,
 }
 
+#[derive(Clone)]
 pub struct MapSegment {
     tiles: [u32; 64 * 128],
     attributes: [u16; 64 * 128],
@@ -176,6 +190,12 @@ pub struct MapSegment {
 }
 
 impl MapSegment {
+    pub fn get_map_name(x: u16, y: u16) -> String {
+        let modx = (x >> 6) + 0x7e00;
+        let mody = (y >> 6) + 0x7e00;
+        format!("{}{}", modx, mody)
+    }
+
     pub async fn load_map_seg(
         cursor: &mut std::io::Cursor<&Vec<u8>>,
         x: u16,

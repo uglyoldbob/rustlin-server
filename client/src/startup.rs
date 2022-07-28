@@ -11,6 +11,7 @@ use sdl2::pixels::Color;
 use sdl2::pixels::PixelFormatEnum;
 use sdl2::render::Texture;
 use sdl2::render::TextureCreator;
+use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::fs;
 use std::time::Duration;
@@ -210,6 +211,17 @@ pub fn startup(mode: DrawMode) {
                     let ts = tileset.clone();
                     let ts = ts.to_gui(&texture_creator);
                     game_resources.tilesets.insert(*id, Loaded(ts));
+                }
+                MessageFromAsync::MapSegment(map, x, y, data) => {
+                    if !game_resources.maps.contains_key(map) {
+                        game_resources.maps.insert(*map, HashMap::new());
+                    }
+                    let combined = ((*x as u32) << 16) | *y as u32;
+                    game_resources
+                        .maps
+                        .get_mut(map)
+                        .unwrap()
+                        .insert(combined, Loaded(data.clone()));
                 }
             }
         }

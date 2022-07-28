@@ -90,6 +90,7 @@ pub enum MessageToAsync {
     LoadSprite(u16, u16),
     LoadSfx(u16),
     LoadTileset(u16),
+    LoadMapSegment(u16, u16, u16),
 }
 
 pub enum MessageFromAsync {
@@ -100,6 +101,7 @@ pub enum MessageFromAsync {
     Sprite(u32, Sprite),
     Sfx(u16, Vec<u8>),
     Tileset(u16, TileSet),
+    MapSegment(u16, u16, u16, MapSegment),
 }
 
 struct PackFiles {
@@ -224,6 +226,7 @@ pub struct GameResources<'a, 'b, 'c> {
     pub sprites: HashMap<u32, Loadable<SpriteGui<'a>>>,
     pub sfx: HashMap<u16, Loadable<Chunk>>,
     pub tilesets: HashMap<u16, Loadable<TileSetGui<'a>>>,
+    pub maps: HashMap<u16, HashMap<u32, Loadable<MapSegment>>>,
 }
 
 impl<'a, 'b, 'c> GameResources<'a, 'b, 'c> {
@@ -248,6 +251,7 @@ impl<'a, 'b, 'c> GameResources<'a, 'b, 'c> {
             sprites: HashMap::new(),
             sfx: HashMap::new(),
             tilesets: HashMap::new(),
+            maps: HashMap::new(),
         }
     }
 }
@@ -396,6 +400,43 @@ pub async fn async_main(
                                 let _e = s.send(MessageFromAsync::Tileset(id, t)).await;
                             }
                         }
+                    }
+                }
+                MessageToAsync::LoadMapSegment(map, x, y) => {
+                    let mapn = MapSegment::get_map_name(x, y);
+                    let mut f = resource_path.clone();
+                    f.push("map");
+                    f.push(format!("{}", map));
+                    f.push(format!("{}.s32", mapn));
+                    let p = f.as_os_str().to_str().unwrap().to_string();
+                    let data = tokio::fs::File::open(p).await;
+                    let ms = if let Ok(mut data) = data {
+                        let mut buf = Vec::new();
+                        let _e = data.read_to_end(&mut buf).await;
+                        let mut c = std::io::Cursor::new(&buf);
+                        let ms = MapSegment::load_map_s32(&mut c, x, y).await;
+                        ms
+                    } else {
+                        let mut f = resource_path.clone();
+                        f.push("map");
+                        f.push(format!("{}", map));
+                        f.push(format!("{}.seg", mapn));
+                        let p = f.as_os_str().to_str().unwrap().to_string();
+                        let data = tokio::fs::File::open(p).await;
+                        if let Ok(mut data) = data {
+                            let mut buf = Vec::new();
+                            let _e = data.read_to_end(&mut buf).await;
+                            let mut c = std::io::Cursor::new(&buf);
+                            let ms = MapSegment::load_map_seg(&mut c, x, y).await;
+                            ms
+                        } else {
+                            None
+                        }
+                    };
+                    if let Some(mapseg) = ms {
+                        let _e = s
+                            .send(MessageFromAsync::MapSegment(map, x, y, mapseg))
+                            .await;
                     }
                 }
             },
