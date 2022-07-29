@@ -1,3 +1,5 @@
+use crate::GameResources;
+use crate::Loadable::*;
 use sdl2::pixels::PixelFormatEnum;
 use sdl2::rect::Rect;
 use sdl2::render::Texture;
@@ -19,46 +21,37 @@ pub struct TileSetGui<'a> {
 }
 
 impl<'a> TileSetGui<'a> {
-    pub fn draw_tile(&self, x: u16, y: u16, subtile: u16, canvas: &mut sdl2::render::WindowCanvas) {
+    pub fn draw_tile<T: sdl2::render::RenderTarget>(&self, x: i32, y: i32, subtile: u16, canvas: &mut sdl2::render::Canvas<T>) {
         if let Some(t) = self.tiles.get(subtile as usize) {
             let q = t.query();
-            let _e = canvas.copy(
-                t,
-                None,
-                Rect::new(x as i32, y as i32, q.width.into(), q.height.into()),
-            );
+            let _e = canvas.copy(t, None, Rect::new(x, y, q.width.into(), q.height.into()));
         }
     }
 
-    pub fn draw_left(&self, x: u16, y: u16, subtile: u16, canvas: &mut sdl2::render::WindowCanvas) {
+    pub fn draw_left<T: sdl2::render::RenderTarget>(&self, x: i32, y: i32, subtile: u16, canvas: &mut sdl2::render::Canvas<T>) {
         if let Some(t) = self.tiles.get(subtile as usize) {
             let q = t.query();
             let _e = canvas.copy(
                 t,
                 Rect::new(0, 0, q.width / 2, 24),
-                Rect::new(x as i32, y as i32, q.width / 2, q.height.into()),
+                Rect::new(x, y, q.width / 2, q.height.into()),
             );
         }
     }
 
-    pub fn draw_right(
+    pub fn draw_right<T: sdl2::render::RenderTarget>(
         &self,
-        x: u16,
-        y: u16,
+        x: i32,
+        y: i32,
         subtile: u16,
-        canvas: &mut sdl2::render::WindowCanvas,
+        canvas: &mut sdl2::render::Canvas<T>,
     ) {
         if let Some(t) = self.tiles.get(subtile as usize) {
             let q = t.query();
             let _e = canvas.copy(
                 t,
                 Rect::new(q.width as i32 / 2, 0, q.width / 2, 24),
-                Rect::new(
-                    x as i32 + q.width as i32 / 2,
-                    y as i32,
-                    q.width / 2,
-                    q.height.into(),
-                ),
+                Rect::new(x + q.width as i32 / 2, y, q.width / 2, q.height.into()),
             );
         }
     }
@@ -191,6 +184,52 @@ pub struct MapSegment {
 }
 
 impl MapSegment {
+    pub fn draw_floor<T: sdl2::render::RenderTarget>(&self, canvas: &mut sdl2::render::Canvas<T>, x: i32, y: i32, r: &mut GameResources) {
+        for y in 0..64 {
+            for x in 0..64 {
+                let startx : i32 = x * 24 - y * 24;
+                let starty: i32 = x * 12 + y * 12;
+                    let index = y * 64 + 2 * x;
+                    let t = self.tiles[index as usize];
+                    let current_tile = (t>>16) as u16;
+                    let current_subtile = (t&0xFFFF) as u16;
+                    match r.tilesets.get(&current_tile) {
+                      Some(ts) => match ts {
+                            Loaded(t) => {
+                                t.draw_left(startx, starty, current_subtile, canvas);
+                            }
+                            _ => {}
+                        },
+                        _ => {}
+                    }
+                    let t = self.tiles[(index+1) as usize];
+                    let current_tile = (t>>16) as u16;
+                    let current_subtile = (t&0xFFFF) as u16;
+                    match r.tilesets.get(&current_tile) {
+                      Some(ts) => match ts {
+                            Loaded(t) => {
+                                t.draw_right(startx, starty, current_subtile, canvas);
+                            }
+                            _ => {}
+                        },
+                        _ => {}
+                    }
+            }
+        }
+    }
+
+    pub fn empty_segment() -> Self {
+        Self {
+            tiles: [1; 64*128],
+            attributes: [0; 64*128],
+            mystery1: Vec::new(),
+            objects: Vec::new(),
+            switches: Vec::new(),
+            x: 0,
+            y: 0,
+        }
+    }
+
     pub fn get_map_name(x: u16, y: u16) -> String {
         let modx = (x >> 6) + 0x7e00;
         let mody = (y >> 6) + 0x7e00;

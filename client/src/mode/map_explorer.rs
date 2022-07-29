@@ -14,7 +14,7 @@ use std::collections::VecDeque;
 pub struct MapExplorer<'a, T> {
     b: Vec<Box<dyn Widget + 'a>>,
     disp: Vec<DynamicTextWidget<'a>>,
-    map: MapWidget,
+    map: MapWidget<'a>,
     current_map: u16,
     current_x: u16,
     current_y: u16,
@@ -36,7 +36,7 @@ impl<'a, T> MapExplorer<'a, T> {
             sdl2::pixels::Color::RED,
         ));
 
-        let map = MapWidget::new(tc, 0, 0);
+        let map = MapWidget::new(tc, 0, 0, 640, 400);
 
         Self {
             b: b,
