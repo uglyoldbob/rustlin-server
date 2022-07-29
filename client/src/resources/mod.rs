@@ -101,7 +101,7 @@ pub enum MessageFromAsync {
     Sprite(u32, Sprite),
     Sfx(u16, Vec<u8>),
     Tileset(u16, TileSet),
-    MapSegment(u16, u16, u16, MapSegment),
+    MapSegment(u16, u16, u16, Box<MapSegment>),
 }
 
 struct PackFiles {
@@ -435,7 +435,7 @@ pub async fn async_main(
                     };
                     if let Some(mapseg) = ms {
                         let _e = s
-                            .send(MessageFromAsync::MapSegment(map, x, y, mapseg))
+                            .send(MessageFromAsync::MapSegment(map, x, y, Box::new(mapseg)))
                             .await;
                     }
                 }
