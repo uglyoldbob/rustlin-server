@@ -1,4 +1,4 @@
-use crate::mode::character_select::CharacterDisplayType;
+use crate::widgets::character_select::CharacterDisplayType;
 
 #[derive(Clone)]
 pub struct CharacterData {

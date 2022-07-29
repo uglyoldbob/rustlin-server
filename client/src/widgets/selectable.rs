@@ -1,31 +1,41 @@
+use crate::widgets::Widget;
 use crate::GameResources;
 use crate::ImageBox;
 use crate::Loadable::*;
 use crate::MessageToAsync;
-use crate::Widget;
 use sdl2::rect::Rect;
 
-pub struct ImgButton {
+pub struct SelectableWidget {
     num: u16,
     x: u16,
     y: u16,
     clicked: bool,
+    selected: bool,
     last_draw: Option<ImageBox>,
 }
 
-impl ImgButton {
+impl SelectableWidget {
     pub fn new(num: u16, x: u16, y: u16) -> Self {
         Self {
             num: num,
             x: x,
             y: y,
             clicked: false,
+            selected: false,
             last_draw: None,
         }
     }
+
+    pub fn is_selected(&self) -> bool {
+        self.selected
+    }
+
+    pub fn set_selected(&mut self, s: bool) {
+        self.selected = s;
+    }
 }
 
-impl Widget for ImgButton {
+impl Widget for SelectableWidget {
     fn last_draw(&self) -> Option<ImageBox> {
         self.last_draw
     }
@@ -43,11 +53,11 @@ impl Widget for ImgButton {
     fn draw_hover(
         &mut self,
         canvas: &mut sdl2::render::WindowCanvas,
-        cursor: bool,
+        _cursor: bool,
         r: &mut GameResources,
         send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
     ) {
-        let value = if cursor {
+        let value = if self.selected {
             if let Some(i) = r.imgs.get(&(self.num + 1)) {
                 if let Loaded(_) = i {
                     self.num + 1

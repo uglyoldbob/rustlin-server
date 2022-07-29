@@ -1,7 +1,7 @@
+use crate::widgets::Widget;
 use crate::GameResources;
 use crate::ImageBox;
 use crate::MessageToAsync;
-use crate::Widget;
 use sdl2::pixels::PixelFormatEnum;
 use sdl2::rect::Rect;
 use sdl2::render::Texture;

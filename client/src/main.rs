@@ -19,6 +19,8 @@ mod keyboard;
 mod resources;
 use crate::resources::*;
 
+pub mod widgets;
+
 mod startup;
 
 pub fn main() {

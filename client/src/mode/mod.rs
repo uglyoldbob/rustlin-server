@@ -1,4 +1,13 @@
 use crate::mouse::MouseEventOutput;
+use crate::widgets::character_select::*;
+use crate::widgets::dynamic_text::DynamicTextWidget;
+use crate::widgets::img_button::ImgButton;
+use crate::widgets::map_widget::MapWidget;
+use crate::widgets::plain_color_button::PlainColorButton;
+use crate::widgets::selectable::SelectableWidget;
+use crate::widgets::sprite_widget::SpriteWidget;
+use crate::widgets::text_button::TextButton;
+use crate::widgets::Widget;
 use crate::GameResources;
 use crate::Loadable::*;
 use crate::MessageToAsync;
@@ -36,75 +45,6 @@ pub struct ImageBox {
 pub enum DrawModeRequest {
     ChangeDrawMode(DrawMode),
 }
-
-pub trait Widget {
-    fn draw(
-        &mut self,
-        canvas: &mut sdl2::render::WindowCanvas,
-        cursor: Option<(i16, i16)>,
-        r: &mut GameResources,
-        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
-    ) {
-        let hover = if let Some(c) = cursor {
-            let (x, y) = c;
-            self.contains(x, y)
-        } else {
-            false
-        };
-        self.draw_hover(canvas, hover, r, send);
-    }
-    fn draw_hover(
-        &mut self,
-        canvas: &mut sdl2::render::WindowCanvas,
-        cursor: bool,
-        r: &mut GameResources,
-        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
-    );
-    fn was_clicked(&mut self) -> bool;
-    fn clicked(&mut self);
-    fn contains(&self, x: i16, y: i16) -> bool {
-        if let Some(t) = &self.last_draw() {
-            let x = if x < 0 { 0 as u16 } else { x as u16 };
-            let y = if y < 0 { 0 as u16 } else { y as u16 };
-            if x >= t.x && y >= t.y {
-                if x < (t.x + t.w) && y < (t.y + t.h) {
-                    true
-                } else {
-                    false
-                }
-            } else {
-                false
-            }
-        } else {
-            false
-        }
-    }
-    fn last_draw(&self) -> Option<ImageBox>;
-}
-
-mod plain_color_button;
-use plain_color_button::PlainColorButton;
-
-mod text_button;
-use text_button::TextButton;
-
-mod img_button;
-use img_button::ImgButton;
-
-mod map_widget;
-use map_widget::MapWidget;
-
-mod selectable;
-use selectable::SelectableWidget;
-
-mod dynamic_text;
-use dynamic_text::DynamicTextWidget;
-
-pub mod character_select;
-use character_select::*;
-
-mod sprite_widget;
-use sprite_widget::SpriteWidget;
 
 /// This trait is used to determine what mode of operation the program is in
 pub trait GameMode {
@@ -2178,6 +2118,7 @@ impl<'a, T> GameMode for TileExplorer<'a, T> {
 pub struct MapExplorer<'a, T> {
     b: Vec<Box<dyn Widget + 'a>>,
     disp: Vec<DynamicTextWidget<'a>>,
+    map: MapWidget,
     current_map: u16,
     current_x: u16,
     current_y: u16,
@@ -2199,6 +2140,8 @@ impl<'a, T> MapExplorer<'a, T> {
             sdl2::pixels::Color::RED,
         ));
 
+        let map = MapWidget::new(tc, 0, 0);
+
         Self {
             b: b,
             disp: disp,
@@ -2207,6 +2150,7 @@ impl<'a, T> MapExplorer<'a, T> {
             current_y: 32768,
             tc: tc,
             displayed: false,
+            map: map,
         }
     }
 }
@@ -2369,6 +2313,7 @@ impl<'a, T> GameMode for MapExplorer<'a, T> {
         for w in &mut self.disp {
             w.draw(canvas, cursor, r, send);
         }
+        self.map.draw(canvas, cursor, r, send);
     }
 
     fn framerate(&self) -> u8 {
