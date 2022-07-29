@@ -107,10 +107,6 @@ pub fn startup(mode: DrawMode) {
 
     let resources = settings.get("general", "resources").unwrap();
 
-    println!("Struct MessageToAsync has size {}", std::mem::size_of::<MessageToAsync>());
-    println!("Struct MessageFromAsync has size {}", std::mem::size_of::<MessageFromAsync>());
-
-
     let rt = tokio::runtime::Runtime::new().unwrap();
     let (mut s1, r1) = tokio::sync::mpsc::channel(100);
     let (s2, mut r2) = tokio::sync::mpsc::channel(100);
