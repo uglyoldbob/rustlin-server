@@ -150,7 +150,7 @@ impl TileSet {
             let w = 48;
             let h = 24;
             let mut data8: Vec<u8> = tmp.data.iter().flat_map(|val| val.to_le_bytes()).collect();
-            let surf = sdl2::surface::Surface::from_data(
+            let mut surf = sdl2::surface::Surface::from_data(
                 data8.as_mut_slice(),
                 w as u32,
                 h as u32,
@@ -158,6 +158,7 @@ impl TileSet {
                 PixelFormatEnum::RGB555,
             )
             .unwrap();
+            let _e = surf.set_color_key(true, sdl2::pixels::Color::BLACK);
             let texture = Texture::from_surface(&surf, tc).unwrap();
             t.push(texture);
         }
