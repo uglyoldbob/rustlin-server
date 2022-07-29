@@ -1,6 +1,5 @@
 use crate::mouse::MouseEventOutput;
 use crate::widgets::dynamic_text::DynamicTextWidget;
-use crate::widgets::map_widget::MapWidget;
 use crate::widgets::text_button::TextButton;
 use crate::widgets::Widget;
 use crate::DrawMode;

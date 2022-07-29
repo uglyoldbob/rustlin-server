@@ -7,11 +7,17 @@ use sdl2::render::TextureCreator;
 
 pub struct MapWidget {
     clicked: bool,
+    x: u16,
+    y: u16,
 }
 
 impl MapWidget {
-    pub fn new<T>(_tc: &TextureCreator<T>, _x: u16, _y: u16) -> Self {
-        Self { clicked: false }
+    pub fn new<T>(_tc: &TextureCreator<T>, x: u16, y: u16) -> Self {
+        Self {
+            clicked: false,
+            x: x,
+            y: y,
+        }
     }
 }
 
@@ -32,10 +38,22 @@ impl Widget for MapWidget {
 
     fn draw_hover(
         &mut self,
-        _canvas: &mut sdl2::render::WindowCanvas,
+        canvas: &mut sdl2::render::WindowCanvas,
         _cursor: bool,
-        _r: &mut GameResources,
+        r: &mut GameResources,
         _send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
     ) {
+        let current_tile = 0;
+        let current_subtile = 0;
+        match r.tilesets.get(&current_tile) {
+            Some(ts) => match ts {
+                Loaded(t) => {
+                    t.draw_left(self.x, self.y, current_subtile, canvas);
+                    t.draw_right(self.x, self.y, current_subtile, canvas);
+                }
+                _ => {}
+            },
+            _ => {}
+        }
     }
 }
