@@ -189,6 +189,7 @@ impl<'a, T> GameMode for MapExplorer<'a, T> {
         _send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
         _requests: &mut VecDeque<DrawModeRequest>,
     ) {
+        self.map.set_map_coord_center(self.current_x, self.current_y);
     }
 
     fn draw(
@@ -200,14 +201,13 @@ impl<'a, T> GameMode for MapExplorer<'a, T> {
     ) {
         canvas.set_draw_color(Color::RGB(0, 0, 0));
         canvas.clear();
-
+        self.map.draw(canvas, cursor, r, send);
         for w in &mut self.b {
             w.draw(canvas, cursor, r, send);
         }
         for w in &mut self.disp {
             w.draw(canvas, cursor, r, send);
         }
-        self.map.draw(canvas, cursor, r, send);
     }
 
     fn framerate(&self) -> u8 {

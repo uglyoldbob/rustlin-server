@@ -344,8 +344,8 @@ impl MapSegment {
         println!("Screen position is {} {}", screen.x, screen.y);
         for a in 0..64 {
             for b in 0..64 {
-                let startx: i32 = b * 24 - a * 24;
-                let starty: i32 = b * 12 + a * 12;
+                let startx: i32 = b * 24 - a * 24 + screen.x;
+                let starty: i32 = b * 12 + a * 12 + screen.y;
                 let index = a * 64 + 2 * b;
                 let t = self.tiles[index as usize];
                 let current_tile = (t >> 16) as u16;
