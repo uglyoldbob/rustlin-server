@@ -45,6 +45,10 @@ impl MapCoordinate {
         }
     }
 
+    pub fn delta(a: i32, b: i32) -> (i32, i32) {
+        (24 * b - 24 * a, 12 * a + 12 * b)
+    }
+
     /// This function builds a MapCoordinate that places the dead center of the tile at the given screen coordinates
     pub fn build(a: u16, b: u16, x1: u32, y1: u32) -> Self {
         Self {
@@ -97,6 +101,10 @@ mod tests {
             let screen2 = map.screen(am as u16, bm as u16);
             assert_eq!(screen2.x, 296 + x);
             assert_eq!(screen2.y, 228 + y);
+
+            let (xcalc, ycalc) = MapCoordinate::delta(a, b);
+            assert_eq!(xcalc, x);
+            assert_eq!(ycalc, y);
         }
     }
     #[test]
