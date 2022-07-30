@@ -7,10 +7,11 @@ use sdl2::render::TextureCreator;
 use tokio::io::AsyncReadExt;
 use tokio::io::AsyncSeekExt;
 
+///Represents the top left pixel of a map coordinate on the screen. This is where the tile for that coordinate is rendered.
 #[derive(Debug, PartialEq)]
 pub struct ScreenCoordinate {
-    x: u32,
-    y: u32,
+    x: i32,
+    y: i32,
     x0: i32,
     y0: i32,
 }
@@ -24,10 +25,21 @@ pub struct MapCoordinate {
 }
 
 impl MapCoordinate {
+    /// Converts the map coordinate to the top left pixel coordinate of where the coordinate should be drawn.
     pub fn to_screen(&self) -> ScreenCoordinate {
         ScreenCoordinate {
-            x: ((24 * (self.b as i32) - 24 * (self.a as i32)) as i32 - self.x0) as u32,
-            y: ((12 * (self.a as i32) + 12 * (self.b as i32)) as i32 - self.y0) as u32,
+            x: (24 * (self.b as i32) - 24 * (self.a as i32)) as i32 - self.x0,
+            y: (12 * (self.a as i32) + 12 * (self.b as i32)) as i32 - self.y0,
+            x0: self.x0,
+            y0: self.y0,
+        }
+    }
+
+    ///Converts the given map coordinate to the top left pixel coordinate, like to_screen
+    pub fn screen(&self, a: u16, b: u16) -> ScreenCoordinate {
+        ScreenCoordinate {
+            x: (24 * (b as i32) - 24 * (a as i32)) as i32 - self.x0,
+            y: (12 * (a as i32) + 12 * (b as i32)) as i32 - self.y0,
             x0: self.x0,
             y0: self.y0,
         }
@@ -67,6 +79,25 @@ mod tests {
         assert_eq!(screen.y, 228);
         let map2 = screen.to_map();
         assert_eq!(map, map2);
+        let mut index = 0;
+        for (a, b, x, y) in [
+            (-1, -1, 0, -24),
+            (-1, 0, 24, -12),
+            (-1, 1, 48, 0),
+            (0, -1, -24, -12),
+            (0, 1, 24, 12),
+            (1, -1, -48, 0),
+            (1, 0, -24, 12),
+            (1, 1, 0, 24),
+        ] {
+            println!("Case {}", index);
+            index += 1;
+            let am = 32768 + (a as i32);
+            let bm = 32768 + (b as i32);
+            let screen2 = map.screen(am as u16, bm as u16);
+            assert_eq!(screen2.x, 296 + x);
+            assert_eq!(screen2.y, 228 + y);
+        }
     }
     #[test]
     fn coordinate_transform2() {
