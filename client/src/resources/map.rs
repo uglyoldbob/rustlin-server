@@ -232,7 +232,7 @@ impl TileSet {
                 let mut mirrored_tile_data = [0 as u16; 24 * 48];
                 let x = cursor.read_u8().await.ok()?;
                 let y = cursor.read_u8().await.ok()?;
-                let w = cursor.read_u8().await.ok()?;
+                let _w = cursor.read_u8().await.ok()?;
                 let h = cursor.read_u8().await.ok()?;
                 for i in 0..h {
                     let num_segments = cursor.read_u8().await.ok()?;
@@ -337,10 +337,11 @@ impl MapSegment {
     pub fn draw_floor<T: sdl2::render::RenderTarget>(
         &self,
         canvas: &mut sdl2::render::Canvas<T>,
-        x: i32,
-        y: i32,
+        map: &MapCoordinate,
         r: &mut GameResources,
     ) {
+        let screen = map.screen(self.x, self.y);
+        println!("Screen position is {} {}", screen.x, screen.y);
         for a in 0..64 {
             for b in 0..64 {
                 let startx: i32 = b * 24 - a * 24;
@@ -381,8 +382,8 @@ impl MapSegment {
             mystery1: Vec::new(),
             objects: Vec::new(),
             switches: Vec::new(),
-            x: 0,
-            y: 0,
+            x: 32768,
+            y: 32768,
         }
     }
 

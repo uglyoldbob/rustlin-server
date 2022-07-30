@@ -77,10 +77,7 @@ pub fn startup(mode: DrawMode) {
 
     let mut game_resources = GameResources::new(font);
     let mut mode: Box<dyn GameMode> = match mode {
-        DrawMode::Explorer => {
-            let t = ExplorerMenu::new(&texture_creator, &mut game_resources);
-            Box::new(t)
-        }
+        DrawMode::Explorer => Box::new(ExplorerMenu::new(&texture_creator, &mut game_resources)),
         DrawMode::PngExplorer => Box::new(PngExplorer::new(&texture_creator, &mut game_resources)),
         DrawMode::ImgExplorer => Box::new(ImgExplorer::new(&texture_creator, &mut game_resources)),
         DrawMode::SprExplorer => Box::new(SprExplorer::new(&texture_creator, &mut game_resources)),
@@ -341,8 +338,7 @@ pub fn startup(mode: DrawMode) {
                 DrawModeRequest::ChangeDrawMode(m) => {
                     mode = match m {
                         DrawMode::Explorer => {
-                            let t = ExplorerMenu::new(&texture_creator, &mut game_resources);
-                            Box::new(t)
+                            Box::new(ExplorerMenu::new(&texture_creator, &mut game_resources))
                         }
                         DrawMode::PngExplorer => {
                             Box::new(PngExplorer::new(&texture_creator, &mut game_resources))

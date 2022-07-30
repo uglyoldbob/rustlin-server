@@ -36,8 +36,6 @@ impl<'a, T> MapExplorer<'a, T> {
             sdl2::pixels::Color::RED,
         ));
 
-        let map = MapWidget::new(tc, 0, 0, 640, 400);
-
         Self {
             b: b,
             disp: disp,
@@ -46,7 +44,7 @@ impl<'a, T> MapExplorer<'a, T> {
             current_y: 32768,
             tc: tc,
             displayed: false,
-            map: map,
+            map: MapWidget::new(tc, 0, 0, 640, 400),
         }
     }
 }
@@ -187,8 +185,8 @@ impl<'a, T> GameMode for MapExplorer<'a, T> {
 
     fn process_frame(
         &mut self,
-        r: &mut GameResources,
-        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+        _r: &mut GameResources,
+        _send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
         _requests: &mut VecDeque<DrawModeRequest>,
     ) {
     }

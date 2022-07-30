@@ -1,8 +1,8 @@
 use crate::map::MapSegment;
+use crate::resources::map::MapCoordinate;
 use crate::widgets::Widget;
 use crate::GameResources;
 use crate::ImageBox;
-use crate::Loadable::*;
 use crate::MessageToAsync;
 use sdl2::pixels::PixelFormatEnum;
 use sdl2::rect::Rect;
@@ -16,9 +16,8 @@ pub struct MapWidget<'a> {
     y: u16,
     w: u16,
     h: u16,
-    mapx: u16,
-    mapy: u16,
-    segments: [Option<MapSegment>; 4],
+    map: MapCoordinate,
+    segments: [Option<Box<MapSegment>>; 4],
     buffer: Texture<'a>,
 }
 
@@ -33,9 +32,13 @@ impl<'a> MapWidget<'a> {
             y: y,
             w: w,
             h: h,
-            mapx: 0,
-            mapy: 0,
-            segments: [Some(MapSegment::empty_segment()), None, None, None],
+            map: MapCoordinate::build(32768, 32768, w as u32 / 2, h as u32 / 2),
+            segments: [
+                Some(Box::new(MapSegment::empty_segment())),
+                None,
+                None,
+                None,
+            ],
             buffer: texture,
         }
     }
@@ -63,13 +66,13 @@ impl<'a> Widget for MapWidget<'a> {
         r: &mut GameResources,
         _send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
     ) {
-        canvas.with_texture_canvas(&mut self.buffer, |canvas| {
+        let _e = canvas.with_texture_canvas(&mut self.buffer, |canvas| {
             if let Some(seg) = &self.segments[0] {
-                seg.draw_floor(canvas, 0, 0, r);
+                seg.draw_floor(canvas, &self.map, r);
             }
         });
         let q = self.buffer.query();
-        canvas.copy(
+        let _e = canvas.copy(
             &self.buffer,
             None,
             Rect::new(
