@@ -1,8 +1,5 @@
 use crate::mouse::MouseEventOutput;
-use crate::widgets::dynamic_text::DynamicTextWidget;
-use crate::widgets::sprite_widget::SpriteWidget;
-use crate::widgets::text_button::TextButton;
-use crate::widgets::Widget;
+use crate::widgets::*;
 use crate::DrawMode;
 use crate::DrawModeRequest;
 use crate::GameMode;

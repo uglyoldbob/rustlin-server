@@ -47,26 +47,26 @@ pub trait Widget {
     fn last_draw(&self) -> Option<ImageBox>;
 }
 
-pub mod plain_color_button;
-use plain_color_button::PlainColorButton;
+mod plain_color_button;
+pub use plain_color_button::PlainColorButton;
 
-pub mod text_button;
-use text_button::TextButton;
+mod text_button;
+pub use text_button::TextButton;
 
-pub mod img_button;
-use img_button::ImgButton;
+mod img_button;
+pub use img_button::ImgButton;
 
-pub mod map_widget;
-use map_widget::MapWidget;
+mod map_widget;
+pub use map_widget::MapWidget;
 
-pub mod selectable;
-use selectable::SelectableWidget;
+mod selectable;
+pub use selectable::SelectableWidget;
 
-pub mod dynamic_text;
-use dynamic_text::DynamicTextWidget;
+mod dynamic_text;
+pub use dynamic_text::DynamicTextWidget;
 
-pub mod character_select;
-use character_select::*;
+mod character_select;
+pub use character_select::*;
 
-pub mod sprite_widget;
-use sprite_widget::SpriteWidget;
+mod sprite_widget;
+pub use sprite_widget::SpriteWidget;

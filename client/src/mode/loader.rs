@@ -1,6 +1,5 @@
 use crate::mouse::MouseEventOutput;
-use crate::widgets::plain_color_button::PlainColorButton;
-use crate::widgets::Widget;
+use crate::widgets::*;
 use crate::DrawMode;
 use crate::DrawModeRequest;
 use crate::GameMode;

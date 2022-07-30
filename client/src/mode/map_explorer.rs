@@ -1,8 +1,6 @@
 use crate::mouse::MouseEventOutput;
-use crate::widgets::dynamic_text::DynamicTextWidget;
-use crate::widgets::map_widget::MapWidget;
-use crate::widgets::text_button::TextButton;
 use crate::widgets::Widget;
+use crate::widgets::*;
 use crate::DrawMode;
 use crate::DrawModeRequest;
 use crate::GameMode;
@@ -189,7 +187,8 @@ impl<'a, T> GameMode for MapExplorer<'a, T> {
         _send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
         _requests: &mut VecDeque<DrawModeRequest>,
     ) {
-        self.map.set_map_coord_center(self.current_x, self.current_y);
+        self.map
+            .set_map_coord_center(self.current_x, self.current_y);
     }
 
     fn draw(
