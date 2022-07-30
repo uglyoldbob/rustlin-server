@@ -7,6 +7,105 @@ use sdl2::render::TextureCreator;
 use tokio::io::AsyncReadExt;
 use tokio::io::AsyncSeekExt;
 
+#[derive(Debug, PartialEq)]
+pub struct ScreenCoordinate {
+    x: u32,
+    y: u32,
+    x0: i32,
+    y0: i32,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct MapCoordinate {
+    pub a: u16,
+    pub b: u16,
+    pub x0: i32,
+    pub y0: i32,
+}
+
+impl MapCoordinate {
+    pub fn to_screen(&self) -> ScreenCoordinate {
+        ScreenCoordinate {
+            x: ((24 * (self.b as i32) - 24 * (self.a as i32)) as i32 - self.x0) as u32,
+            y: ((12 * (self.a as i32) + 12 * (self.b as i32)) as i32 - self.y0) as u32,
+            x0: self.x0,
+            y0: self.y0,
+        }
+    }
+
+    /// This function builds a MapCoordinate that places the dead center of the tile at the given screen coordinates
+    pub fn build(a: u16, b: u16, x1: u32, y1: u32) -> Self {
+        Self {
+            a: a,
+            b: b,
+            x0: 24 * (b as i32) - 24 * (a as i32) - (x1 as i32) + 24,
+            y0: 12 * (a as i32) + 12 * (b as i32) - (y1 as i32) + 12,
+        }
+    }
+}
+
+impl ScreenCoordinate {
+    pub fn to_map(&self) -> MapCoordinate {
+        MapCoordinate {
+            a: ((2 * (self.y as i32) + 2 * self.y0 - (self.x as i32) - self.x0) / 48) as u16,
+            b: ((2 * (self.y as i32) + 2 * self.y0 + (self.x as i32) + self.x0) / 48) as u16,
+            x0: self.x0,
+            y0: self.y0,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn coordinate_transform1() {
+        let map = MapCoordinate::build(32768, 32768, 320, 240);
+        let screen = map.to_screen();
+        assert_eq!(screen.x, 296);
+        assert_eq!(screen.y, 228);
+        let map2 = screen.to_map();
+        assert_eq!(map, map2);
+    }
+    #[test]
+    fn coordinate_transform2() {
+        let map = MapCoordinate::build(0, 0, 320, 240);
+        let screen = map.to_screen();
+        assert_eq!(screen.x, 296);
+        assert_eq!(screen.y, 228);
+        let map2 = screen.to_map();
+        assert_eq!(map, map2);
+    }
+    #[test]
+    fn coordinate_transform3() {
+        let map = MapCoordinate::build(65535, 65535, 320, 240);
+        let screen = map.to_screen();
+        assert_eq!(screen.x, 296);
+        assert_eq!(screen.y, 228);
+        let map2 = screen.to_map();
+        assert_eq!(map, map2);
+    }
+    #[test]
+    fn coordinate_transform4() {
+        let map = MapCoordinate::build(65535, 0, 320, 240);
+        let screen = map.to_screen();
+        assert_eq!(screen.x, 296);
+        assert_eq!(screen.y, 228);
+        let map2 = screen.to_map();
+        assert_eq!(map, map2);
+    }
+    #[test]
+    fn coordinate_transform5() {
+        let map = MapCoordinate::build(0, 65535, 320, 240);
+        let screen = map.to_screen();
+        assert_eq!(screen.x, 296);
+        assert_eq!(screen.y, 228);
+        let map2 = screen.to_map();
+        assert_eq!(map, map2);
+    }
+}
+
 #[derive(Clone)]
 pub struct Tile {
     x: i8,
@@ -21,14 +120,26 @@ pub struct TileSetGui<'a> {
 }
 
 impl<'a> TileSetGui<'a> {
-    pub fn draw_tile<T: sdl2::render::RenderTarget>(&self, x: i32, y: i32, subtile: u16, canvas: &mut sdl2::render::Canvas<T>) {
+    pub fn draw_tile<T: sdl2::render::RenderTarget>(
+        &self,
+        x: i32,
+        y: i32,
+        subtile: u16,
+        canvas: &mut sdl2::render::Canvas<T>,
+    ) {
         if let Some(t) = self.tiles.get(subtile as usize) {
             let q = t.query();
             let _e = canvas.copy(t, None, Rect::new(x, y, q.width.into(), q.height.into()));
         }
     }
 
-    pub fn draw_left<T: sdl2::render::RenderTarget>(&self, x: i32, y: i32, subtile: u16, canvas: &mut sdl2::render::Canvas<T>) {
+    pub fn draw_left<T: sdl2::render::RenderTarget>(
+        &self,
+        x: i32,
+        y: i32,
+        subtile: u16,
+        canvas: &mut sdl2::render::Canvas<T>,
+    ) {
         if let Some(t) = self.tiles.get(subtile as usize) {
             let q = t.query();
             let _e = canvas.copy(
@@ -184,44 +295,50 @@ pub struct MapSegment {
 }
 
 impl MapSegment {
-    pub fn draw_floor<T: sdl2::render::RenderTarget>(&self, canvas: &mut sdl2::render::Canvas<T>, x: i32, y: i32, r: &mut GameResources) {
-        for y in 0..64 {
-            for x in 0..64 {
-                let startx : i32 = x * 24 - y * 24;
-                let starty: i32 = x * 12 + y * 12;
-                    let index = y * 64 + 2 * x;
-                    let t = self.tiles[index as usize];
-                    let current_tile = (t>>16) as u16;
-                    let current_subtile = (t&0xFFFF) as u16;
-                    match r.tilesets.get(&current_tile) {
-                      Some(ts) => match ts {
-                            Loaded(t) => {
-                                t.draw_left(startx, starty, current_subtile, canvas);
-                            }
-                            _ => {}
-                        },
+    pub fn draw_floor<T: sdl2::render::RenderTarget>(
+        &self,
+        canvas: &mut sdl2::render::Canvas<T>,
+        x: i32,
+        y: i32,
+        r: &mut GameResources,
+    ) {
+        for a in 0..64 {
+            for b in 0..64 {
+                let startx: i32 = b * 24 - a * 24;
+                let starty: i32 = b * 12 + a * 12;
+                let index = a * 64 + 2 * b;
+                let t = self.tiles[index as usize];
+                let current_tile = (t >> 16) as u16;
+                let current_subtile = (t & 0xFFFF) as u16;
+                match r.tilesets.get(&current_tile) {
+                    Some(ts) => match ts {
+                        Loaded(t) => {
+                            t.draw_left(startx, starty, current_subtile, canvas);
+                        }
                         _ => {}
-                    }
-                    let t = self.tiles[(index+1) as usize];
-                    let current_tile = (t>>16) as u16;
-                    let current_subtile = (t&0xFFFF) as u16;
-                    match r.tilesets.get(&current_tile) {
-                      Some(ts) => match ts {
-                            Loaded(t) => {
-                                t.draw_right(startx, starty, current_subtile, canvas);
-                            }
-                            _ => {}
-                        },
+                    },
+                    _ => {}
+                }
+                let t = self.tiles[(index + 1) as usize];
+                let current_tile = (t >> 16) as u16;
+                let current_subtile = (t & 0xFFFF) as u16;
+                match r.tilesets.get(&current_tile) {
+                    Some(ts) => match ts {
+                        Loaded(t) => {
+                            t.draw_right(startx, starty, current_subtile, canvas);
+                        }
                         _ => {}
-                    }
+                    },
+                    _ => {}
+                }
             }
         }
     }
 
     pub fn empty_segment() -> Self {
         Self {
-            tiles: [1; 64*128],
-            attributes: [0; 64*128],
+            tiles: [1; 64 * 128],
+            attributes: [0; 64 * 128],
             mystery1: Vec::new(),
             objects: Vec::new(),
             switches: Vec::new(),
