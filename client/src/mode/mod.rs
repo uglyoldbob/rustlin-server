@@ -32,7 +32,7 @@ pub enum DrawModeRequest {
 }
 
 /// This trait is used to determine what mode of operation the program is in
-pub trait GameMode {
+pub trait GameMode<'a> {
     fn process_mouse(
         &mut self,
         events: &Vec<MouseEventOutput>,
@@ -43,12 +43,12 @@ pub trait GameMode {
         &mut self,
         button: sdl2::keyboard::Keycode,
         down: bool,
-        r: &mut GameResources,
+        r: &mut GameResources<'a, '_, '_>,
     );
     /// Perform any additional processing, before drawing, and after receiving all input events
     fn process_frame(
         &mut self,
-        r: &mut GameResources,
+        r: &mut GameResources<'a, '_, '_>,
         send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
         requests: &mut VecDeque<DrawModeRequest>,
     );
@@ -56,7 +56,7 @@ pub trait GameMode {
         &mut self,
         canvas: &mut sdl2::render::WindowCanvas,
         cursor: Option<(i16, i16)>,
-        r: &mut GameResources,
+        r: &mut GameResources<'a, '_, '_>,
         send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
     );
     /// Framerate is specified in frames per second

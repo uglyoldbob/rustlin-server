@@ -217,7 +217,7 @@ impl<'a, T> NewCharacterMode<'a, T> {
     }
 }
 
-impl<'a, T> GameMode for NewCharacterMode<'a, T> {
+impl<'a, T> GameMode<'a> for NewCharacterMode<'a, T> {
     fn process_mouse(
         &mut self,
         events: &Vec<MouseEventOutput>,

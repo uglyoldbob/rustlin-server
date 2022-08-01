@@ -5,6 +5,7 @@ use sdl2::pixels::PixelFormatEnum;
 use sdl2::render::Texture;
 use sdl2::render::TextureCreator;
 use sdl2::surface::Surface;
+use sdl2::video::WindowContext;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::rc::Rc;
@@ -285,18 +286,19 @@ impl<T, U> LoadableMap<T, U> {
 }
 
 pub struct GameResources<'a, 'b, 'c> {
+    tc: &'a TextureCreator<WindowContext>,
     pub pngs: HashMap<u16, Loadable<Texture<'a>>>,
     pub imgs: HashMap<u16, Loadable<Texture<'a>>>,
     pub font: sdl2::ttf::Font<'b, 'c>,
     pub characters: [CharacterData; 8],
     pub sprites: HashMap<u32, Loadable<SpriteGui<'a>>>,
     pub sfx: HashMap<u16, Loadable<Chunk>>,
-    pub tilesets: HashMap<u16, Loadable<TileSetGui<'a>>>,
+    pub tilesets: LoadableMap<u16, TileSetGui<'a>>,
     maps: HashMap<u16, LoadableMap<u32, MapSegment>>,
 }
 
 impl<'a, 'b, 'c> GameResources<'a, 'b, 'c> {
-    pub fn new(font: sdl2::ttf::Font<'b, 'c>) -> Self {
+    pub fn new(font: sdl2::ttf::Font<'b, 'c>, tc: &'a TextureCreator<WindowContext>) -> Self {
         let mut chars = [
             CharacterData::new(),
             CharacterData::new(),
@@ -310,13 +312,14 @@ impl<'a, 'b, 'c> GameResources<'a, 'b, 'c> {
         chars[1].t = CharacterDisplayType::MaleDarkElf;
         chars[2].t = CharacterDisplayType::Locked;
         Self {
+            tc: tc,
             pngs: HashMap::new(),
             imgs: HashMap::new(),
             font: font,
             characters: chars,
             sprites: HashMap::new(),
             sfx: HashMap::new(),
-            tilesets: HashMap::new(),
+            tilesets: LoadableMap::new(),
             maps: HashMap::new(),
         }
     }

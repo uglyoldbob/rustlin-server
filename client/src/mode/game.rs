@@ -56,7 +56,7 @@ impl<'a> Game<'a> {
     }
 }
 
-impl<'a> GameMode for Game<'a> {
+impl<'a> GameMode<'a> for Game<'a> {
     fn process_mouse(
         &mut self,
         events: &Vec<MouseEventOutput>,

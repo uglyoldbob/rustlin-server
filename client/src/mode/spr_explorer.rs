@@ -48,7 +48,7 @@ impl<'a, T> SprExplorer<'a, T> {
     }
 }
 
-impl<'a, T> GameMode for SprExplorer<'a, T> {
+impl<'a, T> GameMode<'a> for SprExplorer<'a, T> {
     fn process_mouse(
         &mut self,
         events: &Vec<MouseEventOutput>,

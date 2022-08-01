@@ -24,7 +24,7 @@ impl<'a> GameLoader<'a> {
     }
 }
 
-impl<'a> GameMode for GameLoader<'a> {
+impl<'a> GameMode<'a> for GameLoader<'a> {
     fn process_mouse(
         &mut self,
         events: &Vec<MouseEventOutput>,

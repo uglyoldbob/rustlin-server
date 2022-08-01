@@ -75,7 +75,7 @@ pub fn startup(mode: DrawMode) {
     let audio = sdl2::mixer::open_audio(44100, 16, 2, 1024);
     println!("Audio is {:?}", audio);
 
-    let mut game_resources = GameResources::new(font);
+    let mut game_resources = GameResources::new(font, &texture_creator);
     let mut mode: Box<dyn GameMode> = match mode {
         DrawMode::Explorer => Box::new(ExplorerMenu::new(&texture_creator, &mut game_resources)),
         DrawMode::PngExplorer => Box::new(PngExplorer::new(&texture_creator, &mut game_resources)),
@@ -212,7 +212,7 @@ pub fn startup(mode: DrawMode) {
                 MessageFromAsync::Tileset(id, tileset) => {
                     let ts = tileset.clone();
                     let ts = ts.to_gui(&texture_creator);
-                    game_resources.tilesets.insert(*id, Loaded(ts));
+                    game_resources.tilesets.insert(*id, ts);
                 }
                 MessageFromAsync::MapSegment(map, x, y, data) => {
                     let combined = ((*x as u32) << 16) | *y as u32;

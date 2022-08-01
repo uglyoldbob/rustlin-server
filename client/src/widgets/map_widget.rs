@@ -1,5 +1,5 @@
-use crate::map::MapSegment;
 use crate::resources::map::MapCoordinate;
+use crate::resources::map::MapSegmentGui;
 use crate::widgets::Widget;
 use crate::GameResources;
 use crate::ImageBox;
@@ -19,7 +19,7 @@ pub struct MapWidget<'a> {
     h: u16,
     map: MapCoordinate,
     mapnum: u16,
-    segments: [Option<Box<MapSegment>>; 4],
+    segments: [Option<Box<MapSegmentGui<'a>>>; 4],
     buffer: Texture<'a>,
 }
 
@@ -36,12 +36,7 @@ impl<'a> MapWidget<'a> {
             h: h,
             map: MapCoordinate::build(32768, 32768, w as u32 / 2, h as u32 / 2),
             mapnum: 0,
-            segments: [
-                Some(Box::new(MapSegment::empty_segment())),
-                None,
-                None,
-                None,
-            ],
+            segments: [None, None, None, None],
             buffer: texture,
         }
     }

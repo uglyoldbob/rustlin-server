@@ -46,7 +46,7 @@ impl<'a, T> ImgExplorer<'a, T> {
     }
 }
 
-impl<'a, T> GameMode for ImgExplorer<'a, T> {
+impl<'a, T> GameMode<'a> for ImgExplorer<'a, T> {
     fn process_mouse(
         &mut self,
         events: &Vec<MouseEventOutput>,

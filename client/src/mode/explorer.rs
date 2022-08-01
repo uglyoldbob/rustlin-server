@@ -64,7 +64,7 @@ impl<'a> ExplorerMenu<'a> {
     }
 }
 
-impl<'a> GameMode for ExplorerMenu<'a> {
+impl<'a> GameMode<'a> for ExplorerMenu<'a> {
     fn process_mouse(
         &mut self,
         events: &Vec<MouseEventOutput>,

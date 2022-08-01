@@ -1,5 +1,7 @@
+use std::collections::HashMap;
+use std::rc::Rc;
+
 use crate::GameResources;
-use crate::Loadable::*;
 use sdl2::pixels::PixelFormatEnum;
 use sdl2::rect::Rect;
 use sdl2::render::Texture;
@@ -322,6 +324,17 @@ pub struct MapObject {
     tiles: Vec<TileData>,
 }
 
+pub struct MapSegmentGui<'a> {
+    tile_ref: HashMap<u16, Rc<TileSetGui<'a>>>,
+    tiles: [u32; 64 * 128],
+    attributes: [u16; 64 * 128],
+    mystery1: Vec<[u16; 3]>,
+    objects: Vec<MapObject>,
+    switches: Vec<u32>,
+    x: u16,
+    y: u16,
+}
+
 #[derive(Clone)]
 pub struct MapSegment {
     tiles: [u32; 64 * 128],
@@ -333,12 +346,12 @@ pub struct MapSegment {
     y: u16,
 }
 
-impl MapSegment {
+impl<'a> MapSegmentGui<'a> {
     pub fn draw_floor<T: sdl2::render::RenderTarget>(
         &self,
         canvas: &mut sdl2::render::Canvas<T>,
         map: &MapCoordinate,
-        r: &mut GameResources,
+        _r: &mut GameResources,
     ) {
         let screen = map.screen(self.x, self.y);
         println!("Screen position is {} {}", screen.x, screen.y);
@@ -350,28 +363,37 @@ impl MapSegment {
                 let t = self.tiles[index as usize];
                 let current_tile = (t >> 16) as u16;
                 let current_subtile = (t & 0xFFFF) as u16;
-                match r.tilesets.get(&current_tile) {
-                    Some(ts) => match ts {
-                        Loaded(t) => {
-                            t.draw_left(startx, starty, current_subtile, canvas);
-                        }
-                        _ => {}
-                    },
+                match self.tile_ref.get(&current_tile) {
+                    Some(ts) => {
+                        ts.draw_left(startx, starty, current_subtile, canvas);
+                    }
                     _ => {}
                 }
                 let t = self.tiles[(index + 1) as usize];
                 let current_tile = (t >> 16) as u16;
                 let current_subtile = (t & 0xFFFF) as u16;
-                match r.tilesets.get(&current_tile) {
-                    Some(ts) => match ts {
-                        Loaded(t) => {
-                            t.draw_right(startx, starty, current_subtile, canvas);
-                        }
-                        _ => {}
-                    },
+                match self.tile_ref.get(&current_tile) {
+                    Some(ts) => {
+                        ts.draw_right(startx, starty, current_subtile, canvas);
+                    }
                     _ => {}
                 }
             }
+        }
+    }
+}
+
+impl MapSegment {
+    pub fn to_gui<'a>(self) -> MapSegmentGui<'a> {
+        MapSegmentGui {
+            tile_ref: HashMap::new(),
+            tiles: self.tiles,
+            attributes: self.attributes,
+            mystery1: self.mystery1,
+            objects: self.objects,
+            switches: self.switches,
+            x: self.x,
+            y: self.y,
         }
     }
 

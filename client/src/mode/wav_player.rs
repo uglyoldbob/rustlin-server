@@ -55,7 +55,7 @@ impl<'a, T> WavPlayer<'a, T> {
     }
 }
 
-impl<'a, T> GameMode for WavPlayer<'a, T> {
+impl<'a, T> GameMode<'a> for WavPlayer<'a, T> {
     fn process_mouse(
         &mut self,
         events: &Vec<MouseEventOutput>,

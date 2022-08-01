@@ -47,7 +47,7 @@ impl<'a, T> MapExplorer<'a, T> {
     }
 }
 
-impl<'a, T> GameMode for MapExplorer<'a, T> {
+impl<'a, T> GameMode<'a> for MapExplorer<'a, T> {
     fn process_mouse(
         &mut self,
         events: &Vec<MouseEventOutput>,

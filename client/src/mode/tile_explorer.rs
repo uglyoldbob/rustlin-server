@@ -1,4 +1,5 @@
 use crate::mouse::MouseEventOutput;
+use crate::resources::map::TileSetGui;
 use crate::widgets::*;
 use crate::DrawMode;
 use crate::DrawModeRequest;
@@ -9,6 +10,7 @@ use crate::MessageToAsync;
 use sdl2::pixels::Color;
 use sdl2::render::TextureCreator;
 use std::collections::VecDeque;
+use std::rc::Rc;
 
 pub struct TileExplorer<'a, T> {
     b: Vec<Box<dyn Widget + 'a>>,
@@ -17,6 +19,7 @@ pub struct TileExplorer<'a, T> {
     current_subtile: u16,
     tc: &'a TextureCreator<T>,
     displayed: bool,
+    tile_ref: Option<Rc<TileSetGui<'a>>>,
 }
 
 impl<'a, T> TileExplorer<'a, T> {
@@ -40,11 +43,12 @@ impl<'a, T> TileExplorer<'a, T> {
             current_subtile: 0,
             tc: tc,
             displayed: false,
+            tile_ref: None,
         }
     }
 }
 
-impl<'a, T> GameMode for TileExplorer<'a, T> {
+impl<'a, T> GameMode<'a> for TileExplorer<'a, T> {
     fn process_mouse(
         &mut self,
         events: &Vec<MouseEventOutput>,
@@ -152,16 +156,14 @@ impl<'a, T> GameMode for TileExplorer<'a, T> {
 
     fn process_frame(
         &mut self,
-        r: &mut GameResources,
+        r: &mut GameResources<'a, '_, '_>,
         send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
         _requests: &mut VecDeque<DrawModeRequest>,
     ) {
-        match r.tilesets.get(&self.current_tile) {
-            None => {
-                r.tilesets.insert(self.current_tile, Loading);
+        if let None = self.tile_ref {
+            self.tile_ref = r.tilesets.get_or_load(self.current_tile, || {
                 let _e = send.blocking_send(MessageToAsync::LoadTileset(self.current_tile));
-            }
-            _ => {}
+            });
         }
     }
 
@@ -182,15 +184,9 @@ impl<'a, T> GameMode for TileExplorer<'a, T> {
             w.draw(canvas, cursor, r, send);
         }
 
-        match r.tilesets.get(&self.current_tile) {
-            Some(ts) => match ts {
-                Loaded(t) => {
-                    t.draw_left(320, 240, self.current_subtile, canvas);
-                    t.draw_right(320, 240, self.current_subtile, canvas);
-                }
-                _ => {}
-            },
-            _ => {}
+        if let Some(t) = &self.tile_ref {
+            t.draw_left(320, 240, self.current_subtile, canvas);
+            t.draw_right(320, 240, self.current_subtile, canvas);
         }
     }
 

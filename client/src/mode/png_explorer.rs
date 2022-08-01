@@ -42,7 +42,7 @@ impl<'a, T> PngExplorer<'a, T> {
     }
 }
 
-impl<'a, T> GameMode for PngExplorer<'a, T> {
+impl<'a, T> GameMode<'a> for PngExplorer<'a, T> {
     fn process_mouse(
         &mut self,
         events: &Vec<MouseEventOutput>,

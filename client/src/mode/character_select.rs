@@ -43,7 +43,7 @@ impl<'a> CharacterSelect<'a> {
     }
 }
 
-impl<'a> GameMode for CharacterSelect<'a> {
+impl<'a> GameMode<'a> for CharacterSelect<'a> {
     fn process_mouse(
         &mut self,
         events: &Vec<MouseEventOutput>,
