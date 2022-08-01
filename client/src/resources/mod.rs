@@ -7,6 +7,8 @@ use sdl2::render::TextureCreator;
 use sdl2::surface::Surface;
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::rc::Rc;
+use std::rc::Weak;
 use tokio::io::AsyncReadExt;
 
 pub mod stringtable;
@@ -218,6 +220,70 @@ pub enum Loadable<T> {
     Loaded(T),
 }
 
+pub enum LoadableReference<T> {
+    Loading,
+    Strong(Rc<T>),
+    Weak(Weak<T>),
+}
+
+impl<T> LoadableReference<T> {
+    pub fn get_ref(&mut self) -> Option<Rc<T>> {
+        match self {
+            LoadableReference::Loading => None,
+            LoadableReference::Strong(r) => {
+                let s = r.clone();
+                let w = Rc::<T>::downgrade(&r);
+                *self = LoadableReference::Weak(w);
+                Some(s)
+            }
+            LoadableReference::Weak(w) => w.upgrade(),
+        }
+    }
+}
+
+pub struct LoadableMap<T, U> {
+    map: HashMap<T, LoadableReference<U>>,
+}
+
+impl<T, U> LoadableMap<T, U> {
+    pub fn new() -> Self {
+        Self {
+            map: HashMap::new(),
+        }
+    }
+
+    pub fn insert(&mut self, key: T, val: U)
+    where
+        T: Eq + std::hash::Hash,
+    {
+        self.map
+            .insert(key, LoadableReference::Strong(Rc::new(val)));
+    }
+
+    pub fn get_or_load<F>(&mut self, key: T, func: F) -> Option<Rc<U>>
+    where
+        F: FnOnce(),
+        T: Eq + std::hash::Hash,
+    {
+        let check = self.map.get_mut(&key);
+        match check {
+            None => {
+                self.map.insert(key, LoadableReference::Loading);
+                func();
+                None
+            }
+            Some(v) => match v {
+                LoadableReference::Loading => None,
+                _ => v.get_ref(),
+            },
+        }
+    }
+
+    pub fn iter_mut(&mut self) -> std::collections::hash_map::IterMut<T, LoadableReference<U>> {
+        self.map.iter_mut()
+    }
+}
+
 pub struct GameResources<'a, 'b, 'c> {
     pub pngs: HashMap<u16, Loadable<Texture<'a>>>,
     pub imgs: HashMap<u16, Loadable<Texture<'a>>>,
@@ -226,7 +292,7 @@ pub struct GameResources<'a, 'b, 'c> {
     pub sprites: HashMap<u32, Loadable<SpriteGui<'a>>>,
     pub sfx: HashMap<u16, Loadable<Chunk>>,
     pub tilesets: HashMap<u16, Loadable<TileSetGui<'a>>>,
-    pub maps: HashMap<u16, HashMap<u32, Loadable<MapSegment>>>,
+    pub maps: HashMap<u16, LoadableMap<u32, MapSegment>>,
 }
 
 impl<'a, 'b, 'c> GameResources<'a, 'b, 'c> {

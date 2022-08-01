@@ -46,6 +46,8 @@ impl<'a> MapWidget<'a> {
         }
     }
 
+    pub fn check_segments(&mut self) {}
+
     pub fn set_map_coord_center(&mut self, a: u16, b: u16) {
         self.map = MapCoordinate::build(a, b, self.w as u32 / 2, self.h as u32 / 2);
     }
