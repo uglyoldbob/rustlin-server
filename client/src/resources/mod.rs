@@ -292,7 +292,7 @@ pub struct GameResources<'a, 'b, 'c> {
     pub sprites: HashMap<u32, Loadable<SpriteGui<'a>>>,
     pub sfx: HashMap<u16, Loadable<Chunk>>,
     pub tilesets: HashMap<u16, Loadable<TileSetGui<'a>>>,
-    pub maps: HashMap<u16, LoadableMap<u32, MapSegment>>,
+    maps: HashMap<u16, LoadableMap<u32, MapSegment>>,
 }
 
 impl<'a, 'b, 'c> GameResources<'a, 'b, 'c> {
@@ -319,6 +319,13 @@ impl<'a, 'b, 'c> GameResources<'a, 'b, 'c> {
             tilesets: HashMap::new(),
             maps: HashMap::new(),
         }
+    }
+
+    pub fn get_map(&mut self, map: u16) -> &mut LoadableMap<u32, MapSegment> {
+        if !self.maps.contains_key(&map) {
+            self.maps.insert(map, LoadableMap::new());
+        }
+        self.maps.get_mut(&map).unwrap()
     }
 }
 

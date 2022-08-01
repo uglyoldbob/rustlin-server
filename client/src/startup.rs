@@ -215,15 +215,8 @@ pub fn startup(mode: DrawMode) {
                     game_resources.tilesets.insert(*id, Loaded(ts));
                 }
                 MessageFromAsync::MapSegment(map, x, y, data) => {
-                    if !game_resources.maps.contains_key(map) {
-                        game_resources.maps.insert(*map, LoadableMap::new());
-                    }
                     let combined = ((*x as u32) << 16) | *y as u32;
-                    game_resources
-                        .maps
-                        .get_mut(map)
-                        .unwrap()
-                        .insert(combined, *data.clone());
+                    game_resources.get_map(*map).insert(combined, *data.clone());
                 }
             }
         }
