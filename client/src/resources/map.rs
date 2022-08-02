@@ -76,9 +76,12 @@ impl ScreenCoordinate {
     }
 
     pub fn map_coordinates(&self, x: i16, y: i16) -> (u16, u16) {
-        let x = x - 12;
-        let a = ((2 * (y as i32) + 2 * self.y0 - (x as i32) - self.x0) / 48) as u16;
-        let b = ((2 * (y as i32) + 2 * self.y0 + (x as i32) + self.x0) / 48) as u16;
+        let x1 = x - 12;
+        let y1 = y + 6;
+        let a = ((2 * (y1 as i32) + 2 * self.y0 - (x1 as i32) - self.x0) / 48) as u16;
+        let x2 = x - 12;
+        let y2 = y - 6;
+        let b = ((2 * (y2 as i32) + 2 * self.y0 + (x2 as i32) + self.x0) / 48) as u16;
         (a, b)
     }
 }
@@ -387,7 +390,6 @@ impl<'a> MapSegmentGui<'a> {
         _r: &mut GameResources,
     ) {
         let screen = map.screen(self.x, self.y);
-        println!("Screen position is {} {}", screen.x, screen.y);
         for a in 0..64 {
             for b in 0..64 {
                 let startx: i32 = b * 24 - a * 24 + screen.x;
