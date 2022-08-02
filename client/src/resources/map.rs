@@ -9,6 +9,8 @@ use sdl2::render::TextureCreator;
 use tokio::io::AsyncReadExt;
 use tokio::io::AsyncSeekExt;
 
+use super::MessageToAsync;
+
 ///Represents the top left pixel of a map coordinate on the screen. This is where the tile for that coordinate is rendered.
 #[derive(Debug, PartialEq)]
 pub struct ScreenCoordinate {
@@ -384,7 +386,11 @@ impl<'a> MapSegmentGui<'a> {
 }
 
 impl MapSegment {
-    pub fn to_gui<'a>(self) -> MapSegmentGui<'a> {
+    pub fn to_gui<'a>(
+        self,
+        r: &mut GameResources,
+        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+    ) -> MapSegmentGui<'a> {
         MapSegmentGui {
             tile_ref: HashMap::new(),
             tiles: self.tiles,

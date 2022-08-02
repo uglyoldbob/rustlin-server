@@ -75,6 +75,9 @@ pub fn startup(mode: DrawMode) {
     let audio = sdl2::mixer::open_audio(44100, 16, 2, 1024);
     println!("Audio is {:?}", audio);
 
+    let (mut s1, r1) = tokio::sync::mpsc::channel(100);
+    let (s2, mut r2) = tokio::sync::mpsc::channel(100);
+
     let mut game_resources = GameResources::new(font, &texture_creator);
     let mut mode: Box<dyn GameMode> = match mode {
         DrawMode::Explorer => Box::new(ExplorerMenu::new(&texture_creator, &mut game_resources)),
@@ -84,7 +87,11 @@ pub fn startup(mode: DrawMode) {
         DrawMode::TileExplorer => {
             Box::new(TileExplorer::new(&texture_creator, &mut game_resources))
         }
-        DrawMode::MapExplorer => Box::new(MapExplorer::new(&texture_creator, &mut game_resources)),
+        DrawMode::MapExplorer => Box::new(MapExplorer::new(
+            &texture_creator,
+            &mut game_resources,
+            &mut s1,
+        )),
         DrawMode::GameLoader => Box::new(GameLoader::new(&texture_creator, &mut game_resources)),
         DrawMode::Login => Box::new(Login::new(&texture_creator)),
         DrawMode::CharacterSelect => {
@@ -110,8 +117,6 @@ pub fn startup(mode: DrawMode) {
     );
     dbg!(stacker::remaining_stack());
     let rt = tokio::runtime::Runtime::new().unwrap();
-    let (mut s1, r1) = tokio::sync::mpsc::channel(100);
-    let (s2, mut r2) = tokio::sync::mpsc::channel(100);
     rt.spawn(std::pin::Pin::from(Box::new(async_main(r1, s2))));
 
     println!("Loading resources from {}", resources);
@@ -345,9 +350,11 @@ pub fn startup(mode: DrawMode) {
                         DrawMode::TileExplorer => {
                             Box::new(TileExplorer::new(&texture_creator, &mut game_resources))
                         }
-                        DrawMode::MapExplorer => {
-                            Box::new(MapExplorer::new(&texture_creator, &mut game_resources))
-                        }
+                        DrawMode::MapExplorer => Box::new(MapExplorer::new(
+                            &texture_creator,
+                            &mut game_resources,
+                            &mut s1,
+                        )),
                         DrawMode::GameLoader => {
                             Box::new(GameLoader::new(&texture_creator, &mut game_resources))
                         }

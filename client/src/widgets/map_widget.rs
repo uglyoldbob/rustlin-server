@@ -1,4 +1,5 @@
 use crate::resources::map::MapCoordinate;
+use crate::resources::map::MapSegment;
 use crate::resources::map::MapSegmentGui;
 use crate::widgets::Widget;
 use crate::GameResources;
@@ -24,7 +25,15 @@ pub struct MapWidget<'a> {
 }
 
 impl<'a> MapWidget<'a> {
-    pub fn new<T>(tc: &'a TextureCreator<T>, x: u16, y: u16, w: u16, h: u16) -> Self {
+    pub fn new<T>(
+        tc: &'a TextureCreator<T>,
+        x: u16,
+        y: u16,
+        w: u16,
+        h: u16,
+        r: &mut GameResources,
+        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+    ) -> Self {
         let texture = tc
             .create_texture_target(PixelFormatEnum::RGB555, w as u32, h as u32)
             .unwrap();
@@ -36,7 +45,12 @@ impl<'a> MapWidget<'a> {
             h: h,
             map: MapCoordinate::build(32768, 32768, w as u32 / 2, h as u32 / 2),
             mapnum: 0,
-            segments: [None, None, None, None],
+            segments: [
+                Some(Box::new(MapSegment::empty_segment().to_gui(r, send))),
+                None,
+                None,
+                None,
+            ],
             buffer: texture,
         }
     }
@@ -68,7 +82,7 @@ impl<'a> Widget for MapWidget<'a> {
         canvas: &mut sdl2::render::WindowCanvas,
         _cursor: bool,
         r: &mut GameResources,
-        _send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
     ) {
         let _e = canvas.with_texture_canvas(&mut self.buffer, |canvas| {
             canvas.set_draw_color(Color::RGB(0, 0, 0));

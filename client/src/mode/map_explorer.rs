@@ -21,7 +21,11 @@ pub struct MapExplorer<'a, T> {
 }
 
 impl<'a, T> MapExplorer<'a, T> {
-    pub fn new(tc: &'a TextureCreator<T>, r: &mut GameResources) -> Self {
+    pub fn new(
+        tc: &'a TextureCreator<T>,
+        r: &mut GameResources,
+        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+    ) -> Self {
         let mut b: Vec<Box<dyn Widget + 'a>> = Vec::new();
         b.push(Box::new(TextButton::new(tc, 320, 400, "Go Back", &r.font)));
         let mut disp = Vec::new();
@@ -42,7 +46,7 @@ impl<'a, T> MapExplorer<'a, T> {
             current_y: 32768,
             tc: tc,
             displayed: false,
-            map: MapWidget::new(tc, 0, 0, 640, 400),
+            map: MapWidget::new(tc, 0, 0, 640, 400, r, send),
         }
     }
 }
