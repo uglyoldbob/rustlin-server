@@ -15,8 +15,8 @@ use super::MessageToAsync;
 ///Represents the top left pixel of a map coordinate on the screen. This is where the tile for that coordinate is rendered.
 #[derive(Debug, PartialEq)]
 pub struct ScreenCoordinate {
-    x: i32,
-    y: i32,
+    pub x: i32,
+    pub y: i32,
     x0: i32,
     y0: i32,
 }
@@ -73,6 +73,13 @@ impl ScreenCoordinate {
             x0: self.x0,
             y0: self.y0,
         }
+    }
+
+    pub fn map_coordinates(&self, x: i16, y: i16) -> (u16, u16) {
+        let x = x - 12;
+        let a = ((2 * (y as i32) + 2 * self.y0 - (x as i32) - self.x0) / 48) as u16;
+        let b = ((2 * (y as i32) + 2 * self.y0 + (x as i32) + self.x0) / 48) as u16;
+        (a, b)
     }
 }
 
