@@ -13,7 +13,7 @@ use std::collections::VecDeque;
 
 /// The screen that allows for user login
 pub struct Login<'a> {
-    b: Vec<Box<dyn Widget + 'a>>,
+    b: Vec<Box<dyn Widget<'a> + 'a>>,
 }
 
 impl<'a> Login<'a> {
@@ -86,7 +86,7 @@ impl<'a> GameMode<'a> for Login<'a> {
         &mut self,
         canvas: &mut sdl2::render::WindowCanvas,
         cursor: Option<(i16, i16)>,
-        r: &mut GameResources,
+        r: &mut GameResources<'a, '_, '_>,
         send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
     ) {
         canvas.set_draw_color(Color::RGB(0, 0, 0));

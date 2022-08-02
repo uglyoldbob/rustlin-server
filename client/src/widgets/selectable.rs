@@ -35,7 +35,7 @@ impl SelectableWidget {
     }
 }
 
-impl Widget for SelectableWidget {
+impl<'a> Widget<'a> for SelectableWidget {
     fn last_draw(&self) -> Option<ImageBox> {
         self.last_draw
     }

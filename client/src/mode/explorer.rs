@@ -12,7 +12,7 @@ use std::collections::VecDeque;
 
 /// This is for exploring the resources of the game client
 pub struct ExplorerMenu<'a> {
-    b: Vec<Box<dyn Widget + 'a>>,
+    b: Vec<Box<dyn Widget<'a> + 'a>>,
 }
 
 impl<'a> ExplorerMenu<'a> {
@@ -138,7 +138,7 @@ impl<'a> GameMode<'a> for ExplorerMenu<'a> {
         &mut self,
         canvas: &mut sdl2::render::WindowCanvas,
         cursor: Option<(i16, i16)>,
-        r: &mut GameResources,
+        r: &mut GameResources<'a, '_, '_>,
         send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
     ) {
         canvas.set_draw_color(Color::RGB(0, 0, 0));

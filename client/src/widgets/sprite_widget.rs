@@ -39,7 +39,7 @@ impl SpriteWidget {
     }
 }
 
-impl Widget for SpriteWidget {
+impl<'a> Widget<'a> for SpriteWidget {
     fn last_draw(&self) -> Option<ImageBox> {
         self.last_draw
     }

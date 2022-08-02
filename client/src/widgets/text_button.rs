@@ -39,7 +39,7 @@ impl<'a> TextButton<'a> {
     }
 }
 
-impl<'a> Widget for TextButton<'a> {
+impl<'a> Widget<'a> for TextButton<'a> {
     fn last_draw(&self) -> Option<ImageBox> {
         self.last_draw
     }

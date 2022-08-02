@@ -389,7 +389,7 @@ impl CharacterSelectWidget {
     }
 }
 
-impl Widget for CharacterSelectWidget {
+impl<'a> Widget<'a> for CharacterSelectWidget {
     fn last_draw(&self) -> Option<ImageBox> {
         self.last_draw
     }

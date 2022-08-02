@@ -10,7 +10,7 @@ use sdl2::pixels::Color;
 use sdl2::render::TextureCreator;
 use std::collections::VecDeque;
 pub struct MapExplorer<'a, T> {
-    b: Vec<Box<dyn Widget + 'a>>,
+    b: Vec<Box<dyn Widget<'a> + 'a>>,
     disp: Vec<DynamicTextWidget<'a>>,
     map: MapWidget<'a>,
     current_map: u16,
@@ -23,10 +23,10 @@ pub struct MapExplorer<'a, T> {
 impl<'a, T> MapExplorer<'a, T> {
     pub fn new(
         tc: &'a TextureCreator<T>,
-        r: &mut GameResources,
+        r: &mut GameResources<'a, '_, '_>,
         send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
     ) -> Self {
-        let mut b: Vec<Box<dyn Widget + 'a>> = Vec::new();
+        let mut b: Vec<Box<dyn Widget<'a> + 'a>> = Vec::new();
         b.push(Box::new(TextButton::new(tc, 320, 400, "Go Back", &r.font)));
         let mut disp = Vec::new();
         disp.push(DynamicTextWidget::new(
@@ -199,7 +199,7 @@ impl<'a, T> GameMode<'a> for MapExplorer<'a, T> {
         &mut self,
         canvas: &mut sdl2::render::WindowCanvas,
         cursor: Option<(i16, i16)>,
-        r: &mut GameResources,
+        r: &mut GameResources<'a, '_, '_>,
         send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
     ) {
         canvas.set_draw_color(Color::RGB(0, 0, 0));

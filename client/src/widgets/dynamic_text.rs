@@ -52,7 +52,7 @@ impl<'a> DynamicTextWidget<'a> {
     }
 }
 
-impl<'a> Widget for DynamicTextWidget<'a> {
+impl<'a> Widget<'a> for DynamicTextWidget<'a> {
     fn last_draw(&self) -> Option<ImageBox> {
         self.last_draw
     }

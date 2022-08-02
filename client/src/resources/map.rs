@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::rc::Rc;
 
 use crate::GameResources;
@@ -328,6 +329,7 @@ pub struct MapObject {
 
 pub struct MapSegmentGui<'a> {
     tile_ref: HashMap<u16, Rc<TileSetGui<'a>>>,
+    tilesets: HashSet<u16>,
     tiles: [u32; 64 * 128],
     attributes: [u16; 64 * 128],
     mystery1: Vec<[u16; 3]>,
@@ -349,6 +351,23 @@ pub struct MapSegment {
 }
 
 impl<'a> MapSegmentGui<'a> {
+    pub fn check_tilesets(
+        &mut self,
+        r: &mut GameResources<'a, '_, '_>,
+        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+    ) {
+        for tileset in &self.tilesets {
+            if !self.tile_ref.contains_key(tileset) {
+                let t = r.tilesets.get_or_load(*tileset, || {
+                    let _e = send.blocking_send(MessageToAsync::LoadTileset(*tileset));
+                });
+                if let Some(t) = t {
+                    self.tile_ref.insert(*tileset, t);
+                }
+            }
+        }
+    }
+
     pub fn draw_floor<T: sdl2::render::RenderTarget>(
         &self,
         canvas: &mut sdl2::render::Canvas<T>,
@@ -388,11 +407,28 @@ impl<'a> MapSegmentGui<'a> {
 impl MapSegment {
     pub fn to_gui<'a>(
         self,
-        r: &mut GameResources,
+        r: &mut GameResources<'a, '_, '_>,
         send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
     ) -> MapSegmentGui<'a> {
+        let mut tilesets = HashSet::new();
+        for tiles in &self.tiles {
+            let tileset = (tiles >> 16) as u16;
+            tilesets.insert(tileset);
+        }
+        let mut tr = HashMap::new();
+        for tileset in &tilesets {
+            if !tr.contains_key(tileset) {
+                let t = r.tilesets.get_or_load(*tileset, || {
+                    let _e = send.blocking_send(MessageToAsync::LoadTileset(*tileset));
+                });
+                if let Some(t) = t {
+                    tr.insert(*tileset, t);
+                }
+            }
+        }
         MapSegmentGui {
-            tile_ref: HashMap::new(),
+            tile_ref: tr,
+            tilesets: tilesets,
             tiles: self.tiles,
             attributes: self.attributes,
             mystery1: self.mystery1,

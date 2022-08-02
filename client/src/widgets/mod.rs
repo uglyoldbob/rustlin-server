@@ -2,12 +2,12 @@ use crate::GameResources;
 use crate::ImageBox;
 use crate::MessageToAsync;
 
-pub trait Widget {
+pub trait Widget<'a> {
     fn draw(
         &mut self,
         canvas: &mut sdl2::render::WindowCanvas,
         cursor: Option<(i16, i16)>,
-        r: &mut GameResources,
+        r: &mut GameResources<'a, '_, '_>,
         send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
     ) {
         let hover = if let Some(c) = cursor {
@@ -22,7 +22,7 @@ pub trait Widget {
         &mut self,
         canvas: &mut sdl2::render::WindowCanvas,
         cursor: bool,
-        r: &mut GameResources,
+        r: &mut GameResources<'a, '_, '_>,
         send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
     );
     fn was_clicked(&mut self) -> bool;

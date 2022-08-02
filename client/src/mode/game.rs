@@ -13,7 +13,7 @@ use std::collections::VecDeque;
 
 /// The screen that allows for selection of which character to play
 pub struct Game<'a> {
-    b: Vec<Box<dyn Widget + 'a>>,
+    b: Vec<Box<dyn Widget<'a> + 'a>>,
     disp: Vec<DynamicTextWidget<'a>>,
     sprites: Vec<SpriteWidget>,
 }
@@ -115,7 +115,7 @@ impl<'a> GameMode<'a> for Game<'a> {
         &mut self,
         canvas: &mut sdl2::render::WindowCanvas,
         cursor: Option<(i16, i16)>,
-        r: &mut GameResources,
+        r: &mut GameResources<'a, '_, '_>,
         send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
     ) {
         canvas.set_draw_color(Color::RGB(0, 0, 0));

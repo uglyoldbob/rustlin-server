@@ -38,7 +38,7 @@ impl<'a> PlainColorButton<'a> {
     }
 }
 
-impl<'a> Widget for PlainColorButton<'a> {
+impl<'a> Widget<'a> for PlainColorButton<'a> {
     fn was_clicked(&mut self) -> bool {
         let ret = self.clicked;
         self.clicked = false;

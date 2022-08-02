@@ -13,7 +13,7 @@ use std::collections::VecDeque;
 /// This is for exploring the resources of the game client
 pub struct NewCharacterMode<'a, T> {
     tc: &'a TextureCreator<T>,
-    b: Vec<Box<dyn Widget + 'a>>,
+    b: Vec<Box<dyn Widget<'a> + 'a>>,
     c: CharacterSelectWidget,
     options: Vec<SelectableWidget>,
     selected_class: u8,
@@ -393,7 +393,7 @@ impl<'a, T> GameMode<'a> for NewCharacterMode<'a, T> {
         &mut self,
         canvas: &mut sdl2::render::WindowCanvas,
         cursor: Option<(i16, i16)>,
-        r: &mut GameResources,
+        r: &mut GameResources<'a, '_, '_>,
         send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
     ) {
         canvas.set_draw_color(Color::RGB(0, 0, 0));

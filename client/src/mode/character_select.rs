@@ -13,7 +13,7 @@ use std::collections::VecDeque;
 
 /// The screen that allows for selection of which character to play
 pub struct CharacterSelect<'a> {
-    b: Vec<Box<dyn Widget + 'a>>,
+    b: Vec<Box<dyn Widget<'a> + 'a>>,
     char_sel: Vec<CharacterSelectWidget>,
     page: u8,
     selection: Option<u8>,
@@ -21,8 +21,8 @@ pub struct CharacterSelect<'a> {
 }
 
 impl<'a> CharacterSelect<'a> {
-    pub fn new<T>(_tc: &'a TextureCreator<T>, _r: &mut GameResources) -> Self {
-        let mut b: Vec<Box<dyn Widget + 'a>> = Vec::new();
+    pub fn new<T>(_tc: &'a TextureCreator<T>, _r: &mut GameResources<'a, '_, '_>) -> Self {
+        let mut b: Vec<Box<dyn Widget<'a> + 'a>> = Vec::new();
         b.push(Box::new(ImgButton::new(0x6e5, 0x0f7, 0x10b)));
         b.push(Box::new(ImgButton::new(0x6e7, 0x16c, 0x10b)));
         b.push(Box::new(ImgButton::new(0x334, 0x20d, 0x185)));
@@ -169,7 +169,7 @@ impl<'a> GameMode<'a> for CharacterSelect<'a> {
         &mut self,
         canvas: &mut sdl2::render::WindowCanvas,
         cursor: Option<(i16, i16)>,
-        r: &mut GameResources,
+        r: &mut GameResources<'a, '_, '_>,
         send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
     ) {
         canvas.set_draw_color(Color::RGB(0, 0, 0));

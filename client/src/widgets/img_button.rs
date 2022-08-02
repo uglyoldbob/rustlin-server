@@ -25,7 +25,7 @@ impl ImgButton {
     }
 }
 
-impl Widget for ImgButton {
+impl<'a> Widget<'a> for ImgButton {
     fn last_draw(&self) -> Option<ImageBox> {
         self.last_draw
     }

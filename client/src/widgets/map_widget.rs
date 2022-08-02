@@ -31,7 +31,7 @@ impl<'a> MapWidget<'a> {
         y: u16,
         w: u16,
         h: u16,
-        r: &mut GameResources,
+        r: &mut GameResources<'a, '_, '_>,
         send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
     ) -> Self {
         let texture = tc
@@ -62,7 +62,7 @@ impl<'a> MapWidget<'a> {
     }
 }
 
-impl<'a> Widget for MapWidget<'a> {
+impl<'a> Widget<'a> for MapWidget<'a> {
     fn last_draw(&self) -> Option<ImageBox> {
         None
     }
@@ -81,9 +81,14 @@ impl<'a> Widget for MapWidget<'a> {
         &mut self,
         canvas: &mut sdl2::render::WindowCanvas,
         _cursor: bool,
-        r: &mut GameResources,
+        r: &mut GameResources<'a, '_, '_>,
         send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
     ) {
+        for seg in &mut self.segments {
+            if let Some(segment) = seg {
+                segment.check_tilesets(r, send);
+            }
+        }
         let _e = canvas.with_texture_canvas(&mut self.buffer, |canvas| {
             canvas.set_draw_color(Color::RGB(0, 0, 0));
             canvas.clear();

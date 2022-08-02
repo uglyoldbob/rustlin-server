@@ -10,7 +10,7 @@ use sdl2::render::TextureCreator;
 use std::collections::VecDeque;
 
 pub struct SprExplorer<'a, T> {
-    b: Vec<Box<dyn Widget + 'a>>,
+    b: Vec<Box<dyn Widget<'a> + 'a>>,
     disp: Vec<DynamicTextWidget<'a>>,
     current_spr_a: u16,
     current_spr_b: u16,
@@ -168,7 +168,7 @@ impl<'a, T> GameMode<'a> for SprExplorer<'a, T> {
         &mut self,
         canvas: &mut sdl2::render::WindowCanvas,
         cursor: Option<(i16, i16)>,
-        r: &mut GameResources,
+        r: &mut GameResources<'a, '_, '_>,
         send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
     ) {
         canvas.set_draw_color(Color::RGB(0, 0, 0));
