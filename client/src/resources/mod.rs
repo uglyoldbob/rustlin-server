@@ -490,7 +490,7 @@ pub async fn async_main(
                         let mut buf = Vec::new();
                         let _e = data.read_to_end(&mut buf).await;
                         let mut c = std::io::Cursor::new(&buf);
-                        let ms = MapSegment::load_map_s32(&mut c, x, y).await;
+                        let ms = MapSegment::load_map_s32(&mut c, x, y, map).await;
                         ms
                     } else {
                         let mut f = resource_path.clone();
@@ -503,7 +503,7 @@ pub async fn async_main(
                             let mut buf = Vec::new();
                             let _e = data.read_to_end(&mut buf).await;
                             let mut c = std::io::Cursor::new(&buf);
-                            let ms = MapSegment::load_map_seg(&mut c, x, y).await;
+                            let ms = MapSegment::load_map_seg(&mut c, x, y, map).await;
                             ms
                         } else {
                             None

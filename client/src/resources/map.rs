@@ -337,6 +337,7 @@ pub struct MapSegmentGui<'a> {
     switches: Vec<u32>,
     x: u16,
     y: u16,
+    mapnum: u16,
 }
 
 #[derive(Clone)]
@@ -348,9 +349,13 @@ pub struct MapSegment {
     switches: Vec<u32>,
     x: u16,
     y: u16,
+    mapnum: u16,
 }
 
 impl<'a> MapSegmentGui<'a> {
+    pub fn get_mapnum(&self) -> u16 {
+        self.mapnum
+    }
     pub fn check_tilesets(
         &mut self,
         r: &mut GameResources<'a, '_, '_>,
@@ -436,6 +441,7 @@ impl MapSegment {
             switches: self.switches,
             x: self.x,
             y: self.y,
+            mapnum: self.mapnum,
         }
     }
 
@@ -448,6 +454,7 @@ impl MapSegment {
             switches: Vec::new(),
             x: 32768,
             y: 32768,
+            mapnum: 0,
         }
     }
 
@@ -461,6 +468,7 @@ impl MapSegment {
         cursor: &mut std::io::Cursor<&Vec<u8>>,
         x: u16,
         y: u16,
+        mapnum: u16,
     ) -> Option<Self> {
         let mut t = [0; 64 * 128];
         for t in t.iter_mut() {
@@ -509,6 +517,7 @@ impl MapSegment {
             switches: Vec::new(),
             x: x,
             y: y,
+            mapnum: mapnum,
         })
     }
 
@@ -516,6 +525,7 @@ impl MapSegment {
         cursor: &mut std::io::Cursor<&Vec<u8>>,
         x: u16,
         y: u16,
+        mapnum: u16,
     ) -> Option<Self> {
         let mut t = [0; 64 * 128];
         for t in t.iter_mut() {
@@ -589,6 +599,7 @@ impl MapSegment {
             switches: switches,
             x: x,
             y: y,
+            mapnum: mapnum,
         })
     }
 }
