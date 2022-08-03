@@ -23,7 +23,7 @@ pub struct MapWidget<'a> {
     h: u16,
     map: MapCoordinate,
     mapnum: u16,
-    segments: [Option<Box<MapSegmentGui<'a>>>; 4],
+    segments: [Option<Rc<MapSegmentGui<'a>>>; 4],
     buffer: Texture<'a>,
     cursor: Option<(i16, i16)>,
     tile_ref: Option<Rc<TileSetGui<'a>>>,
@@ -42,6 +42,7 @@ impl<'a> MapWidget<'a> {
         let texture = tc
             .create_texture_target(PixelFormatEnum::RGB555, w as u32, h as u32)
             .unwrap();
+
         Self {
             clicked: false,
             x: x,
@@ -50,12 +51,7 @@ impl<'a> MapWidget<'a> {
             h: h,
             map: MapCoordinate::build(32768, 32768, w as u32 / 2, h as u32 / 2),
             mapnum: 4,
-            segments: [
-                Some(Box::new(MapSegment::empty_segment().to_gui(r, send))),
-                None,
-                None,
-                None,
-            ],
+            segments: [None, None, None, None],
             buffer: texture,
             cursor: None,
             tile_ref: None,
@@ -105,19 +101,13 @@ impl<'a> MapWidget<'a> {
             (*amin + 64, *bmin + 64),
         ];
 
-        let mut temp_map: [Option<Box<MapSegmentGui<'a>>>; 4] = [None, None, None, None];
+        let mut temp_map: [Option<Rc<MapSegmentGui<'a>>>; 4] = [None, None, None, None];
         for (i, (ac, bc)) in required_segments.iter().enumerate() {
             let key = (*ac as u32) << 16 | (*bc as u32);
-            let s1 = r.get_map(self.mapnum).get_or_load(key, || {
+            let s1: Option<Rc<MapSegmentGui<'a>>> = r.get_map(self.mapnum).get_or_load(key, || {
                 let _e = send.blocking_send(MessageToAsync::LoadMapSegment(self.mapnum, *ac, *bc));
             });
-            let s2: Option<Box<MapSegmentGui>> = if let Some(r) = s1 {
-                let o: MapSegmentGui = (*r).clone();
-                Some(Box::new(o))
-            } else {
-                None
-            };
-            temp_map[i] = s2;
+            temp_map[i] = s1;
         }
 
         self.segments = temp_map;
@@ -150,11 +140,6 @@ impl<'a> Widget<'a> for MapWidget<'a> {
         r: &mut GameResources<'a, '_, '_>,
         send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
     ) {
-        for seg in &mut self.segments {
-            if let Some(segment) = seg {
-                segment.check_tilesets(r, send);
-            }
-        }
         if let None = self.tile_ref {
             self.tile_ref = r.tilesets.get_or_load(2, || {
                 let _e = send.blocking_send(MessageToAsync::LoadTileset(2));
@@ -163,8 +148,10 @@ impl<'a> Widget<'a> for MapWidget<'a> {
         let _e = canvas.with_texture_canvas(&mut self.buffer, |canvas| {
             canvas.set_draw_color(Color::RGB(0, 0, 0));
             canvas.clear();
-            if let Some(seg) = &self.segments[0] {
-                seg.draw_floor(canvas, &self.map, r);
+            for maybesegment in self.segments.iter() {
+                if let Some(seg) = maybesegment {
+                    seg.draw_floor(canvas, &self.map, r);
+                }
             }
             if let Some((x, y)) = self.cursor {
                 let screen = self.map.to_screen();

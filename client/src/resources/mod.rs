@@ -516,8 +516,7 @@ pub async fn async_main(
                         let _e = s
                             .send(MessageFromAsync::MapSegment(map, x, y, Box::new(mapseg)))
                             .await;
-                    }
-                    else {
+                    } else {
                         println!("Map segment was not loaded");
                     }
                 }

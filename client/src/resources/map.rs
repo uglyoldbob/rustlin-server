@@ -367,21 +367,9 @@ impl<'a> MapSegmentGui<'a> {
     pub fn get_mapnum(&self) -> u16 {
         self.mapnum
     }
-    pub fn check_tilesets(
-        &mut self,
-        r: &mut GameResources<'a, '_, '_>,
-        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
-    ) {
-        for tileset in &self.tilesets {
-            if !self.tile_ref.contains_key(tileset) {
-                let t = r.tilesets.get_or_load(*tileset, || {
-                    let _e = send.blocking_send(MessageToAsync::LoadTileset(*tileset));
-                });
-                if let Some(t) = t {
-                    self.tile_ref.insert(*tileset, t);
-                }
-            }
-        }
+    pub fn combined(&self) -> u32 {
+        let c: u32 = (self.x as u32) << 16 | (self.y as u32);
+        c
     }
 
     pub fn draw_floor<T: sdl2::render::RenderTarget>(
@@ -421,10 +409,10 @@ impl<'a> MapSegmentGui<'a> {
 
 impl MapSegment {
     pub fn to_gui<'a>(
-        self,
+        &self,
         r: &mut GameResources<'a, '_, '_>,
         send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
-    ) -> MapSegmentGui<'a> {
+    ) -> Option<MapSegmentGui<'a>> {
         let mut tilesets = HashSet::new();
         for tiles in &self.tiles {
             let tileset = (tiles >> 16) as u16;
@@ -438,21 +426,23 @@ impl MapSegment {
                 });
                 if let Some(t) = t {
                     tr.insert(*tileset, t);
+                } else {
+                    return None;
                 }
             }
         }
-        MapSegmentGui {
+        Some(MapSegmentGui {
             tile_ref: tr,
             tilesets: tilesets,
             tiles: self.tiles,
             attributes: self.attributes,
-            mystery1: self.mystery1,
-            objects: self.objects,
-            switches: self.switches,
+            mystery1: self.mystery1.clone(),
+            objects: self.objects.clone(),
+            switches: self.switches.clone(),
             x: self.x,
             y: self.y,
             mapnum: self.mapnum,
-        }
+        })
     }
 
     pub fn empty_segment() -> Self {

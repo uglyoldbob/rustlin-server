@@ -1,3 +1,4 @@
+use crate::map::MapSegment;
 use crate::mode::*;
 use crate::mouse::*;
 use crate::resources::*;
@@ -142,6 +143,9 @@ pub fn startup(mode: DrawMode) {
     let mut mouse = Mouse::new();
     let mut drawmode_commands: VecDeque<DrawModeRequest> = VecDeque::new();
 
+    let mut parsing_map = None;
+    let mut temporary_maps: Vec<Box<MapSegment>> = Vec::new();
+
     'running: loop {
         while let Ok(msg) = r2.try_recv() {
             match &msg {
@@ -221,8 +225,16 @@ pub fn startup(mode: DrawMode) {
                 }
                 MessageFromAsync::MapSegment(map, x, y, data) => {
                     let combined = ((*x as u32) << 16) | *y as u32;
-                    let ms = data.clone().to_gui(&mut game_resources, &mut s1);
-                    game_resources.get_map(*map).insert(combined, ms);
+                    let data = data.clone();
+                    let ms = data.to_gui(&mut game_resources, &mut s1);
+                    match ms {
+                        Some(ms) => {
+                            game_resources.get_map(*map).insert(combined, ms);
+                        }
+                        None => {
+                            temporary_maps.push(data);
+                        }
+                    }
                 }
             }
         }
@@ -326,6 +338,19 @@ pub fn startup(mode: DrawMode) {
                     }
                 }
                 _ => {}
+            }
+        }
+
+        if let None = parsing_map {
+            parsing_map = temporary_maps.pop();
+        }
+
+        if let Some(ms) = &parsing_map {
+            if let Some(ms) = ms.to_gui(&mut game_resources, &mut s1) {
+                let map = ms.get_mapnum();
+                let combined = ms.combined();
+                game_resources.get_map(map).insert(combined, ms);
+                parsing_map = None;
             }
         }
         mouse.parse();
