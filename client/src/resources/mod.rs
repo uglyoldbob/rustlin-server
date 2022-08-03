@@ -294,7 +294,7 @@ pub struct GameResources<'a, 'b, 'c> {
     pub sprites: HashMap<u32, Loadable<SpriteGui<'a>>>,
     pub sfx: HashMap<u16, Loadable<Chunk>>,
     pub tilesets: LoadableMap<u16, TileSetGui<'a>>,
-    maps: HashMap<u16, LoadableMap<u32, MapSegment>>,
+    maps: HashMap<u16, LoadableMap<u32, MapSegmentGui<'a>>>,
 }
 
 impl<'a, 'b, 'c> GameResources<'a, 'b, 'c> {
@@ -324,7 +324,7 @@ impl<'a, 'b, 'c> GameResources<'a, 'b, 'c> {
         }
     }
 
-    pub fn get_map(&mut self, map: u16) -> &mut LoadableMap<u32, MapSegment> {
+    pub fn get_map(&mut self, map: u16) -> &mut LoadableMap<u32, MapSegmentGui<'a>> {
         if !self.maps.contains_key(&map) {
             self.maps.insert(map, LoadableMap::new());
         }
@@ -479,7 +479,9 @@ pub async fn async_main(
                     }
                 }
                 MessageToAsync::LoadMapSegment(map, x, y) => {
+                    println!("Loading map {} {} {}", map, x, y);
                     let mapn = MapSegment::get_map_name(x, y);
+                    println!("Looking for {}", &mapn);
                     let mut f = resource_path.clone();
                     f.push("map");
                     f.push(format!("{}", map));
@@ -510,9 +512,13 @@ pub async fn async_main(
                         }
                     };
                     if let Some(mapseg) = ms {
+                        println!("Map segment was loaded");
                         let _e = s
                             .send(MessageFromAsync::MapSegment(map, x, y, Box::new(mapseg)))
                             .await;
+                    }
+                    else {
+                        println!("Map segment was not loaded");
                     }
                 }
             },

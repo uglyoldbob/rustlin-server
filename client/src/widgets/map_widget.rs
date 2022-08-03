@@ -49,7 +49,7 @@ impl<'a> MapWidget<'a> {
             w: w,
             h: h,
             map: MapCoordinate::build(32768, 32768, w as u32 / 2, h as u32 / 2),
-            mapnum: 0,
+            mapnum: 4,
             segments: [
                 Some(Box::new(MapSegment::empty_segment().to_gui(r, send))),
                 None,
@@ -66,7 +66,11 @@ impl<'a> MapWidget<'a> {
         self.cursor = cursor;
     }
 
-    pub fn check_segments(&mut self) {
+    pub fn check_segments(
+        &mut self,
+        r: &mut GameResources<'a, '_, '_>,
+        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+    ) {
         for seg in &mut self.segments {
             if let Some(segment) = seg {
                 if segment.get_mapnum() != self.mapnum {
@@ -74,6 +78,49 @@ impl<'a> MapWidget<'a> {
                 }
             }
         }
+        let screen = self.map.to_screen();
+        let (a1, b1) = screen.map_coordinates(0, 0);
+        let (a2, b2) = screen.map_coordinates(self.w as i16, 0);
+        let (a3, b3) = screen.map_coordinates(0, self.h as i16);
+        let (a4, b4) = screen.map_coordinates(self.w as i16, self.h as i16);
+
+        let a1 = a1 & 0xFFC0;
+        let a2 = a2 & 0xFFC0;
+        let a3 = a3 & 0xFFC0;
+        let a4 = a4 & 0xFFC0;
+        let b1 = b1 & 0xFFC0;
+        let b2 = b2 & 0xFFC0;
+        let b3 = b3 & 0xFFC0;
+        let b4 = b4 & 0xFFC0;
+
+        let a = [a1, a2, a3, a4];
+        let b = [b1, b2, b3, b4];
+        let amin = a.iter().min().unwrap();
+        let bmin = b.iter().min().unwrap();
+
+        let required_segments = [
+            (*amin, *bmin),
+            (*amin, *bmin + 64),
+            (*amin + 64, *bmin),
+            (*amin + 64, *bmin + 64),
+        ];
+
+        let mut temp_map: [Option<Box<MapSegmentGui<'a>>>; 4] = [None, None, None, None];
+        for (i, (ac, bc)) in required_segments.iter().enumerate() {
+            let key = (*ac as u32) << 16 | (*bc as u32);
+            let s1 = r.get_map(self.mapnum).get_or_load(key, || {
+                let _e = send.blocking_send(MessageToAsync::LoadMapSegment(self.mapnum, *ac, *bc));
+            });
+            let s2: Option<Box<MapSegmentGui>> = if let Some(r) = s1 {
+                let o: MapSegmentGui = (*r).clone();
+                Some(Box::new(o))
+            } else {
+                None
+            };
+            temp_map[i] = s2;
+        }
+
+        self.segments = temp_map;
     }
 
     pub fn set_map_coord_center(&mut self, a: u16, b: u16) {

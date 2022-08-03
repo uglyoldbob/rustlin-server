@@ -221,7 +221,8 @@ pub fn startup(mode: DrawMode) {
                 }
                 MessageFromAsync::MapSegment(map, x, y, data) => {
                     let combined = ((*x as u32) << 16) | *y as u32;
-                    game_resources.get_map(*map).insert(combined, *data.clone());
+                    let ms = data.clone().to_gui(&mut game_resources, &mut s1);
+                    game_resources.get_map(*map).insert(combined, ms);
                 }
             }
         }

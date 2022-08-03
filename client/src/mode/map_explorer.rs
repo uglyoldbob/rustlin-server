@@ -204,6 +204,7 @@ impl<'a, T> GameMode<'a> for MapExplorer<'a, T> {
     ) {
         canvas.set_draw_color(Color::RGB(0, 0, 0));
         canvas.clear();
+        self.map.check_segments(r, send);
         self.map.provide_cursor(cursor);
         self.map.draw(canvas, cursor, r, send);
         for w in &mut self.b {

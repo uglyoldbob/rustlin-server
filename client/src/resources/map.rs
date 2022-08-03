@@ -337,6 +337,7 @@ pub struct MapObject {
     tiles: Vec<TileData>,
 }
 
+#[derive(Clone)]
 pub struct MapSegmentGui<'a> {
     tile_ref: HashMap<u16, Rc<TileSetGui<'a>>>,
     tilesets: HashSet<u16>,
@@ -470,7 +471,7 @@ impl MapSegment {
     pub fn get_map_name(x: u16, y: u16) -> String {
         let modx = (x >> 6) + 0x7e00;
         let mody = (y >> 6) + 0x7e00;
-        format!("{}{}", modx, mody)
+        format!("{:4x}{:4x}", modx, mody)
     }
 
     pub async fn load_map_seg(
