@@ -524,6 +524,14 @@ impl MapSegment {
             cursor.read_u16_le().await.ok()?;
         }
 
+        let mut v = Vec::new();
+        cursor.read_to_end(&mut v).await.ok()?;
+
+        if v.len() > 0 {
+            println!("There were {} bytes remaining", v.len());
+            return None;
+        }
+
         Some(Self {
             tiles: t,
             attributes: [0; 64 * 64 * 2],
