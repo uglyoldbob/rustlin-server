@@ -373,6 +373,33 @@ impl<'a> MapSegmentGui<'a> {
         c
     }
 
+    pub fn tilesets_loaded(&self) -> bool {
+        let mut loaded = true;
+        for tileset in &self.tilesets {
+            if !self.tile_ref.contains_key(tileset) {
+                loaded = false;
+            }
+        }
+        loaded
+    }
+
+    pub fn check_tilesets(
+        &mut self,
+        r: &mut GameResources<'a, '_, '_>,
+        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+    ) {
+        for tileset in &self.tilesets {
+            if !self.tile_ref.contains_key(tileset) {
+                let t = r.tilesets.get_or_load(*tileset, || {
+                    let _e = send.blocking_send(MessageToAsync::LoadTileset(*tileset));
+                });
+                if let Some(t) = t {
+                    self.tile_ref.insert(*tileset, t);
+                }
+            }
+        }
+    }
+
     pub fn draw_floor<T: sdl2::render::RenderTarget>(
         &self,
         canvas: &mut sdl2::render::Canvas<T>,
@@ -390,7 +417,6 @@ impl<'a> MapSegmentGui<'a> {
                 let current_subtile = (t & 0xFF) as u16;
                 match self.tile_ref.get(&current_tile) {
                     Some(ts) => {
-                        println!("drawing left at {} {}: {}, {}", startx, starty, current_tile, current_subtile);
                         ts.draw_left(startx, starty, current_subtile, canvas);
                     }
                     _ => {}
@@ -414,7 +440,7 @@ impl MapSegment {
         &self,
         r: &mut GameResources<'a, '_, '_>,
         send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
-    ) -> Option<MapSegmentGui<'a>> {
+    ) -> MapSegmentGui<'a> {
         let mut tilesets = HashSet::new();
         for tiles in &self.tiles {
             let tileset = (tiles >> 8) as u16;
@@ -428,12 +454,10 @@ impl MapSegment {
                 });
                 if let Some(t) = t {
                     tr.insert(*tileset, t);
-                } else {
-                    return None;
                 }
             }
         }
-        Some(MapSegmentGui {
+        MapSegmentGui {
             tile_ref: tr,
             tilesets: tilesets,
             tiles: self.tiles,
@@ -444,7 +468,7 @@ impl MapSegment {
             x: self.x,
             y: self.y,
             mapnum: self.mapnum,
-        })
+        }
     }
 
     pub fn empty_segment() -> Self {

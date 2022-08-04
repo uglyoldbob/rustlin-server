@@ -481,8 +481,7 @@ pub async fn async_main(
                                 println!("Submitting {}.til", id);
                                 let _e = s.send(MessageFromAsync::Tileset(id, t)).await;
                             }
-                        }
-                        else {
+                        } else {
                             println!("Tileset {} not found", id);
                         }
                     }

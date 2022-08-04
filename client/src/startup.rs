@@ -1,6 +1,7 @@
 use crate::map::MapSegment;
 use crate::mode::*;
 use crate::mouse::*;
+use crate::resources::map::MapSegmentGui;
 use crate::resources::*;
 use crate::Loadable::Loaded;
 use sdl2::event::Event;
@@ -144,7 +145,7 @@ pub fn startup(mode: DrawMode) {
     let mut drawmode_commands: VecDeque<DrawModeRequest> = VecDeque::new();
 
     let mut parsing_map = None;
-    let mut temporary_maps: Vec<Box<MapSegment>> = Vec::new();
+    let mut temporary_maps: Vec<MapSegmentGui> = Vec::new();
 
     'running: loop {
         while let Ok(msg) = r2.try_recv() {
@@ -227,13 +228,10 @@ pub fn startup(mode: DrawMode) {
                     let combined = ((*x as u32) << 16) | *y as u32;
                     let data = data.clone();
                     let ms = data.to_gui(&mut game_resources, &mut s1);
-                    match ms {
-                        Some(ms) => {
-                            game_resources.get_map(*map).insert(combined, ms);
-                        }
-                        None => {
-                            temporary_maps.push(data);
-                        }
+                    if ms.tilesets_loaded() {
+                        game_resources.get_map(*map).insert(combined, ms);
+                    } else {
+                        temporary_maps.push(ms);
                     }
                 }
             }
@@ -345,11 +343,12 @@ pub fn startup(mode: DrawMode) {
             parsing_map = temporary_maps.pop();
         }
 
-        if let Some(ms) = &parsing_map {
-            if let Some(ms) = ms.to_gui(&mut game_resources, &mut s1) {
+        if let Some(ms) = &mut parsing_map {
+            ms.check_tilesets(&mut game_resources, &mut s1);
+            if ms.tilesets_loaded() {
                 let map = ms.get_mapnum();
                 let combined = ms.combined();
-                game_resources.get_map(map).insert(combined, ms);
+                game_resources.get_map(map).insert(combined, ms.clone());
                 parsing_map = None;
             }
         }
