@@ -285,8 +285,8 @@ impl TileSet {
                     for j in 0..width {
                         let d: u16 = tile_data[ind_offset];
                         ind_offset += 1;
-                        mirrored_tile_data[i * 48 + 23 + width - j] = d;
-                        mirrored_tile_data[i * 48 + 24 - width + j] = d;
+                        mirrored_tile_data[(23-i) * 48 + 24 + j] = d;
+                        mirrored_tile_data[(23-i) * 48 + 23 - j] = d;
                     }
                 }
                 mirrored_tile_data
