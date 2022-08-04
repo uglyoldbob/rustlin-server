@@ -76,8 +76,8 @@ impl ScreenCoordinate {
     }
 
     pub fn map_coordinates(&self, x: i16, y: i16) -> (u16, u16) {
-        let x1 = x - 12;
-        let y1 = y + 6;
+        let x1 = x - 24;
+        let y1 = y - 12;
         let a = (((x1 as i32) + self.x0 - 2 * (y1 as i32) - 2 * self.y0) / 48) as u16;
         let x1 = x - 12;
         let y1 = y - 6;
@@ -285,8 +285,8 @@ impl TileSet {
                     for j in 0..width {
                         let d: u16 = tile_data[ind_offset];
                         ind_offset += 1;
-                        mirrored_tile_data[i * 48 + 24 + j] = d;
-                        mirrored_tile_data[i * 48 + 23 - j] = d;
+                        mirrored_tile_data[i * 48 + 23 + width - j] = d;
+                        mirrored_tile_data[i * 48 + 24 - width + j] = d;
                     }
                 }
                 mirrored_tile_data
@@ -411,7 +411,7 @@ impl<'a> MapSegmentGui<'a> {
             for b in 0..64 {
                 let startx: i32 = b * 24 + a * 24 + screen.x;
                 let starty: i32 = b * 12 - a * 12 + screen.y;
-                let index = a * 64 + 2 * b;
+                let index = a * 128 + 2 * b;
                 let t = self.tiles[index as usize];
                 let current_tile = (t >> 8) as u16;
                 let current_subtile = (t & 0xFF) as u16;
@@ -446,19 +446,8 @@ impl MapSegment {
             let tileset = (tiles >> 8) as u16;
             tilesets.insert(tileset);
         }
-        let mut tr = HashMap::new();
-        for tileset in &tilesets {
-            if !tr.contains_key(tileset) {
-                let t = r.tilesets.get_or_load(*tileset, || {
-                    let _e = send.blocking_send(MessageToAsync::LoadTileset(*tileset));
-                });
-                if let Some(t) = t {
-                    tr.insert(*tileset, t);
-                }
-            }
-        }
         MapSegmentGui {
-            tile_ref: tr,
+            tile_ref: HashMap::new(),
             tilesets: tilesets,
             tiles: self.tiles,
             attributes: self.attributes,
@@ -554,6 +543,7 @@ impl MapSegment {
         mapnum: u16,
     ) -> Option<Self> {
         let mut t = [0; 64 * 128];
+        println!("Reading floor tile data");
         for t in t.iter_mut() {
             *t = cursor.read_u32_le().await.ok()?;
         }
@@ -567,11 +557,13 @@ impl MapSegment {
             mys1.push(data);
         }
         let mut attr = [0; 64 * 128];
+        println!("Reading attributes");
         for t in attr.iter_mut() {
             *t = cursor.read_u16_le().await.ok()?;
         }
 
         let num_objects = cursor.read_u32_le().await.ok()?;
+        println!("Reading {} objects at 0x{:x}", num_objects, cursor.position());
         let mut objs = Vec::with_capacity(num_objects as usize);
         for _ in 0..num_objects {
             let _index = cursor.read_u16_le().await.ok()?;
@@ -600,21 +592,36 @@ impl MapSegment {
             let obj = MapObject { tiles: t };
             objs.push(obj);
         }
-
         let num_switches = cursor.read_u32_le().await.ok()?;
+        println!("Reading {} switches at 0x{:x}", num_switches, cursor.position());
         let mut switches = Vec::with_capacity(num_switches as usize);
         for _ in 0..num_switches {
             switches.push(cursor.read_u32_le().await.ok()?);
+            cursor.read_u8().await.ok()?;
+        }
+        let num_portals = cursor.read_u32_le().await.ok()?;
+        println!("Reading {} portals at 0x{:x}", num_portals, cursor.position());
+        for _ in 0..num_portals {
+            cursor.read_u16_le().await.ok()?;
+            cursor.read_u16_le().await.ok()?;
         }
 
-        let num_portals = cursor.read_u32_le().await.ok()?;
-        for _ in 0..num_portals {
-            cursor.read_u8().await.ok()?;
-            cursor.read_u8().await.ok()?;
-            cursor.read_u8().await.ok()?;
+        cursor.read_u16_le().await.ok()?;
+        let num_unknown = cursor.read_u16_le().await.ok()?;
+        
+        println!("num unknown is {}", num_unknown);
+        for _ in 0..num_unknown {
             cursor.read_u16_le().await.ok()?;
             cursor.read_u16_le().await.ok()?;
             cursor.read_u16_le().await.ok()?;
+        }
+
+        let mut v = Vec::new();
+        cursor.read_to_end(&mut v).await.ok()?;
+
+        if v.len() > 0 {
+            println!("There were {} bytes remaining", v.len());
+            return None;
         }
 
         Some(Self {

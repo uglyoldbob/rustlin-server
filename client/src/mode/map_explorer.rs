@@ -27,12 +27,12 @@ impl<'a, T> MapExplorer<'a, T> {
         send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
     ) -> Self {
         let mut b: Vec<Box<dyn Widget<'a> + 'a>> = Vec::new();
-        b.push(Box::new(TextButton::new(tc, 320, 400, "Go Back", &r.font)));
+        b.push(Box::new(TextButton::new(tc, 320, 420, "Go Back", &r.font)));
         let mut disp = Vec::new();
         disp.push(DynamicTextWidget::new(
             tc,
             320,
-            386,
+            406,
             "Displaying map 0, coordinate 32768, 32768",
             &r.font,
             sdl2::pixels::Color::RED,

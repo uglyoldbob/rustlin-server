@@ -497,6 +497,7 @@ pub async fn async_main(
                     let p = f.as_os_str().to_str().unwrap().to_string();
                     let data = tokio::fs::File::open(p).await;
                     let ms = if let Ok(mut data) = data {
+                        println!("Parsing s32");
                         let mut buf = Vec::new();
                         let _e = data.read_to_end(&mut buf).await;
                         let mut c = std::io::Cursor::new(&buf);
@@ -510,6 +511,7 @@ pub async fn async_main(
                         let p = f.as_os_str().to_str().unwrap().to_string();
                         let data = tokio::fs::File::open(p).await;
                         if let Ok(mut data) = data {
+                            println!("Parsing seg");
                             let mut buf = Vec::new();
                             let _e = data.read_to_end(&mut buf).await;
                             let mut c = std::io::Cursor::new(&buf);
