@@ -230,6 +230,7 @@ pub struct TileSet {
 impl TileSet {
     pub async fn decode_tileset_data(cursor: &mut std::io::Cursor<&Vec<u8>>) -> Option<Self> {
         let num_tiles = cursor.read_u16_le().await.ok()?;
+        println!("There are {} tiles", num_tiles);
         cursor.read_u16_le().await.ok()?;
         let mut offsets = Vec::with_capacity(num_tiles as usize);
         for _ in 0..num_tiles {
@@ -385,17 +386,18 @@ impl<'a> MapSegmentGui<'a> {
                 let starty: i32 = b * 12 + a * 12 + screen.y;
                 let index = a * 64 + 2 * b;
                 let t = self.tiles[index as usize];
-                let current_tile = (t >> 16) as u16;
-                let current_subtile = (t & 0xFFFF) as u16;
+                let current_tile = (t >> 8) as u16;
+                let current_subtile = (t & 0xFF) as u16;
                 match self.tile_ref.get(&current_tile) {
                     Some(ts) => {
+                        println!("drawing left at {} {}: {}, {}", startx, starty, current_tile, current_subtile);
                         ts.draw_left(startx, starty, current_subtile, canvas);
                     }
                     _ => {}
                 }
                 let t = self.tiles[(index + 1) as usize];
-                let current_tile = (t >> 16) as u16;
-                let current_subtile = (t & 0xFFFF) as u16;
+                let current_tile = (t >> 8) as u16;
+                let current_subtile = (t & 0xFF) as u16;
                 match self.tile_ref.get(&current_tile) {
                     Some(ts) => {
                         ts.draw_right(startx, starty, current_subtile, canvas);
@@ -415,7 +417,7 @@ impl MapSegment {
     ) -> Option<MapSegmentGui<'a>> {
         let mut tilesets = HashSet::new();
         for tiles in &self.tiles {
-            let tileset = (tiles >> 16) as u16;
+            let tileset = (tiles >> 8) as u16;
             tilesets.insert(tileset);
         }
         let mut tr = HashMap::new();

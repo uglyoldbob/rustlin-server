@@ -275,7 +275,13 @@ impl<T, U> LoadableMap<T, U> {
             }
             Some(v) => match v {
                 LoadableReference::Loading => None,
-                _ => v.get_ref(),
+                _ => {
+                    let r = v.get_ref();
+                    if let None = r {
+                        func();
+                    }
+                    r
+                }
             },
         }
     }
@@ -475,6 +481,9 @@ pub async fn async_main(
                                 println!("Submitting {}.til", id);
                                 let _e = s.send(MessageFromAsync::Tileset(id, t)).await;
                             }
+                        }
+                        else {
+                            println!("Tileset {} not found", id);
                         }
                     }
                 }

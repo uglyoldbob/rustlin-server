@@ -100,6 +100,7 @@ impl<'a, T> GameMode<'a> for TileExplorer<'a, T> {
                         if true {
                             self.current_tile -= 1;
                             self.current_subtile = 0;
+                            self.tile_ref = None;
                             let words = format!(
                                 "Displaying {}.til subtile {}",
                                 self.current_tile, self.current_subtile
@@ -114,6 +115,7 @@ impl<'a, T> GameMode<'a> for TileExplorer<'a, T> {
                         if true {
                             self.current_tile += 1;
                             self.current_subtile = 0;
+                            self.tile_ref = None;
                             let words = format!(
                                 "Displaying {}.til subtile {}",
                                 self.current_tile, self.current_subtile
