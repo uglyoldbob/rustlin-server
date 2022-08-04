@@ -33,8 +33,8 @@ impl MapCoordinate {
     /// Converts the map coordinate to the top left pixel coordinate of where the coordinate should be drawn.
     pub fn to_screen(&self) -> ScreenCoordinate {
         ScreenCoordinate {
-            x: (24 * (self.b as i32) - 24 * (self.a as i32)) as i32 - self.x0,
-            y: (12 * (self.a as i32) + 12 * (self.b as i32)) as i32 - self.y0,
+            x: (24 * (self.b as i32) + 24 * (self.a as i32)) as i32 - self.x0,
+            y: (12 * (self.b as i32) - 12 * (self.a as i32)) as i32 - self.y0,
             x0: self.x0,
             y0: self.y0,
         }
@@ -43,15 +43,15 @@ impl MapCoordinate {
     ///Converts the given map coordinate to the top left pixel coordinate, like to_screen
     pub fn screen(&self, a: u16, b: u16) -> ScreenCoordinate {
         ScreenCoordinate {
-            x: (24 * (b as i32) - 24 * (a as i32)) as i32 - self.x0,
-            y: (12 * (a as i32) + 12 * (b as i32)) as i32 - self.y0,
+            x: (24 * (b as i32) + 24 * (a as i32)) as i32 - self.x0,
+            y: (12 * (b as i32) - 12 * (a as i32)) as i32 - self.y0,
             x0: self.x0,
             y0: self.y0,
         }
     }
 
     pub fn delta(a: i32, b: i32) -> (i32, i32) {
-        (24 * b - 24 * a, 12 * a + 12 * b)
+        (24 * b + 24 * a, 12 * b - 12 * a)
     }
 
     /// This function builds a MapCoordinate that places the dead center of the tile at the given screen coordinates
@@ -59,8 +59,8 @@ impl MapCoordinate {
         Self {
             a: a,
             b: b,
-            x0: 24 * (b as i32) - 24 * (a as i32) - (x1 as i32) + 24,
-            y0: 12 * (a as i32) + 12 * (b as i32) - (y1 as i32) + 12,
+            x0: 24 * (b as i32) + 24 * (a as i32) - (x1 as i32) + 24,
+            y0: 12 * (b as i32) - 12 * (a as i32) - (y1 as i32) + 12,
         }
     }
 }
@@ -68,7 +68,7 @@ impl MapCoordinate {
 impl ScreenCoordinate {
     pub fn to_map(&self) -> MapCoordinate {
         MapCoordinate {
-            a: ((2 * (self.y as i32) + 2 * self.y0 - (self.x as i32) - self.x0) / 48) as u16,
+            a: (((self.x as i32) + self.x0 - 2 * (self.y as i32) - 2 * self.y0) / 48) as u16,
             b: ((2 * (self.y as i32) + 2 * self.y0 + (self.x as i32) + self.x0) / 48) as u16,
             x0: self.x0,
             y0: self.y0,
@@ -78,10 +78,10 @@ impl ScreenCoordinate {
     pub fn map_coordinates(&self, x: i16, y: i16) -> (u16, u16) {
         let x1 = x - 12;
         let y1 = y + 6;
-        let a = ((2 * (y1 as i32) + 2 * self.y0 - (x1 as i32) - self.x0) / 48) as u16;
-        let x2 = x - 12;
-        let y2 = y - 6;
-        let b = ((2 * (y2 as i32) + 2 * self.y0 + (x2 as i32) + self.x0) / 48) as u16;
+        let a = (((x1 as i32) + self.x0 - 2 * (y1 as i32) - 2 * self.y0) / 48) as u16;
+        let x1 = x - 12;
+        let y1 = y - 6;
+        let b = ((2 * (y1 as i32) + 2 * self.y0 + (x1 as i32) + self.x0) / 48) as u16;
         (a, b)
     }
 }
@@ -100,14 +100,14 @@ mod tests {
         assert_eq!(map, map2);
         let mut index = 0;
         for (a, b, x, y) in [
-            (-1, -1, 0, -24),
-            (-1, 0, 24, -12),
-            (-1, 1, 48, 0),
+            (-1, -1, -48, 0),
+            (-1, 0, -24, 12),
+            (-1, 1, 0, 24),
             (0, -1, -24, -12),
             (0, 1, 24, 12),
-            (1, -1, -48, 0),
-            (1, 0, -24, 12),
-            (1, 1, 0, 24),
+            (1, -1, 0, -24),
+            (1, 0, 24, -12),
+            (1, 1, 48, 0),
         ] {
             println!("Case {}", index);
             index += 1;
@@ -409,8 +409,8 @@ impl<'a> MapSegmentGui<'a> {
         let screen = map.screen(self.x, self.y);
         for a in 0..64 {
             for b in 0..64 {
-                let startx: i32 = b * 24 - a * 24 + screen.x;
-                let starty: i32 = b * 12 + a * 12 + screen.y;
+                let startx: i32 = b * 24 + a * 24 + screen.x;
+                let starty: i32 = b * 12 - a * 12 + screen.y;
                 let index = a * 64 + 2 * b;
                 let t = self.tiles[index as usize];
                 let current_tile = (t >> 8) as u16;
