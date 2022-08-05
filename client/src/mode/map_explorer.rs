@@ -41,7 +41,7 @@ impl<'a, T> MapExplorer<'a, T> {
         Self {
             b: b,
             disp: disp,
-            current_map: 4,
+            current_map: 0,
             current_x: 32768,
             current_y: 32768,
             tc: tc,
@@ -191,6 +191,7 @@ impl<'a, T> GameMode<'a> for MapExplorer<'a, T> {
         _send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
         _requests: &mut VecDeque<DrawModeRequest>,
     ) {
+        self.map.set_map(self.current_map);
         self.map
             .set_map_coord_center(self.current_x, self.current_y);
     }

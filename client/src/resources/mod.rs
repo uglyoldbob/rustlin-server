@@ -471,18 +471,13 @@ pub async fn async_main(
                 MessageToAsync::LoadTileset(id) => {
                     if let Some(p) = &mut res.packs {
                         let name = format!("{}.til", id);
-                        println!("Loading {}.til", id);
                         let data = p.tile.raw_file_contents(name.clone()).await;
                         if let Some(data) = data {
-                            println!("Decoding {}.til", id);
                             let mut cursor = std::io::Cursor::new(&data);
                             let tileset = TileSet::decode_tileset_data(&mut cursor).await;
                             if let Some(t) = tileset {
-                                println!("Submitting {}.til", id);
                                 let _e = s.send(MessageFromAsync::Tileset(id, t)).await;
                             }
-                        } else {
-                            println!("Tileset {} not found", id);
                         }
                     }
                 }

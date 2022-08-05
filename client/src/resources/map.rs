@@ -230,7 +230,6 @@ pub struct TileSet {
 impl TileSet {
     pub async fn decode_tileset_data(cursor: &mut std::io::Cursor<&Vec<u8>>) -> Option<Self> {
         let num_tiles = cursor.read_u16_le().await.ok()?;
-        println!("There are {} tiles", num_tiles);
         cursor.read_u16_le().await.ok()?;
         let mut offsets = Vec::with_capacity(num_tiles as usize);
         for _ in 0..num_tiles {
@@ -285,8 +284,8 @@ impl TileSet {
                     for j in 0..width {
                         let d: u16 = tile_data[ind_offset];
                         ind_offset += 1;
-                        mirrored_tile_data[(23 - i) * 48 + 24 + j] = d;
-                        mirrored_tile_data[(23 - i) * 48 + 24  - width + j] = d;
+                        mirrored_tile_data[i * 48 + 24 + j] = d;
+                        mirrored_tile_data[i * 48 + 24 - width + j] = d;
                     }
                 }
                 mirrored_tile_data
@@ -404,7 +403,7 @@ impl<'a> MapSegmentGui<'a> {
             for b in 0..64 {
                 let startx: i32 = b * 24 + a * 24 + screen.x;
                 let starty: i32 = b * 12 - a * 12 + screen.y;
-                let index = a * 128 + 2 * b;
+                let index = b * 128 + 2 * a;
                 let t = self.tiles[index as usize];
                 let current_tile = (t >> 8) as u16;
                 let current_subtile = (t & 0xFF) as u16;
@@ -534,7 +533,7 @@ impl MapSegment {
 
         if v.len() > 0 {
             println!("There were {} bytes remaining", v.len());
-            return None;
+            //return None;
         }
 
         Some(Self {

@@ -113,6 +113,10 @@ impl<'a> MapWidget<'a> {
         self.segments = temp_map;
     }
 
+    pub fn set_map(&mut self, m: u16) {
+        self.mapnum = m;
+    }
+
     pub fn set_map_coord_center(&mut self, a: u16, b: u16) {
         self.map = MapCoordinate::build(a, b, self.w as u32 / 2, self.h as u32 / 2);
     }
