@@ -41,7 +41,7 @@ impl<'a, T> MapExplorer<'a, T> {
         Self {
             b: b,
             disp: disp,
-            current_map: 0,
+            current_map: 4,
             current_x: 32768,
             current_y: 32768,
             tc: tc,
@@ -155,9 +155,9 @@ impl<'a, T> GameMode<'a> for MapExplorer<'a, T> {
                     }
                 }
                 sdl2::keyboard::Keycode::S => {
-                    if self.current_y > 0 {
+                    if self.current_y < 65534 {
                         if true {
-                            self.current_y -= 1;
+                            self.current_y += 1;
                             let words = format!(
                                 "Displaying map {}, coordinate {}, {}",
                                 self.current_map, self.current_x, self.current_y
@@ -168,9 +168,9 @@ impl<'a, T> GameMode<'a> for MapExplorer<'a, T> {
                     }
                 }
                 sdl2::keyboard::Keycode::W => {
-                    if self.current_y < 65534 {
+                    if self.current_y > 0 {
                         if true {
-                            self.current_y += 1;
+                            self.current_y -= 1;
                             let words = format!(
                                 "Displaying map {}, coordinate {}, {}",
                                 self.current_map, self.current_x, self.current_y

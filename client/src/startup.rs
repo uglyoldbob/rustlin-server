@@ -224,15 +224,10 @@ pub fn startup(mode: DrawMode) {
                     let ts = ts.to_gui(&texture_creator);
                     game_resources.tilesets.insert(*id, ts);
                 }
-                MessageFromAsync::MapSegment(map, x, y, data) => {
-                    let combined = ((*x as u32) << 16) | *y as u32;
+                MessageFromAsync::MapSegment(_map, _x, _y, data) => {
                     let data = data.clone();
                     let ms = data.to_gui(&mut game_resources, &mut s1);
-                    if ms.tilesets_loaded() {
-                        game_resources.get_map(*map).insert(combined, ms);
-                    } else {
-                        temporary_maps.push(ms);
-                    }
+                    temporary_maps.push(ms);
                 }
             }
         }
@@ -344,8 +339,7 @@ pub fn startup(mode: DrawMode) {
         }
 
         if let Some(ms) = &mut parsing_map {
-            ms.check_tilesets(&mut game_resources, &mut s1);
-            if ms.tilesets_loaded() {
+            if ms.check_tilesets(&mut game_resources, &mut s1) {
                 let map = ms.get_mapnum();
                 let combined = ms.combined();
                 game_resources.get_map(map).insert(combined, ms.clone());

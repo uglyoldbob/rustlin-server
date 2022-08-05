@@ -285,8 +285,8 @@ impl TileSet {
                     for j in 0..width {
                         let d: u16 = tile_data[ind_offset];
                         ind_offset += 1;
-                        mirrored_tile_data[(23-i) * 48 + 24 + j] = d;
-                        mirrored_tile_data[(23-i) * 48 + 23 - j] = d;
+                        mirrored_tile_data[(23 - i) * 48 + 24 + j] = d;
+                        mirrored_tile_data[(23 - i) * 48 + 24  - width + j] = d;
                     }
                 }
                 mirrored_tile_data
@@ -373,23 +373,15 @@ impl<'a> MapSegmentGui<'a> {
         c
     }
 
-    pub fn tilesets_loaded(&self) -> bool {
-        let mut loaded = true;
-        for tileset in &self.tilesets {
-            if !self.tile_ref.contains_key(tileset) {
-                loaded = false;
-            }
-        }
-        loaded
-    }
-
     pub fn check_tilesets(
         &mut self,
         r: &mut GameResources<'a, '_, '_>,
         send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
-    ) {
+    ) -> bool {
+        let mut done = true;
         for tileset in &self.tilesets {
             if !self.tile_ref.contains_key(tileset) {
+                done = false;
                 let t = r.tilesets.get_or_load(*tileset, || {
                     let _e = send.blocking_send(MessageToAsync::LoadTileset(*tileset));
                 });
@@ -398,6 +390,7 @@ impl<'a> MapSegmentGui<'a> {
                 }
             }
         }
+        done
     }
 
     pub fn draw_floor<T: sdl2::render::RenderTarget>(
@@ -498,23 +491,35 @@ impl MapSegment {
         }
 
         let mystery2 = cursor.read_u32_le().await.ok()?;
+        println!("num 2 is {} at 0x{:x}", mystery2, cursor.position());
         for _ in 0..mystery2 {
             cursor.read_u16_le().await.ok()?;
             let _m1 = cursor.read_u16_le().await.ok()?;
         }
 
         let mystery3 = cursor.read_u32_le().await.ok()?;
+        println!("num 3 is {} at 0x{:x}", mystery3, cursor.position());
         for _ in 0..mystery3 {
             let _m1 = cursor.read_u16_le().await.ok()?;
             let _m2 = cursor.read_u16_le().await.ok()?;
         }
 
         let num_tilesets = cursor.read_u8().await.ok()?;
+        println!(
+            "num tilesets is {} at 0x{:x}",
+            num_tilesets,
+            cursor.position()
+        );
         for _ in 0..num_tilesets {
             let _tileset = cursor.read_u8().await.ok()?;
         }
 
         let num_portals = cursor.read_u16_le().await.ok()?;
+        println!(
+            "num portals is {} at 0x{:x}",
+            num_portals,
+            cursor.position()
+        );
         for _ in 0..num_portals {
             cursor.read_u8().await.ok()?;
             cursor.read_u8().await.ok()?;
@@ -571,7 +576,11 @@ impl MapSegment {
         }
 
         let num_objects = cursor.read_u32_le().await.ok()?;
-        println!("Reading {} objects at 0x{:x}", num_objects, cursor.position());
+        println!(
+            "Reading {} objects at 0x{:x}",
+            num_objects,
+            cursor.position()
+        );
         let mut objs = Vec::with_capacity(num_objects as usize);
         for _ in 0..num_objects {
             let _index = cursor.read_u16_le().await.ok()?;
@@ -601,14 +610,22 @@ impl MapSegment {
             objs.push(obj);
         }
         let num_switches = cursor.read_u32_le().await.ok()?;
-        println!("Reading {} switches at 0x{:x}", num_switches, cursor.position());
+        println!(
+            "Reading {} switches at 0x{:x}",
+            num_switches,
+            cursor.position()
+        );
         let mut switches = Vec::with_capacity(num_switches as usize);
         for _ in 0..num_switches {
             switches.push(cursor.read_u32_le().await.ok()?);
             cursor.read_u8().await.ok()?;
         }
         let num_portals = cursor.read_u32_le().await.ok()?;
-        println!("Reading {} portals at 0x{:x}", num_portals, cursor.position());
+        println!(
+            "Reading {} portals at 0x{:x}",
+            num_portals,
+            cursor.position()
+        );
         for _ in 0..num_portals {
             cursor.read_u16_le().await.ok()?;
             cursor.read_u16_le().await.ok()?;
@@ -616,7 +633,7 @@ impl MapSegment {
 
         cursor.read_u16_le().await.ok()?;
         let num_unknown = cursor.read_u16_le().await.ok()?;
-        
+
         println!("num unknown is {}", num_unknown);
         for _ in 0..num_unknown {
             cursor.read_u16_le().await.ok()?;
