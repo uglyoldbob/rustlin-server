@@ -41,9 +41,9 @@ impl<'a, T> MapExplorer<'a, T> {
         Self {
             b: b,
             disp: disp,
-            current_map: 0,
-            current_x: 32627,
-            current_y: 32959,
+            current_map: 4,
+            current_x: 32704,
+            current_y: 32768,
             tc: tc,
             displayed: false,
             map: MapWidget::new(tc, 0, 0, 640, 400, r, send),
