@@ -157,6 +157,11 @@ impl<'a> Widget<'a> for MapWidget<'a> {
                     seg.draw_floor(canvas, &self.map, r);
                 }
             }
+            for maybesegment in self.segments.iter() {
+                if let Some(seg) = maybesegment {
+                    seg.draw_objects(canvas, &self.map, r);
+                }
+            }
             if let Some((x, y)) = self.cursor {
                 let screen = self.map.to_screen();
                 let (a, b) = screen.map_coordinates(x, y);

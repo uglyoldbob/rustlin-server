@@ -393,6 +393,34 @@ impl<'a> MapSegmentGui<'a> {
         done
     }
 
+    pub fn draw_objects<T: sdl2::render::RenderTarget>(
+        &self,
+        canvas: &mut sdl2::render::Canvas<T>,
+        map: &MapCoordinate,
+        _r: &mut GameResources,
+    ) {
+        let screen = map.screen(self.x, self.y);
+        for o in &self.objects {
+            for tdata in &o.tiles {
+                let a = (tdata.x / 2) as i32;
+                let b = tdata.y as i32;
+                let tile = tdata.data >> 8;
+                let subtile = (tdata.data & 0xFF) as u8;
+                let mut startx: i32 = b * 24 + a * 24 + screen.x;
+                if (tdata.x % 2) == 1 {
+                    startx += 24;
+                }
+                let starty: i32 = b * 12 - a * 12 + screen.y;
+                match self.tile_ref.get(&tile) {
+                    Some(ts) => {
+                        ts.draw_tile(startx, starty, subtile, canvas);
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+
     pub fn draw_floor<T: sdl2::render::RenderTarget>(
         &self,
         canvas: &mut sdl2::render::Canvas<T>,
@@ -602,6 +630,7 @@ impl MapSegment {
                 } else {
                     let h = cursor.read_i8().await.ok()?;
                     let data = cursor.read_u32_le().await.ok()?;
+                    ts.insert(data >> 8);
                     let tile = TileData {
                         x: b,
                         y: c,
@@ -640,18 +669,13 @@ impl MapSegment {
         let num_unknown = cursor.read_u16_le().await.ok()?;
 
         println!("num unknown is {}", num_unknown);
-        for _ in 0..num_unknown {
-            cursor.read_u16_le().await.ok()?;
-            cursor.read_u16_le().await.ok()?;
-            cursor.read_u16_le().await.ok()?;
-        }
 
         let mut v = Vec::new();
         cursor.read_to_end(&mut v).await.ok()?;
 
         if v.len() > 0 {
             println!("There were {} bytes remaining", v.len());
-            return None;
+            //return None;
         }
 
         Some(Self {
