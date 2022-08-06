@@ -345,6 +345,8 @@ pub struct MapSegmentGui<'a> {
     attributes: [u16; 64 * 128],
     mystery1: Vec<[u16; 3]>,
     objects: Vec<MapObject>,
+    min_object_depth: i8,
+    max_object_depth: i8,
     switches: Vec<u32>,
     x: u16,
     y: u16,
@@ -357,6 +359,8 @@ pub struct MapSegment {
     attributes: [u16; 64 * 128],
     mystery1: Vec<[u16; 3]>,
     objects: Vec<MapObject>,
+    min_object_depth: i8,
+    max_object_depth: i8,
     switches: Vec<u32>,
     x: u16,
     y: u16,
@@ -400,22 +404,27 @@ impl<'a> MapSegmentGui<'a> {
         _r: &mut GameResources,
     ) {
         let screen = map.screen(self.x, self.y);
+        for layer in self.min_object_depth..=self.max_object_depth {
         for o in &self.objects {
-            for tdata in &o.tiles {
-                let a = (tdata.x / 2) as i32;
-                let b = tdata.y as i32;
-                let tile = tdata.data >> 8;
-                let subtile = (tdata.data & 0xFF) as u8;
-                let mut startx: i32 = b * 24 + a * 24 + screen.x;
-                if (tdata.x % 2) == 1 {
-                    startx += 24;
-                }
-                let starty: i32 = b * 12 - a * 12 + screen.y;
-                match self.tile_ref.get(&tile) {
-                    Some(ts) => {
-                        ts.draw_tile(startx, starty, subtile, canvas);
+            
+                for tdata in &o.tiles {
+                    if tdata.h == layer {
+                        let a = (tdata.x / 2) as i32;
+                        let b = tdata.y as i32;
+                        let tile = tdata.data >> 8;
+                        let subtile = (tdata.data & 0xFF) as u8;
+                        let mut startx: i32 = b * 24 + a * 24 + screen.x;
+                        if (tdata.x % 2) == 1 {
+                            startx += 24;
+                        }
+                        let starty: i32 = b * 12 - a * 12 + screen.y;
+                        match self.tile_ref.get(&tile) {
+                            Some(ts) => {
+                                ts.draw_tile(startx, starty, subtile, canvas);
+                            }
+                            _ => {}
+                        }
                     }
-                    _ => {}
                 }
             }
         }
@@ -473,6 +482,8 @@ impl MapSegment {
             x: self.x,
             y: self.y,
             mapnum: self.mapnum,
+            min_object_depth: self.min_object_depth,
+            max_object_depth: self.max_object_depth,
         }
     }
 
@@ -489,6 +500,8 @@ impl MapSegment {
             y: 32768,
             mapnum: 0,
             tilesets: ts,
+            min_object_depth: 0,
+            max_object_depth: 0,
         }
     }
 
@@ -576,6 +589,8 @@ impl MapSegment {
             y: y,
             mapnum: mapnum,
             tilesets: ts,
+            min_object_depth: 0,
+            max_object_depth: 0,
         })
     }
 
@@ -615,6 +630,8 @@ impl MapSegment {
             cursor.position()
         );
         let mut objs = Vec::with_capacity(num_objects as usize);
+        let mut min_depth = 127;
+        let mut max_depth = -128;
         for _ in 0..num_objects {
             let _index = cursor.read_u16_le().await.ok()?;
             let num_tiles = cursor.read_u16_le().await.ok()?;
@@ -631,6 +648,12 @@ impl MapSegment {
                     let h = cursor.read_i8().await.ok()?;
                     let data = cursor.read_u32_le().await.ok()?;
                     ts.insert(data >> 8);
+                    if min_depth > h {
+                        min_depth = h;
+                    }
+                    if max_depth < h {
+                        max_depth = h;
+                    }
                     let tile = TileData {
                         x: b,
                         y: c,
@@ -640,7 +663,9 @@ impl MapSegment {
                     t.push(tile);
                 }
             }
-            let obj = MapObject { tiles: t };
+            let obj = MapObject {
+                tiles: t,
+            };
             objs.push(obj);
         }
         let num_switches = cursor.read_u32_le().await.ok()?;
@@ -688,6 +713,8 @@ impl MapSegment {
             y: y,
             mapnum: mapnum,
             tilesets: ts,
+            min_object_depth: min_depth,
+            max_object_depth: max_depth,
         })
     }
 }
