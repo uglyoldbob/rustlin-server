@@ -15,8 +15,8 @@ use std::rc::Rc;
 pub struct TileExplorer<'a, T> {
     b: Vec<Box<dyn Widget<'a> + 'a>>,
     disp: Vec<DynamicTextWidget<'a>>,
-    current_tile: u16,
-    current_subtile: u16,
+    current_tile: u32,
+    current_subtile: u8,
     tc: &'a TextureCreator<T>,
     displayed: bool,
     tile_ref: Option<Rc<TileSetGui<'a>>>,
@@ -139,7 +139,7 @@ impl<'a, T> GameMode<'a> for TileExplorer<'a, T> {
                     }
                 }
                 sdl2::keyboard::Keycode::Up => {
-                    if self.current_subtile < 65534 {
+                    if self.current_subtile < 255 {
                         if true {
                             self.current_subtile += 1;
                             let words = format!(

@@ -178,7 +178,7 @@ impl<'a> TileSetGui<'a> {
         &self,
         x: i32,
         y: i32,
-        subtile: u16,
+        subtile: u8,
         canvas: &mut sdl2::render::Canvas<T>,
     ) {
         if let Some(t) = self.tiles.get(subtile as usize) {
@@ -191,7 +191,7 @@ impl<'a> TileSetGui<'a> {
         &self,
         x: i32,
         y: i32,
-        subtile: u16,
+        subtile: u8,
         canvas: &mut sdl2::render::Canvas<T>,
     ) {
         if let Some(t) = self.tiles.get(subtile as usize) {
@@ -208,7 +208,7 @@ impl<'a> TileSetGui<'a> {
         &self,
         x: i32,
         y: i32,
-        subtile: u16,
+        subtile: u8,
         canvas: &mut sdl2::render::Canvas<T>,
     ) {
         if let Some(t) = self.tiles.get(subtile as usize) {
@@ -339,8 +339,8 @@ pub struct MapObject {
 
 #[derive(Clone)]
 pub struct MapSegmentGui<'a> {
-    tile_ref: HashMap<u16, Rc<TileSetGui<'a>>>,
-    tilesets: HashSet<u16>,
+    tile_ref: HashMap<u32, Rc<TileSetGui<'a>>>,
+    tilesets: HashSet<u32>,
     tiles: [u32; 64 * 128],
     attributes: [u16; 64 * 128],
     mystery1: Vec<[u16; 3]>,
@@ -361,6 +361,7 @@ pub struct MapSegment {
     x: u16,
     y: u16,
     mapnum: u16,
+    tilesets: HashSet<u32>,
 }
 
 impl<'a> MapSegmentGui<'a> {
@@ -405,8 +406,8 @@ impl<'a> MapSegmentGui<'a> {
                 let starty: i32 = b * 12 - a * 12 + screen.y;
                 let index = b * 128 + 2 * a;
                 let t = self.tiles[index as usize];
-                let current_tile = (t >> 8) as u16;
-                let current_subtile = (t & 0xFF) as u16;
+                let current_tile = (t >> 8) as u32;
+                let current_subtile = (t & 0xFF) as u8;
                 match self.tile_ref.get(&current_tile) {
                     Some(ts) => {
                         ts.draw_left(startx, starty, current_subtile, canvas);
@@ -414,8 +415,8 @@ impl<'a> MapSegmentGui<'a> {
                     _ => {}
                 }
                 let t = self.tiles[(index + 1) as usize];
-                let current_tile = (t >> 8) as u16;
-                let current_subtile = (t & 0xFF) as u16;
+                let current_tile = (t >> 8) as u32;
+                let current_subtile = (t & 0xFF) as u8;
                 match self.tile_ref.get(&current_tile) {
                     Some(ts) => {
                         ts.draw_right(startx, starty, current_subtile, canvas);
@@ -429,23 +430,18 @@ impl<'a> MapSegmentGui<'a> {
 
 impl MapSegment {
     pub fn to_gui<'a>(
-        &self,
+        self,
         r: &mut GameResources<'a, '_, '_>,
         send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
     ) -> MapSegmentGui<'a> {
-        let mut tilesets = HashSet::new();
-        for tiles in &self.tiles {
-            let tileset = (tiles >> 8) as u16;
-            tilesets.insert(tileset);
-        }
         MapSegmentGui {
             tile_ref: HashMap::new(),
-            tilesets: tilesets,
+            tilesets: self.tilesets,
             tiles: self.tiles,
             attributes: self.attributes,
-            mystery1: self.mystery1.clone(),
-            objects: self.objects.clone(),
-            switches: self.switches.clone(),
+            mystery1: self.mystery1,
+            objects: self.objects,
+            switches: self.switches,
             x: self.x,
             y: self.y,
             mapnum: self.mapnum,
@@ -453,6 +449,8 @@ impl MapSegment {
     }
 
     pub fn empty_segment() -> Self {
+        let mut ts = HashSet::new();
+        ts.insert(0);
         Self {
             tiles: [1; 64 * 128],
             attributes: [0; 64 * 128],
@@ -462,6 +460,7 @@ impl MapSegment {
             x: 32768,
             y: 32768,
             mapnum: 0,
+            tilesets: ts,
         }
     }
 
@@ -477,9 +476,12 @@ impl MapSegment {
         y: u16,
         mapnum: u16,
     ) -> Option<Self> {
+        let mut ts = HashSet::new();
         let mut t = [0; 64 * 128];
         for t in t.iter_mut() {
-            *t = cursor.read_u16_le().await.ok()? as u32;
+            let data = cursor.read_u16_le().await.ok()? as u32;
+            ts.insert(data >> 8);
+            *t = data;
         }
 
         let _mystery1 = cursor.read_u16_le().await.ok()?;
@@ -545,6 +547,7 @@ impl MapSegment {
             x: x,
             y: y,
             mapnum: mapnum,
+            tilesets: ts,
         })
     }
 
@@ -554,10 +557,13 @@ impl MapSegment {
         y: u16,
         mapnum: u16,
     ) -> Option<Self> {
+        let mut ts = HashSet::new();
         let mut t = [0; 64 * 128];
         println!("Reading floor tile data");
         for t in t.iter_mut() {
-            *t = cursor.read_u32_le().await.ok()?;
+            let data = cursor.read_u32_le().await.ok()?;
+            ts.insert(data >> 8);
+            *t = data;
         }
         let mut mys1 = Vec::new();
         let quant = cursor.read_u16_le().await.ok()?;
@@ -657,6 +663,7 @@ impl MapSegment {
             x: x,
             y: y,
             mapnum: mapnum,
+            tilesets: ts,
         })
     }
 }

@@ -92,7 +92,7 @@ pub enum MessageToAsync {
     LoadRunner(Box<dyn AsyncRunner + Send>),
     LoadSprite(u16, u16),
     LoadSfx(u16),
-    LoadTileset(u16),
+    LoadTileset(u32),
     LoadMapSegment(u16, u16, u16),
 }
 
@@ -103,7 +103,7 @@ pub enum MessageFromAsync {
     Img(u16, Img),
     Sprite(u32, Sprite),
     Sfx(u16, Vec<u8>),
-    Tileset(u16, TileSet),
+    Tileset(u32, TileSet),
     MapSegment(u16, u16, u16, Box<MapSegment>),
 }
 
@@ -299,7 +299,7 @@ pub struct GameResources<'a, 'b, 'c> {
     pub characters: [CharacterData; 8],
     pub sprites: HashMap<u32, Loadable<SpriteGui<'a>>>,
     pub sfx: HashMap<u16, Loadable<Chunk>>,
-    pub tilesets: LoadableMap<u16, TileSetGui<'a>>,
+    pub tilesets: LoadableMap<u32, TileSetGui<'a>>,
     maps: HashMap<u16, LoadableMap<u32, MapSegmentGui<'a>>>,
 }
 
