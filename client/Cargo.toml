@@ -24,6 +24,14 @@ features=["use_mac_framework", "image", "ttf", "mixer"]
 version = "^0"
 path="../common"
 
+[dev-dependencies]
+criterion = "0.3.6"
+
+[[bench]]
+name="map_bench"
+path="src/map_bench.rs"
+harness = false
+
 [[bin]]
 name="rustlin-client"
 path="src/main.rs"
