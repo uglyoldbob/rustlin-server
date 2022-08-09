@@ -13,7 +13,6 @@ use sdl2::pixels::Color;
 use sdl2::pixels::PixelFormatEnum;
 use sdl2::render::Texture;
 use sdl2::render::TextureCreator;
-use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::fs;
 use std::path::PathBuf;
@@ -59,7 +58,6 @@ async fn test_map_load() {
     let mut d = PathBuf::from(resources);
     d.push("map");
 
-    let mut num_maps = 1;
     let mut num_success = 0;
 
     let mut maps = Vec::new();
@@ -76,19 +74,24 @@ async fn test_map_load() {
                         let path = e.path();
                         let meta = fs::metadata(&path).unwrap();
                         if meta.is_file() {
-                            if path.file_name().unwrap().to_string_lossy().ends_with(".s32") {
+                            if path
+                                .file_name()
+                                .unwrap()
+                                .to_string_lossy()
+                                .ends_with(".s32")
+                            {
                                 maps.push(path);
                             }
                         }
                     }
                 }
-
             }
         }
     }
 
-    num_maps = maps.len();
-    for f in maps {
+    let mut map_s32_failures = Vec::new();
+
+    for f in &maps {
         println!("Map file {}", f.display());
         let data = tokio::fs::File::open(f).await;
         if let Ok(mut data) = data {
@@ -96,13 +99,19 @@ async fn test_map_load() {
             let _e = data.read_to_end(&mut buf).await;
             let mut c = std::io::Cursor::new(&buf);
             let ms = MapSegment::load_map_s32(&mut c, 32768, 32768, 0).await;
-            if let Some(map) = ms {
+            if let Some(_map) = ms {
                 num_success += 1;
+            } else {
+                map_s32_failures.push(f);
             }
         }
     }
 
-    assert_eq!(num_maps, num_success);
+    for e in map_s32_failures {
+        println!("{} failed to load", e.display());
+    }
+
+    assert_eq!(maps.len(), num_success);
 }
 
 #[test]
