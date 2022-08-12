@@ -18,6 +18,7 @@ use std::fs;
 use std::path::PathBuf;
 use std::time::Duration;
 use tokio::io::AsyncReadExt;
+use tokio::io::AsyncWriteExt;
 
 mod settings;
 
@@ -107,7 +108,15 @@ async fn test_map_load() {
         }
     }
 
+    let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    d.pop();
+    d.push("map_testing_results.txt");
+    let mut fo = tokio::fs::File::create(d).await.unwrap();
+
+
     for e in map_s32_failures {
+        let words = format!("{} failed to load\n", e.display());
+        fo.write_all(words.as_bytes()).await;
         println!("{} failed to load", e.display());
     }
 

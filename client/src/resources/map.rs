@@ -327,9 +327,9 @@ impl TileSet {
 
 #[derive(Clone)]
 pub struct TileData {
-    x: i8,
-    y: i8,
-    h: i8,
+    x: u8,
+    y: u8,
+    h: u8,
     data: u32,
 }
 
@@ -346,8 +346,8 @@ pub struct MapSegmentGui<'a> {
     attributes: [u16; 64 * 128],
     mystery1: Vec<(u8, u8, u32)>,
     objects: Vec<MapObject>,
-    min_object_depth: i8,
-    max_object_depth: i8,
+    min_object_depth: u8,
+    max_object_depth: u8,
     switches: Vec<u32>,
     x: u16,
     y: u16,
@@ -361,8 +361,8 @@ pub struct MapSegment {
     attributes: [u16; 64 * 128],
     mystery1: Vec<(u8, u8, u32)>,
     objects: Vec<MapObject>,
-    min_object_depth: i8,
-    max_object_depth: i8,
+    min_object_depth: u8,
+    max_object_depth: u8,
     switches: Vec<u32>,
     x: u16,
     y: u16,
@@ -430,23 +430,7 @@ impl<'a> MapSegmentGui<'a> {
                 }
             }
         }
-        for (x, y, c) in &self.mystery1 {
-            let a = (x / 2) as i32;
-            let b = *y as i32;
-            let tile = (c >> 8);
-            let subtile = (c & 0xFF) as u8;
-            let mut startx: i32 = b * 24 + a * 24 + screen.x;
-            if (x % 2) == 1 {
-                startx += 24;
-            }
-            let starty: i32 = b * 12 - a * 12 + screen.y;
-            match self.tile_ref.get(&tile) {
-                Some(ts) => {
-                    ts.draw_tile(startx, starty, subtile, canvas);
-                }
-                _ => {}
-            }
-        }
+        
     }
 
     pub fn draw_floor<T: sdl2::render::RenderTarget>(
@@ -604,7 +588,6 @@ impl MapSegment {
             println!("There were {} bytes remaining", v.len());
             //return None;
         }
-
         Some(Self {
             tiles: t,
             attributes: [0; 64 * 64 * 2],
@@ -636,6 +619,7 @@ impl MapSegment {
             ts.insert(data >> 8);
             *t = data;
         }
+        ts.insert(2);   // for testing
         let mut mys1 = Vec::new();
         let quant = cursor.read_u16_le().await.ok()?;
         println!("Number mystery is {}", quant);
@@ -663,22 +647,22 @@ impl MapSegment {
             cursor.position()
         );
         let mut objs = Vec::with_capacity(num_objects as usize);
-        let mut min_depth = 127;
-        let mut max_depth = -128;
+        let mut min_depth = 255;
+        let mut max_depth = 0;
         for _ in 0..num_objects {
             let _index = cursor.read_u16_le().await.ok()?;
             let num_tiles = cursor.read_u16_le().await.ok()?;
             let mut t = Vec::with_capacity(num_tiles as usize);
             for _ in 0..num_tiles {
-                let b = cursor.read_i8().await.ok()?;
-                let c = cursor.read_i8().await.ok()?;
-                if b == -51i8 && c == -51i8 {
+                let b = cursor.read_u8().await.ok()?;
+                let c = cursor.read_u8().await.ok()?;
+                if b == 205 && c == 205 {
                     for _ in 0..5 {
                         cursor.read_u8().await.ok()?;
                     }
                     println!("This map segment feature is unimplemented?");
                 } else {
-                    let h = cursor.read_i8().await.ok()?;
+                    let h = cursor.read_u8().await.ok()?;
                     let data = cursor.read_u32_le().await.ok()?;
                     ts.insert(data >> 8);
                     if min_depth > h {
@@ -700,17 +684,18 @@ impl MapSegment {
             objs.push(obj);
         }
         let num_switches = cursor.read_u32_le().await.ok()?;
-        println!(
-            "Reading {} switches at 0x{:x}",
+        print!(
+            "Reading {} switches at 0x{:x} ",
             num_switches,
             cursor.position()
         );
         let mut switches = Vec::with_capacity(num_switches as usize);
         for _ in 0..num_switches {
-            cursor.read_u8().await.ok()?;
-            cursor.read_u8().await.ok()?;
-            switches.push(cursor.read_u16_le().await.ok()? as u32);
-            cursor.read_u8().await.ok()?;
+            let mys1 = cursor.read_i8().await.ok()?;
+            let mys2 = cursor.read_i8().await.ok()?;
+            let val = cursor.read_u16_le().await.ok()? as u32;
+            let mys3 = cursor.read_u8().await.ok()?;
+            switches.push(val);
         }
         let num_tilesets = cursor.read_u32_le().await.ok()?;
         println!(
@@ -725,7 +710,7 @@ impl MapSegment {
         // if there is data left
         let amount_portal = cursor.read_u16_le().await;
         if let Ok(num_portal) = amount_portal {
-            println!("There are {} portals", num_portal);
+            println!("There are {} portals at 0x{:x}", num_portal, cursor.position());
             for _ in 0..num_portal {
                 let mys1 = cursor.read_u8().await.ok()?;
                 let mys2 = cursor.read_u8().await.ok()?;
@@ -738,7 +723,7 @@ impl MapSegment {
 
         let amount_stuff = cursor.read_u16_le().await;
         if let Ok(amount) = amount_stuff {
-            println!("There are {} stuff", amount);
+            println!("There are {} stuff at 0x{:x}", amount, cursor.position());
             for _ in 0..amount {
                 let a = cursor.read_u16_le().await.ok()?;
                 let b = cursor.read_u16_le().await.ok()?;
