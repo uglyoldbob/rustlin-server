@@ -344,7 +344,7 @@ pub struct MapSegmentGui<'a> {
     tilesets: HashSet<u32>,
     tiles: [u32; 64 * 128],
     attributes: [u16; 64 * 128],
-    mystery1: Vec<(u8, u8, u32)>,
+    extra_floor_tiles: Vec<(u8, u8, u32)>,
     objects: Vec<MapObject>,
     min_object_depth: u8,
     max_object_depth: u8,
@@ -359,7 +359,7 @@ pub struct MapSegmentGui<'a> {
 pub struct MapSegment {
     tiles: [u32; 64 * 128],
     attributes: [u16; 64 * 128],
-    mystery1: Vec<(u8, u8, u32)>,
+    extra_floor_tiles: Vec<(u8, u8, u32)>,
     objects: Vec<MapObject>,
     min_object_depth: u8,
     max_object_depth: u8,
@@ -405,27 +405,46 @@ impl<'a> MapSegmentGui<'a> {
         canvas: &mut sdl2::render::Canvas<T>,
         map: &MapCoordinate,
         _r: &mut GameResources,
+        layer: u8,
     ) {
         let screen = map.screen(self.x, self.y);
-        for layer in self.min_object_depth..=self.max_object_depth {
-            for o in &self.objects {
-                for tdata in &o.tiles {
-                    if tdata.h == layer {
-                        let a = (tdata.x / 2) as i32;
-                        let b = tdata.y as i32;
-                        let tile = tdata.data >> 8;
-                        let subtile = (tdata.data & 0xFF) as u8;
-                        let mut startx: i32 = b * 24 + a * 24 + screen.x;
-                        if (tdata.x % 2) == 1 {
-                            startx += 24;
+        if layer == 0 {
+            for (x, y, c) in &self.mystery1 {
+                let a = (x / 2) as i32;
+                let b = *y as i32;
+                let tile = c >> 8;
+                let subtile = (c & 0xFF) as u8;
+                let mut startx: i32 = b * 24 + a * 24 + screen.x;
+                if (x % 2) == 1 {
+                    startx += 24;
+                }
+                let starty: i32 = b * 12 - a * 12 + screen.y;
+                match self.tile_ref.get(&tile) {
+                    Some(ts) => {
+                        ts.draw_tile(startx, starty, subtile, canvas);
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        for o in &self.objects {
+            for tdata in &o.tiles {
+                if tdata.h == layer {
+                    let a = (tdata.x / 2) as i32;
+                    let b = tdata.y as i32;
+                    let tile = tdata.data >> 8;
+                    let subtile = (tdata.data & 0xFF) as u8;
+                    let mut startx: i32 = b * 24 + a * 24 + screen.x;
+                    if (tdata.x % 2) == 1 {
+                        startx += 24;
+                    }
+                    let starty: i32 = b * 12 - a * 12 + screen.y;
+                    match self.tile_ref.get(&tile) {
+                        Some(ts) => {
+                            ts.draw_tile(startx, starty, subtile, canvas);
                         }
-                        let starty: i32 = b * 12 - a * 12 + screen.y;
-                        match self.tile_ref.get(&tile) {
-                            Some(ts) => {
-                                ts.draw_tile(startx, starty, subtile, canvas);
-                            }
-                            _ => {}
-                        }
+                        _ => {}
                     }
                 }
             }
@@ -442,7 +461,7 @@ impl<'a> MapSegmentGui<'a> {
         let mut rng = rand::thread_rng();
         let random = rng.gen::<f32>();
         if self.partial && (random < 0.5) {
-            return;
+            //return;
         }
         let screen = map.screen(self.x, self.y);
         for a in 0..64 {
@@ -484,7 +503,7 @@ impl MapSegment {
             tilesets: self.tilesets,
             tiles: self.tiles,
             attributes: self.attributes,
-            mystery1: self.mystery1,
+            extra_floor_tiles: self.extra_floor_tiles,
             objects: self.objects,
             switches: self.switches,
             x: self.x,
@@ -502,7 +521,7 @@ impl MapSegment {
         Self {
             tiles: [1; 64 * 128],
             attributes: [0; 64 * 128],
-            mystery1: Vec::new(),
+            extra_floor_tiles: Vec::new(),
             objects: Vec::new(),
             switches: Vec::new(),
             x: 32768,
@@ -591,7 +610,7 @@ impl MapSegment {
         Some(Self {
             tiles: t,
             attributes: [0; 64 * 64 * 2],
-            mystery1: Vec::new(),
+            extra_floor_tiles: Vec::new(),
             objects: Vec::new(),
             switches: Vec::new(),
             x: x,
@@ -620,9 +639,9 @@ impl MapSegment {
             *t = data;
         }
         ts.insert(2);   // for testing
-        let mut mys1 = Vec::new();
+        let mut extra_floor_tiles = Vec::new();
         let quant = cursor.read_u16_le().await.ok()?;
-        println!("Number mystery is {}", quant);
+        println!("Number extra floor tiles is {}", quant);
         for _ in 0..quant {
             partial = true;
             let (a, b, c): (u8, u8, u32) = (
@@ -631,7 +650,7 @@ impl MapSegment {
                 cursor.read_u32_le().await.ok()?,
             );
             ts.insert(c >> 8);
-            mys1.push((a, b, c));
+            extra_floor_tiles.push((a, b, c));
         }
         println!("");
         let mut attr = [0; 64 * 128];
@@ -742,7 +761,7 @@ impl MapSegment {
         Some(Self {
             tiles: t,
             attributes: attr,
-            mystery1: mys1,
+            extra_floor_tiles: extra_floor_tiles,
             objects: objs,
             switches: switches,
             x: x,
