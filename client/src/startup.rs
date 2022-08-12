@@ -113,7 +113,6 @@ async fn test_map_load() {
     d.push("map_testing_results.txt");
     let mut fo = tokio::fs::File::create(d).await.unwrap();
 
-
     for e in map_s32_failures {
         let words = format!("{} failed to load\n", e.display());
         fo.write_all(words.as_bytes()).await;

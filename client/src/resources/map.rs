@@ -409,7 +409,7 @@ impl<'a> MapSegmentGui<'a> {
     ) {
         let screen = map.screen(self.x, self.y);
         if layer == 0 {
-            for (x, y, c) in &self.mystery1 {
+            for (x, y, c) in &self.extra_floor_tiles {
                 let a = (x / 2) as i32;
                 let b = *y as i32;
                 let tile = c >> 8;
@@ -449,7 +449,6 @@ impl<'a> MapSegmentGui<'a> {
                 }
             }
         }
-        
     }
 
     pub fn draw_floor<T: sdl2::render::RenderTarget>(
@@ -638,7 +637,7 @@ impl MapSegment {
             ts.insert(data >> 8);
             *t = data;
         }
-        ts.insert(2);   // for testing
+        ts.insert(2); // for testing
         let mut extra_floor_tiles = Vec::new();
         let quant = cursor.read_u16_le().await.ok()?;
         println!("Number extra floor tiles is {}", quant);
@@ -710,8 +709,8 @@ impl MapSegment {
         );
         let mut switches = Vec::with_capacity(num_switches as usize);
         for _ in 0..num_switches {
-            let mys1 = cursor.read_i8().await.ok()?;
-            let mys2 = cursor.read_i8().await.ok()?;
+            let mys1 = cursor.read_u8().await.ok()?;
+            let mys2 = cursor.read_u8().await.ok()?;
             let val = cursor.read_u16_le().await.ok()? as u32;
             let mys3 = cursor.read_u8().await.ok()?;
             switches.push(val);
@@ -729,7 +728,11 @@ impl MapSegment {
         // if there is data left
         let amount_portal = cursor.read_u16_le().await;
         if let Ok(num_portal) = amount_portal {
-            println!("There are {} portals at 0x{:x}", num_portal, cursor.position());
+            println!(
+                "There are {} portals at 0x{:x}",
+                num_portal,
+                cursor.position()
+            );
             for _ in 0..num_portal {
                 let mys1 = cursor.read_u8().await.ok()?;
                 let mys2 = cursor.read_u8().await.ok()?;
