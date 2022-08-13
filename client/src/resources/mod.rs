@@ -497,7 +497,11 @@ pub async fn async_main(
                         let _e = data.read_to_end(&mut buf).await;
                         let mut c = std::io::Cursor::new(&buf);
                         let ms = MapSegment::load_map_s32(&mut c, x, y, map).await;
-                        ms
+                        if let Err(e) = &ms {
+                            println!("Map s32 error");
+                            println!("{}", e);
+                        }
+                        ms.ok()
                     } else {
                         let mut f = resource_path.clone();
                         f.push("map");
@@ -511,7 +515,11 @@ pub async fn async_main(
                             let _e = data.read_to_end(&mut buf).await;
                             let mut c = std::io::Cursor::new(&buf);
                             let ms = MapSegment::load_map_seg(&mut c, x, y, map).await;
-                            ms
+                            if let Err(e) = &ms {
+                                println!("Map seg error");
+                                println!("{}", e);
+                            }
+                            ms.ok()
                         } else {
                             None
                         }

@@ -92,6 +92,11 @@ async fn test_map_load() {
 
     let mut map_s32_failures = Vec::new();
 
+    let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    d.pop();
+    d.push("map_testing_results.txt");
+    let mut fo = tokio::fs::File::create(d).await.unwrap();
+
     for f in &maps {
         println!("Map file {}", f.display());
         let data = tokio::fs::File::open(f).await;
@@ -100,23 +105,17 @@ async fn test_map_load() {
             let _e = data.read_to_end(&mut buf).await;
             let mut c = std::io::Cursor::new(&buf);
             let ms = MapSegment::load_map_s32(&mut c, 32768, 32768, 0).await;
-            if let Some(_map) = ms {
-                num_success += 1;
-            } else {
-                map_s32_failures.push(f);
+            match ms {
+                Ok(_m) => {
+                    num_success += 1;
+                }
+                Err(e) => {
+                    map_s32_failures.push(f);
+                    let w = format!("Map failure {} is:\n{}\n", f.display(), e);
+                    fo.write_all(w.as_bytes()).await;
+                }
             }
         }
-    }
-
-    let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    d.pop();
-    d.push("map_testing_results.txt");
-    let mut fo = tokio::fs::File::create(d).await.unwrap();
-
-    for e in map_s32_failures {
-        let words = format!("{} failed to load\n", e.display());
-        fo.write_all(words.as_bytes()).await;
-        println!("{} failed to load", e.display());
     }
 
     assert_eq!(maps.len(), num_success);
