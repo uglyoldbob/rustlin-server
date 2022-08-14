@@ -1,4 +1,3 @@
-use rand::Rng;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::rc::Rc;
@@ -403,6 +402,46 @@ impl<'a> MapSegmentGui<'a> {
         done
     }
 
+    pub fn draw_attr<T: sdl2::render::RenderTarget>(
+        &self,
+        canvas: &mut sdl2::render::Canvas<T>,
+        map: &MapCoordinate,
+        _r: &mut GameResources,
+        attr: u16,
+    ) {
+        let screen = map.screen(self.x, self.y);
+        for a in 0..64 {
+            for b in 0..64 {
+                let startx: i32 = b * 24 + a * 24 + screen.x;
+                let starty: i32 = b * 12 - a * 12 + screen.y;
+                let index = b * 128 + 2 * a;
+                let attribute = self.attributes[index as usize];
+
+                let current_tile = 2;
+                let current_subtile = 89;
+
+                if (attribute & attr) != 0 {
+                    match self.tile_ref.get(&current_tile) {
+                        Some(ts) => {
+                            ts.draw_left(startx, starty, current_subtile, canvas);
+                        }
+                        _ => {}
+                    }
+                }
+                let attribute = self.attributes[(index + 1) as usize];
+
+                if (attribute & attr) != 0 {
+                    match self.tile_ref.get(&current_tile) {
+                        Some(ts) => {
+                            ts.draw_right(startx, starty, current_subtile, canvas);
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
+    }
+
     pub fn draw_objects<T: sdl2::render::RenderTarget>(
         &self,
         canvas: &mut sdl2::render::Canvas<T>,
@@ -465,11 +504,6 @@ impl<'a> MapSegmentGui<'a> {
         map: &MapCoordinate,
         _r: &mut GameResources,
     ) {
-        let mut rng = rand::thread_rng();
-        let random = rng.gen::<f32>();
-        if self.partial && (random < 0.5) {
-            //return;
-        }
         let screen = map.screen(self.x, self.y);
         for a in 0..64 {
             for b in 0..64 {
@@ -502,8 +536,8 @@ impl<'a> MapSegmentGui<'a> {
 impl MapSegment {
     pub fn to_gui<'a>(
         self,
-        r: &mut GameResources<'a, '_, '_>,
-        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+        _r: &mut GameResources<'a, '_, '_>,
+        _send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
     ) -> MapSegmentGui<'a> {
         MapSegmentGui {
             tile_ref: HashMap::new(),
@@ -808,7 +842,7 @@ impl MapSegment {
         }
         let num_tilesets = cursor.read_u32_le().await.ok().ok_or("Not enough data")?;
         for _ in 0..num_tilesets {
-            let val = cursor.read_u32_le().await.ok().ok_or("Not enough data")?;
+            let _val = cursor.read_u32_le().await.ok().ok_or("Not enough data")?;
         }
 
         // if there is data left

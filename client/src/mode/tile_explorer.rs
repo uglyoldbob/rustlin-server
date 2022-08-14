@@ -5,7 +5,6 @@ use crate::DrawMode;
 use crate::DrawModeRequest;
 use crate::GameMode;
 use crate::GameResources;
-use crate::Loadable::*;
 use crate::MessageToAsync;
 use sdl2::pixels::Color;
 use sdl2::render::TextureCreator;

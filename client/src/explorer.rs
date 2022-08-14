@@ -140,10 +140,14 @@ async fn test_map_load() {
     let mut fo = tokio::fs::File::create(d).await.unwrap();
 
     let w = format!("Number of seg maps {}\n", seg_maps.len());
-    fo.write_all(w.as_bytes()).await;
+    fo.write_all(w.as_bytes())
+        .await
+        .expect("Failed writing results to file");
 
     let w = format!("Number of s32 maps {}\n", maps.len());
-    fo.write_all(w.as_bytes()).await;
+    fo.write_all(w.as_bytes())
+        .await
+        .expect("Failed writing results to file");
 
     for f in &maps {
         println!("Map file {}", f.display());
@@ -157,12 +161,16 @@ async fn test_map_load() {
                 Ok(_m) => {
                     num_success += 1;
                     let w = format!("Map success {}\n", f.display());
-                    fo.write_all(w.as_bytes()).await;
+                    fo.write_all(w.as_bytes())
+                        .await
+                        .expect("Failed writing results to file");
                 }
                 Err(e) => {
                     map_s32_failures.push(f);
                     let w = format!("Map failure {} is:\n{}\n", f.display(), e);
-                    fo.write_all(w.as_bytes()).await;
+                    fo.write_all(w.as_bytes())
+                        .await
+                        .expect("Failed writing results to file");
                 }
             }
         }
@@ -180,12 +188,16 @@ async fn test_map_load() {
                 Ok(_m) => {
                     num_success += 1;
                     let w = format!("Map seg success {}\n", f.display());
-                    fo.write_all(w.as_bytes()).await;
+                    fo.write_all(w.as_bytes())
+                        .await
+                        .expect("Failed writing results to file");
                 }
                 Err(e) => {
                     map_seg_failures.push(f);
                     let w = format!("Map seg failure {} is:\n{}\n", f.display(), e);
-                    fo.write_all(w.as_bytes()).await;
+                    fo.write_all(w.as_bytes())
+                        .await
+                        .expect("Failed writing results to file");
                 }
             }
         }

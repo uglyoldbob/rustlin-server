@@ -1,7 +1,6 @@
 use std::rc::Rc;
 
 use crate::resources::map::MapCoordinate;
-use crate::resources::map::MapSegment;
 use crate::resources::map::MapSegmentGui;
 use crate::resources::map::TileSetGui;
 use crate::widgets::Widget;
@@ -36,8 +35,8 @@ impl<'a> MapWidget<'a> {
         y: u16,
         w: u16,
         h: u16,
-        r: &mut GameResources<'a, '_, '_>,
-        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+        _r: &mut GameResources<'a, '_, '_>,
+        _send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
     ) -> Self {
         let texture = tc
             .create_texture_target(PixelFormatEnum::RGB555, w as u32, h as u32)
@@ -162,6 +161,11 @@ impl<'a> Widget<'a> for MapWidget<'a> {
                     if let Some(seg) = maybesegment {
                         seg.draw_objects(canvas, &self.map, r, layer);
                     }
+                }
+            }
+            for maybesegment in self.segments.iter() {
+                if let Some(seg) = maybesegment {
+                    seg.draw_attr(canvas, &self.map, r, 2);
                 }
             }
             if let Some((x, y)) = self.cursor {
