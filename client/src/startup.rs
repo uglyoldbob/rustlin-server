@@ -1,4 +1,3 @@
-use crate::map::MapSegment;
 use crate::mode::*;
 use crate::mouse::*;
 use crate::resources::map::MapSegmentGui;
@@ -15,10 +14,7 @@ use sdl2::render::Texture;
 use sdl2::render::TextureCreator;
 use std::collections::VecDeque;
 use std::fs;
-use std::path::PathBuf;
 use std::time::Duration;
-use tokio::io::AsyncReadExt;
-use tokio::io::AsyncWriteExt;
 
 mod settings;
 
@@ -36,95 +32,6 @@ fn make_dummy_texture<'a, T>(tc: &'a TextureCreator<T>) -> Texture<'a> {
     .unwrap();
     let _e = surf.set_color_key(true, sdl2::pixels::Color::BLACK);
     Texture::from_surface(&surf, tc).unwrap()
-}
-
-async fn test_map_load() {
-    let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    d.pop();
-    d.push("client-settings.ini");
-    println!("Reading settings from {}", d.display());
-    let settings_file = fs::read_to_string(d.into_os_string().into_string().unwrap());
-    let settings_con = match settings_file {
-        Ok(con) => con,
-        Err(_) => "".to_string(),
-    };
-    let mut settings = configparser::ini::Ini::new();
-    let settings_result = settings.read(settings_con);
-    if let Err(e) = settings_result {
-        println!("Failed to read settings {}", e);
-    }
-
-    let resources = settings.get("general", "resources").unwrap();
-
-    let mut d = PathBuf::from(resources);
-    d.push("map");
-
-    let mut num_success = 0;
-
-    let mut maps = Vec::new();
-
-    let entries = fs::read_dir(d).unwrap();
-    for e in entries.into_iter() {
-        if let Ok(e) = e {
-            let path = e.path();
-            let meta = fs::metadata(&path).unwrap();
-            if meta.is_dir() {
-                let map_segs = fs::read_dir(path).unwrap();
-                for e in map_segs.into_iter() {
-                    if let Ok(e) = e {
-                        let path = e.path();
-                        let meta = fs::metadata(&path).unwrap();
-                        if meta.is_file() {
-                            if path
-                                .file_name()
-                                .unwrap()
-                                .to_string_lossy()
-                                .ends_with(".s32")
-                            {
-                                maps.push(path);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    let mut map_s32_failures = Vec::new();
-
-    let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    d.pop();
-    d.push("map_testing_results.txt");
-    let mut fo = tokio::fs::File::create(d).await.unwrap();
-
-    for f in &maps {
-        println!("Map file {}", f.display());
-        let data = tokio::fs::File::open(f).await;
-        if let Ok(mut data) = data {
-            let mut buf = Vec::new();
-            let _e = data.read_to_end(&mut buf).await;
-            let mut c = std::io::Cursor::new(&buf);
-            let ms = MapSegment::load_map_s32(&mut c, 32768, 32768, 0).await;
-            match ms {
-                Ok(_m) => {
-                    num_success += 1;
-                }
-                Err(e) => {
-                    map_s32_failures.push(f);
-                    let w = format!("Map failure {} is:\n{}\n", f.display(), e);
-                    fo.write_all(w.as_bytes()).await;
-                }
-            }
-        }
-    }
-
-    assert_eq!(maps.len(), num_success);
-}
-
-#[test]
-fn check_map_load() {
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    rt.block_on(std::pin::Pin::from(Box::new(test_map_load())));
 }
 
 pub fn startup(mode: DrawMode) {
