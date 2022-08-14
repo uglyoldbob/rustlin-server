@@ -500,8 +500,11 @@ pub async fn async_main(
                         if let Err(e) = &ms {
                             println!("Map s32 error");
                             println!("{}", e);
+                            Some(MapSegment::empty_segment(x, y, map))
                         }
-                        ms.ok()
+                        else {
+                            ms.ok()
+                        }
                     } else {
                         let mut f = resource_path.clone();
                         f.push("map");
@@ -518,10 +521,13 @@ pub async fn async_main(
                             if let Err(e) = &ms {
                                 println!("Map seg error");
                                 println!("{}", e);
+                                Some(MapSegment::empty_segment(x, y, map))
                             }
-                            ms.ok()
+                            else {
+                                ms.ok()
+                            }
                         } else {
-                            None
+                            Some(MapSegment::empty_segment(x, y, map))
                         }
                     };
                     if let Some(mapseg) = ms {
