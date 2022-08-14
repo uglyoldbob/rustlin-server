@@ -501,8 +501,7 @@ pub async fn async_main(
                             println!("Map s32 error");
                             println!("{}", e);
                             Some(MapSegment::empty_segment(x, y, map))
-                        }
-                        else {
+                        } else {
                             ms.ok()
                         }
                     } else {
@@ -522,8 +521,7 @@ pub async fn async_main(
                                 println!("Map seg error");
                                 println!("{}", e);
                                 Some(MapSegment::empty_segment(x, y, map))
-                            }
-                            else {
+                            } else {
                                 ms.ok()
                             }
                         } else {
