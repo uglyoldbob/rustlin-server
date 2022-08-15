@@ -76,8 +76,8 @@ impl ScreenCoordinate {
     }
 
     pub fn map_coordinates(&self, x: i16, y: i16) -> (u16, u16) {
-        let x1 = x - 24;
-        let y1 = y - 12;
+        let x1 = x + 24;
+        let y1 = y;
         let a = (((x1 as i32) + self.x0 - 2 * (y1 as i32) - 2 * self.y0) / 48) as u16;
         let x1 = x - 12;
         let y1 = y - 6;
