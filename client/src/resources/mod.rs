@@ -278,6 +278,7 @@ impl<T, U> LoadableMap<T, U> {
                 _ => {
                     let r = v.get_ref();
                     if let None = r {
+                        self.map.insert(key, LoadableReference::Loading);
                         func();
                     }
                     r
