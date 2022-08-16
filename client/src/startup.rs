@@ -224,7 +224,7 @@ pub fn startup(mode: DrawMode) {
                 }
                 MessageFromAsync::MapSegment(_map, _x, _y, data) => {
                     let data = data.clone();
-                    let ms = data.to_gui(&mut game_resources, &mut s1);
+                    let ms = data.to_gui();
                     temporary_maps.push(ms);
                 }
             }
