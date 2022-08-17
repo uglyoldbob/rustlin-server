@@ -175,18 +175,26 @@ pub fn bench1(c: &mut Criterion) {
 
     let mut d = PathBuf::from(resources);
 
+    let (mut s1, r1) = tokio::sync::mpsc::channel(100);
+    let (s2, mut r2) = tokio::sync::mpsc::channel(100);
+    s1.blocking_send(MessageToAsync::LoadResources(d.as_os_str().to_str().unwrap().to_string()));
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    rt.spawn(async_bench1(r1, s2, d.clone()));
 
+
+
+    let mut r2 = RefCell::new(r2);
     let mut group = c.benchmark_group("map loading");
     group.bench_function("map 1", |b|{
-        let (mut s1, r1) = tokio::sync::mpsc::channel(100);
-        let (s2, mut r2) = tokio::sync::mpsc::channel(100);
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        rt.spawn(async_bench1(r1, s2, d.clone()));
-
-        let mut r2 = RefCell::new(r2);
         b.iter(||load_map(r2.get_mut(), s1.clone(), 4, 32768, 32768));
     });
+    drop(rt);
 
+    let (mut s1, r1) = tokio::sync::mpsc::channel(100);
+    let (s2, mut r2) = tokio::sync::mpsc::channel(100);
+    s1.blocking_send(MessageToAsync::LoadResources(d.as_os_str().to_str().unwrap().to_string()));
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    rt.spawn(async_bench1(r1, s2, d.clone()));
     let sdl = sdl2::init().unwrap();
     let video = sdl.video().unwrap();
     let mut vid_win = video.window("benchmark", 640, 480);
@@ -195,14 +203,8 @@ pub fn bench1(c: &mut Criterion) {
     let mut canvas = window.into_canvas().build().unwrap();
     let tc = canvas.texture_creator();
 
+    let mut r2 = RefCell::new(r2);
     group.bench_function("tileset 0", |b| {
-        let (mut s1, r1) = tokio::sync::mpsc::channel(100);
-        let (s2, mut r2) = tokio::sync::mpsc::channel(100);
-        s1.blocking_send(MessageToAsync::LoadResources(d.as_os_str().to_str().unwrap().to_string()));
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        rt.spawn(async_bench1(r1, s2, d.clone()));
-
-        let mut r2 = RefCell::new(r2);
         b.iter(||load_tileset(r2.get_mut(), s1.clone(), &tc, 0));
     });
 
