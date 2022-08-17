@@ -107,11 +107,11 @@ pub enum MessageFromAsync {
     MapSegment(u16, u16, u16, Box<MapSegment>),
 }
 
-struct PackFiles {
-    tile: Pack,
-    text: Pack,
-    sprite: Pack,
-    sprites: Vec<Pack>,
+pub struct PackFiles {
+    pub tile: Pack,
+    pub text: Pack,
+    pub sprite: Pack,
+    pub sprites: Vec<Pack>,
 }
 
 impl PackFiles {
@@ -340,7 +340,7 @@ impl<'a, 'b, 'c> GameResources<'a, 'b, 'c> {
 }
 
 pub struct Resources {
-    packs: Option<PackFiles>,
+    pub packs: Option<PackFiles>,
 }
 
 impl Resources {

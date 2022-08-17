@@ -1,7 +1,10 @@
 #![allow(dead_code)]
 use crate::map::MapSegment;
 use crate::map::MapSegmentGui;
+use crate::map::TileSet;
+use crate::map::TileSetGui;
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use sdl2::render::TextureCreator;
 use std::cell::RefCell;
 use std::fs;
 use std::path::PathBuf;
@@ -27,9 +30,22 @@ async fn async_bench1(
     s: tokio::sync::mpsc::Sender<MessageFromAsync>,
     resource_path: PathBuf,
 ) {
+    let mut res: Resources = Resources::new();
     loop {
         if let Some(msg) = r.recv().await {
             match msg {
+                MessageToAsync::LoadResources(path) => {
+                    println!("Loading resources {}", path);
+                    match PackFiles::load(path).await {
+                        Ok(p) => {
+                            res.packs = Some(p);
+                            let _e = s.send(MessageFromAsync::ResourceStatus(true)).await;
+                        }
+                        Err(()) => {
+                            let _e = s.send(MessageFromAsync::ResourceStatus(false)).await;
+                        }
+                    }
+                }
                 MessageToAsync::LoadMapSegment(map, x, y) => {
                     let mapn = MapSegment::get_map_name(x, y);
                     let mut f = resource_path.clone();
@@ -75,6 +91,19 @@ async fn async_bench1(
                             .await;
                     } 
                 }
+                MessageToAsync::LoadTileset(id) => {
+                    if let Some(p) = &mut res.packs {
+                        let name = format!("{}.til", id);
+                        let data = p.tile.raw_file_contents(name.clone()).await;
+                        if let Some(data) = data {
+                            let mut cursor = std::io::Cursor::new(&data);
+                            let tileset = TileSet::decode_tileset_data(&mut cursor).await;
+                            if let Some(t) = tileset {
+                                let _e = s.send(MessageFromAsync::Tileset(id, t)).await;
+                            }
+                        }
+                    }
+                }
                 _ => {}
             }
         }
@@ -102,6 +131,29 @@ pub fn load_map<'a>(
         }
     }
 }
+
+pub fn load_tileset<'a, T>(
+    r: &mut tokio::sync::mpsc::Receiver<MessageFromAsync>,
+    s: tokio::sync::mpsc::Sender<MessageToAsync>,
+    tc: &'a TextureCreator<T>,
+    set: u32,
+) -> TileSetGui<'a> {
+    let e = s.blocking_send(MessageToAsync::LoadTileset(set));
+    loop {
+        if let Ok(msg) = r.try_recv() {
+            match msg {
+                MessageFromAsync::Tileset(id, tileset) => {
+                    let data = tileset.clone();
+                    let ms = data.to_gui(tc);
+                    return ms;
+                }
+                _ => {}
+            }
+        }
+    }
+}
+
+
 
 pub fn bench1(c: &mut Criterion) {
     let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -134,6 +186,26 @@ pub fn bench1(c: &mut Criterion) {
         let mut r2 = RefCell::new(r2);
         b.iter(||load_map(r2.get_mut(), s1.clone(), 4, 32768, 32768));
     });
+
+    let sdl = sdl2::init().unwrap();
+    let video = sdl.video().unwrap();
+    let mut vid_win = video.window("benchmark", 640, 480);
+    let mut window = vid_win.position_centered();
+    let window = window.opengl().build().unwrap();
+    let mut canvas = window.into_canvas().build().unwrap();
+    let tc = canvas.texture_creator();
+
+    group.bench_function("tileset 0", |b| {
+        let (mut s1, r1) = tokio::sync::mpsc::channel(100);
+        let (s2, mut r2) = tokio::sync::mpsc::channel(100);
+        s1.blocking_send(MessageToAsync::LoadResources(d.as_os_str().to_str().unwrap().to_string()));
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        rt.spawn(async_bench1(r1, s2, d.clone()));
+
+        let mut r2 = RefCell::new(r2);
+        b.iter(||load_tileset(r2.get_mut(), s1.clone(), &tc, 0));
+    });
+
     group.finish();
 }
 
