@@ -147,7 +147,7 @@ pub fn startup(mode: DrawMode) {
 
     'running: loop {
         while let Ok(msg) = r2.try_recv() {
-            match &msg {
+            match msg {
                 MessageFromAsync::ResourceStatus(b) => {
                     if !b {
                         println!("Failed to load game resources");
@@ -183,11 +183,11 @@ pub fn startup(mode: DrawMode) {
                     println!("Loaded string table {}", name);
                 }
                 MessageFromAsync::Png(name, data) => {
-                    let png = texture_creator.load_texture_bytes(data);
+                    let png = texture_creator.load_texture_bytes(&data);
                     match png {
                         Ok(mut a) => {
                             a.set_blend_mode(sdl2::render::BlendMode::Add);
-                            game_resources.pngs.insert(*name, Loaded(a));
+                            game_resources.pngs.insert(name, Loaded(a));
                         }
                         Err(e) => {
                             println!("PNG {} fail {}", name, e);
@@ -195,13 +195,12 @@ pub fn startup(mode: DrawMode) {
                         }
                     }
                 }
-                MessageFromAsync::Img(name, data) => {
+                MessageFromAsync::Img(name, mut data) => {
                     println!("Loaded IMG {}", name);
-                    let mut data = (*data).clone();
                     let img = data.convert_img_data(&texture_creator);
                     match img {
                         Some(a) => {
-                            game_resources.imgs.insert(*name, Loaded(a));
+                            game_resources.imgs.insert(name, Loaded(a));
                         }
                         None => {
                             println!("IMG {} fail", name);
@@ -210,20 +209,19 @@ pub fn startup(mode: DrawMode) {
                 }
                 MessageFromAsync::Sprite(id, spr) => {
                     let sprite = spr.to_gui(&texture_creator);
-                    game_resources.sprites.insert(*id, Loaded(sprite));
+                    game_resources.sprites.insert(id, Loaded(sprite));
                 }
                 MessageFromAsync::Sfx(id, data) => {
                     let rwops = sdl2::rwops::RWops::from_bytes(&data[..]).unwrap();
                     let chnk = rwops.load_wav().unwrap();
-                    game_resources.sfx.insert(*id, Loaded(chnk));
+                    game_resources.sfx.insert(id, Loaded(chnk));
                 }
                 MessageFromAsync::Tileset(id, tileset) => {
-                    let ts = tileset.clone();
+                    let ts = tileset;
                     let ts = ts.to_gui(&texture_creator);
-                    game_resources.tilesets.insert(*id, ts);
+                    game_resources.tilesets.insert(id, ts);
                 }
                 MessageFromAsync::MapSegment(_map, _x, _y, data) => {
-                    let data = data.clone();
                     let ms = data.to_gui();
                     temporary_maps.push(ms);
                 }

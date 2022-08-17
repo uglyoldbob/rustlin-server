@@ -143,7 +143,7 @@ pub fn load_tileset<'a, T>(
         if let Ok(msg) = r.try_recv() {
             match msg {
                 MessageFromAsync::Tileset(id, tileset) => {
-                    let data = tileset.clone();
+                    let data = tileset;
                     let ms = data.to_gui(tc);
                     return ms;
                 }
