@@ -75,8 +75,8 @@ pub fn startup(mode: DrawMode) {
     let audio = sdl2::mixer::open_audio(44100, 16, 2, 1024);
     println!("Audio is {:?}", audio);
 
-    let (mut s1, r1) = tokio::sync::mpsc::channel(100);
-    let (s2, mut r2) = tokio::sync::mpsc::channel(100);
+    let (mut s1, r1) = tokio::sync::mpsc::unbounded_channel();
+    let (s2, mut r2) = tokio::sync::mpsc::unbounded_channel();
 
     let mut game_resources = GameResources::new(font, &texture_creator);
     let mut mode: Box<dyn GameMode> = match mode {
@@ -121,10 +121,10 @@ pub fn startup(mode: DrawMode) {
 
     println!("Loading resources from {}", resources);
 
-    let _e = s1.blocking_send(MessageToAsync::LoadResources(resources.clone()));
-    let _e = s1.blocking_send(MessageToAsync::LoadTable("obscene-e.tbl".to_string()));
-    let _e = s1.blocking_send(MessageToAsync::LoadFont("Font/eng.fnt".to_string()));
-    let _e = s1.blocking_send(MessageToAsync::LoadSpriteTable);
+    let _e = s1.send(MessageToAsync::LoadResources(resources.clone()));
+    let _e = s1.send(MessageToAsync::LoadTable("obscene-e.tbl".to_string()));
+    let _e = s1.send(MessageToAsync::LoadFont("Font/eng.fnt".to_string()));
+    let _e = s1.send(MessageToAsync::LoadSpriteTable);
     //load Font/SMALL.FNT
 
     //load pack files
@@ -217,11 +217,13 @@ pub fn startup(mode: DrawMode) {
                     game_resources.sfx.insert(id, Loaded(chnk));
                 }
                 MessageFromAsync::Tileset(id, tileset) => {
+                    println!("Recieved tileset");
                     let ts = tileset;
                     let ts = ts.to_gui(&texture_creator);
                     game_resources.tilesets.insert(id, ts);
                 }
                 MessageFromAsync::MapSegment(_map, _x, _y, data) => {
+                    println!("Recieved map segment");
                     let ms = data.to_gui();
                     temporary_maps.push(ms);
                 }

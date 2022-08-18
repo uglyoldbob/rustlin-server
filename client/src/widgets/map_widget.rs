@@ -36,7 +36,7 @@ impl<'a> MapWidget<'a> {
         w: u16,
         h: u16,
         _r: &mut GameResources<'a, '_, '_>,
-        _send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+        _send: &mut tokio::sync::mpsc::UnboundedSender<MessageToAsync>,
     ) -> Self {
         let texture = tc
             .create_texture_target(PixelFormatEnum::RGB555, w as u32, h as u32)
@@ -64,7 +64,7 @@ impl<'a> MapWidget<'a> {
     pub fn check_segments(
         &mut self,
         r: &mut GameResources<'a, '_, '_>,
-        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+        send: &mut tokio::sync::mpsc::UnboundedSender<MessageToAsync>,
     ) {
         for seg in &mut self.segments {
             if let Some(segment) = seg {
@@ -104,7 +104,11 @@ impl<'a> MapWidget<'a> {
         for (i, (ac, bc)) in required_segments.iter().enumerate() {
             let key = (*ac as u32) << 16 | (*bc as u32);
             let s1: Option<Rc<MapSegmentGui<'a>>> = r.get_map(self.mapnum).get_or_load(key, || {
-                let _e = send.blocking_send(MessageToAsync::LoadMapSegment(self.mapnum, *ac, *bc));
+                println!("Signaling to load a map {}, 0x{:x}", self.mapnum, key);
+                let e = send.send(MessageToAsync::LoadMapSegment(self.mapnum, *ac, *bc));
+                if let Err(_e) = e {
+                    println!("FAILED TO SIGNAL TO LOAD A MAP SEGMENT!");
+                }
             });
             temp_map[i] = s1;
         }
@@ -141,11 +145,11 @@ impl<'a> Widget<'a> for MapWidget<'a> {
         canvas: &mut sdl2::render::WindowCanvas,
         _cursor: bool,
         r: &mut GameResources<'a, '_, '_>,
-        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+        send: &mut tokio::sync::mpsc::UnboundedSender<MessageToAsync>,
     ) {
         if let None = self.tile_ref {
             self.tile_ref = r.tilesets.get_or_load(2, || {
-                let _e = send.blocking_send(MessageToAsync::LoadTileset(2));
+                let _e = send.send(MessageToAsync::LoadTileset(2));
             });
         }
         let _e = canvas.with_texture_canvas(&mut self.buffer, |canvas| {

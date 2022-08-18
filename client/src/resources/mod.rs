@@ -350,8 +350,8 @@ impl Resources {
 }
 
 pub async fn async_main(
-    mut r: tokio::sync::mpsc::Receiver<MessageToAsync>,
-    s: tokio::sync::mpsc::Sender<MessageFromAsync>,
+    mut r: tokio::sync::mpsc::UnboundedReceiver<MessageToAsync>,
+    s: tokio::sync::mpsc::UnboundedSender<MessageFromAsync>,
 ) {
     println!("Async main");
 
@@ -372,10 +372,10 @@ pub async fn async_main(
                     match PackFiles::load(path).await {
                         Ok(p) => {
                             res.packs = Some(p);
-                            let _e = s.send(MessageFromAsync::ResourceStatus(true)).await;
+                            let _e = s.send(MessageFromAsync::ResourceStatus(true));
                         }
                         Err(()) => {
-                            let _e = s.send(MessageFromAsync::ResourceStatus(false)).await;
+                            let _e = s.send(MessageFromAsync::ResourceStatus(false));
                         }
                     }
                 }
@@ -394,9 +394,7 @@ pub async fn async_main(
                         match data {
                             Some(d) => {
                                 let table = StringTable::from(d);
-                                let _e = s
-                                    .send(MessageFromAsync::StringTable(name, table.clone()))
-                                    .await;
+                                let _e = s.send(MessageFromAsync::StringTable(name, table.clone()));
                             }
                             None => {
                                 println!("{} failed to load", name);
@@ -410,7 +408,7 @@ pub async fn async_main(
                         let data = p.load_png(name2.clone()).await;
                         match data {
                             Some(d) => {
-                                let _e = s.send(MessageFromAsync::Png(name, d)).await;
+                                let _e = s.send(MessageFromAsync::Png(name, d));
                             }
                             None => {
                                 println!("{} failed to load", name2);
@@ -423,7 +421,7 @@ pub async fn async_main(
                         let data = p.load_img(name).await;
                         match data {
                             Some(d) => {
-                                let _e = s.send(MessageFromAsync::Img(name, d)).await;
+                                let _e = s.send(MessageFromAsync::Img(name, d));
                             }
                             None => {
                                 println!("{} failed to load", name);
@@ -449,7 +447,7 @@ pub async fn async_main(
                             let spr = Sprite::parse_sprite(&mut cursor).await;
                             if let Some(spr) = spr {
                                 println!("Success {}", name);
-                                let _e = s.send(MessageFromAsync::Sprite(id, spr)).await;
+                                let _e = s.send(MessageFromAsync::Sprite(id, spr));
                             } else {
                                 println!("Failed to load sprite file {}", name);
                             }
@@ -466,18 +464,19 @@ pub async fn async_main(
                     if let Ok(mut data) = data {
                         let mut c = Vec::new();
                         data.read_to_end(&mut c).await.unwrap();
-                        let _e = s.send(MessageFromAsync::Sfx(id, c.clone())).await;
+                        let _e = s.send(MessageFromAsync::Sfx(id, c.clone()));
                     }
                 }
                 MessageToAsync::LoadTileset(id) => {
                     if let Some(p) = &mut res.packs {
+                        println!("Loading a tileset");
                         let name = format!("{}.til", id);
                         let data = p.tile.raw_file_contents(name.clone()).await;
                         if let Some(data) = data {
                             let mut cursor = std::io::Cursor::new(&data);
                             let tileset = TileSet::decode_tileset_data(&mut cursor).await;
                             if let Some(t) = tileset {
-                                let _e = s.send(MessageFromAsync::Tileset(id, t)).await;
+                                let _e = s.send(MessageFromAsync::Tileset(id, t));
                             }
                         }
                     }
@@ -531,9 +530,7 @@ pub async fn async_main(
                     };
                     if let Some(mapseg) = ms {
                         println!("Map segment was loaded");
-                        let _e = s
-                            .send(MessageFromAsync::MapSegment(map, x, y, Box::new(mapseg)))
-                            .await;
+                        let _e = s.send(MessageFromAsync::MapSegment(map, x, y, Box::new(mapseg)));
                     } else {
                         println!("Map segment was not loaded");
                     }
@@ -541,4 +538,5 @@ pub async fn async_main(
             },
         }
     }
+    println!("EXITING ASYNC FUNCTION FOR SOME REASON");
 }

@@ -385,14 +385,18 @@ impl<'a> MapSegmentGui<'a> {
     pub fn check_tilesets(
         &mut self,
         r: &mut GameResources<'a, '_, '_>,
-        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+        send: &mut tokio::sync::mpsc::UnboundedSender<MessageToAsync>,
     ) -> bool {
         let mut done = true;
         for tileset in &self.tilesets {
             if !self.tile_ref.contains_key(tileset) {
                 done = false;
                 let t = r.tilesets.get_or_load(*tileset, || {
-                    let _e = send.blocking_send(MessageToAsync::LoadTileset(*tileset));
+                    println!("Signaling to load a tileset {}", tileset);
+                    let e = send.send(MessageToAsync::LoadTileset(*tileset));
+                    if let Err(_e) = e {
+                        println!("FAILED TO SIGNAL TO LOAD A TILESET!");
+                    }
                 });
                 if let Some(t) = t {
                     self.tile_ref.insert(*tileset, t);
@@ -860,7 +864,6 @@ impl MapSegment {
         if v.len() > 0 {
             return Err("Bytes were remaining".to_string());
         }
-
 
         Ok(Self {
             tiles: t,

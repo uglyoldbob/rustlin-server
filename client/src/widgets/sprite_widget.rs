@@ -59,7 +59,7 @@ impl<'a> Widget<'a> for SpriteWidget {
         canvas: &mut sdl2::render::WindowCanvas,
         _cursor: bool,
         r: &mut GameResources,
-        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+        send: &mut tokio::sync::mpsc::UnboundedSender<MessageToAsync>,
     ) {
         let id = (self.id_major as u32) << 16 | self.id_minor as u32;
         if let Some(i) = r.sprites.get(&id) {
@@ -78,7 +78,7 @@ impl<'a> Widget<'a> for SpriteWidget {
             }
         } else {
             r.sprites.insert(id, Loading);
-            let _e = send.blocking_send(MessageToAsync::LoadSprite(self.id_major, self.id_minor));
+            let _e = send.send(MessageToAsync::LoadSprite(self.id_major, self.id_minor));
             self.last_draw = None;
         }
     }

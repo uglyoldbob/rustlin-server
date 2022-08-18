@@ -55,7 +55,7 @@ impl<'a> Widget<'a> for SelectableWidget {
         canvas: &mut sdl2::render::WindowCanvas,
         _cursor: bool,
         r: &mut GameResources,
-        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+        send: &mut tokio::sync::mpsc::UnboundedSender<MessageToAsync>,
     ) {
         let value = if self.selected {
             if let Some(i) = r.imgs.get(&(self.num + 1)) {
@@ -66,7 +66,7 @@ impl<'a> Widget<'a> for SelectableWidget {
                 }
             } else {
                 r.imgs.insert(self.num + 1, Loading);
-                let _e = send.blocking_send(MessageToAsync::LoadImg(self.num + 1));
+                let _e = send.send(MessageToAsync::LoadImg(self.num + 1));
                 self.num
             }
         } else {
@@ -97,7 +97,7 @@ impl<'a> Widget<'a> for SelectableWidget {
             }
         } else {
             r.imgs.insert(value, Loading);
-            let _e = send.blocking_send(MessageToAsync::LoadImg(value));
+            let _e = send.send(MessageToAsync::LoadImg(value));
             None
         };
     }

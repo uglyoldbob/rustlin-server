@@ -410,7 +410,7 @@ impl<'a> Widget<'a> for CharacterSelectWidget {
         canvas: &mut sdl2::render::WindowCanvas,
         cursor: bool,
         r: &mut GameResources,
-        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+        send: &mut tokio::sync::mpsc::UnboundedSender<MessageToAsync>,
     ) {
         let value = if self.animating {
             let val: u16 = self.animate_start + self.animate_index;
@@ -425,7 +425,7 @@ impl<'a> Widget<'a> for CharacterSelectWidget {
                     }
                 } else {
                     r.pngs.insert(self.hover, Loading);
-                    let _e = send.blocking_send(MessageToAsync::LoadPng(self.hover));
+                    let _e = send.send(MessageToAsync::LoadPng(self.hover));
                     self.plain
                 }
             } else {
@@ -446,7 +446,7 @@ impl<'a> Widget<'a> for CharacterSelectWidget {
                 }
             } else {
                 r.pngs.insert(check_val, Loading);
-                let _e = send.blocking_send(MessageToAsync::LoadPng(check_val));
+                let _e = send.send(MessageToAsync::LoadPng(check_val));
             }
             if self.animate_index == self.animate_quantity {
                 self.animate_index = 0;
@@ -472,7 +472,7 @@ impl<'a> Widget<'a> for CharacterSelectWidget {
                     }
                 } else {
                     r.imgs.insert(value, Loading);
-                    let _e = send.blocking_send(MessageToAsync::LoadImg(value));
+                    let _e = send.send(MessageToAsync::LoadImg(value));
                 }
                 None
             } else {
@@ -526,7 +526,7 @@ impl<'a> Widget<'a> for CharacterSelectWidget {
                     }
                 } else {
                     r.pngs.insert(value, Loading);
-                    let _e = send.blocking_send(MessageToAsync::LoadPng(value));
+                    let _e = send.send(MessageToAsync::LoadPng(value));
                     if let Some(i) = r.pngs.get(&self.last_png) {
                         if let Loaded(t) = i {
                             let q = t.query();

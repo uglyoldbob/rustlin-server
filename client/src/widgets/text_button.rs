@@ -59,7 +59,7 @@ impl<'a> Widget<'a> for TextButton<'a> {
         canvas: &mut sdl2::render::WindowCanvas,
         cursor: bool,
         _r: &mut GameResources,
-        _send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+        _send: &mut tokio::sync::mpsc::UnboundedSender<MessageToAsync>,
     ) {
         let t = if cursor { &self.t2 } else { &self.t };
         let q = t.query();

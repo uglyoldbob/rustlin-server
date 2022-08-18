@@ -8,7 +8,7 @@ pub trait Widget<'a> {
         canvas: &mut sdl2::render::WindowCanvas,
         cursor: Option<(i16, i16)>,
         r: &mut GameResources<'a, '_, '_>,
-        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+        send: &mut tokio::sync::mpsc::UnboundedSender<MessageToAsync>,
     ) {
         let hover = if let Some(c) = cursor {
             let (x, y) = c;
@@ -23,7 +23,7 @@ pub trait Widget<'a> {
         canvas: &mut sdl2::render::WindowCanvas,
         cursor: bool,
         r: &mut GameResources<'a, '_, '_>,
-        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+        send: &mut tokio::sync::mpsc::UnboundedSender<MessageToAsync>,
     );
     fn was_clicked(&mut self) -> bool;
     fn clicked(&mut self);

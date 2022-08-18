@@ -74,7 +74,7 @@ impl<'a> GameMode<'a> for GameLoader<'a> {
     fn process_frame(
         &mut self,
         _r: &mut GameResources,
-        _send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+        _send: &mut tokio::sync::mpsc::UnboundedSender<MessageToAsync>,
         _requests: &mut VecDeque<DrawModeRequest>,
     ) {
     }
@@ -84,7 +84,7 @@ impl<'a> GameMode<'a> for GameLoader<'a> {
         canvas: &mut sdl2::render::WindowCanvas,
         cursor: Option<(i16, i16)>,
         r: &mut GameResources<'a, '_, '_>,
-        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+        send: &mut tokio::sync::mpsc::UnboundedSender<MessageToAsync>,
     ) {
         canvas.set_draw_color(Color::RGB(0, 0, 0));
         canvas.clear();
@@ -95,7 +95,7 @@ impl<'a> GameMode<'a> for GameLoader<'a> {
             }
         } else {
             r.pngs.insert(value, Loading);
-            let _e = send.blocking_send(MessageToAsync::LoadPng(value));
+            let _e = send.send(MessageToAsync::LoadPng(value));
         }
 
         let value = 330;
@@ -110,7 +110,7 @@ impl<'a> GameMode<'a> for GameLoader<'a> {
             }
         } else {
             r.imgs.insert(value, Loading);
-            let _e = send.blocking_send(MessageToAsync::LoadImg(value));
+            let _e = send.send(MessageToAsync::LoadImg(value));
         }
         for w in &mut self.b {
             w.draw(canvas, cursor, r, send);

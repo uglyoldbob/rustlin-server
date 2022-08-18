@@ -24,7 +24,7 @@ impl<'a, T> MapExplorer<'a, T> {
     pub fn new(
         tc: &'a TextureCreator<T>,
         r: &mut GameResources<'a, '_, '_>,
-        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+        send: &mut tokio::sync::mpsc::UnboundedSender<MessageToAsync>,
     ) -> Self {
         let mut b: Vec<Box<dyn Widget<'a> + 'a>> = Vec::new();
         b.push(Box::new(TextButton::new(tc, 320, 420, "Go Back", &r.font)));
@@ -42,8 +42,8 @@ impl<'a, T> MapExplorer<'a, T> {
             b: b,
             disp: disp,
             current_map: 4,
-            current_x: 32704,
-            current_y: 32768,
+            current_x: 33640,
+            current_y: 32399,
             tc: tc,
             displayed: false,
             map: MapWidget::new(tc, 0, 0, 640, 400, r, send),
@@ -188,7 +188,7 @@ impl<'a, T> GameMode<'a> for MapExplorer<'a, T> {
     fn process_frame(
         &mut self,
         _r: &mut GameResources,
-        _send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+        _send: &mut tokio::sync::mpsc::UnboundedSender<MessageToAsync>,
         _requests: &mut VecDeque<DrawModeRequest>,
     ) {
         self.map.set_map(self.current_map);
@@ -201,7 +201,7 @@ impl<'a, T> GameMode<'a> for MapExplorer<'a, T> {
         canvas: &mut sdl2::render::WindowCanvas,
         cursor: Option<(i16, i16)>,
         r: &mut GameResources<'a, '_, '_>,
-        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+        send: &mut tokio::sync::mpsc::UnboundedSender<MessageToAsync>,
     ) {
         canvas.set_draw_color(Color::RGB(0, 0, 0));
         canvas.clear();

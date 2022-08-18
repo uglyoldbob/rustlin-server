@@ -45,12 +45,12 @@ impl<'a, T> WavPlayer<'a, T> {
     fn check_sfx(
         &mut self,
         r: &mut GameResources,
-        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+        send: &mut tokio::sync::mpsc::UnboundedSender<MessageToAsync>,
     ) {
         if r.sfx.contains_key(&self.current_wav) {
         } else {
             r.sfx.insert(self.current_wav, Loading);
-            let _e = send.blocking_send(MessageToAsync::LoadSfx(self.current_wav));
+            let _e = send.send(MessageToAsync::LoadSfx(self.current_wav));
         }
     }
 }
@@ -129,7 +129,7 @@ impl<'a, T> GameMode<'a> for WavPlayer<'a, T> {
     fn process_frame(
         &mut self,
         r: &mut GameResources,
-        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+        send: &mut tokio::sync::mpsc::UnboundedSender<MessageToAsync>,
         _requests: &mut VecDeque<DrawModeRequest>,
     ) {
         self.check_sfx(r, send);
@@ -152,7 +152,7 @@ impl<'a, T> GameMode<'a> for WavPlayer<'a, T> {
         canvas: &mut sdl2::render::WindowCanvas,
         cursor: Option<(i16, i16)>,
         r: &mut GameResources<'a, '_, '_>,
-        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+        send: &mut tokio::sync::mpsc::UnboundedSender<MessageToAsync>,
     ) {
         canvas.set_draw_color(Color::RGB(0, 0, 0));
         canvas.clear();

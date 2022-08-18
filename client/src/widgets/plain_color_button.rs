@@ -57,7 +57,7 @@ impl<'a> Widget<'a> for PlainColorButton<'a> {
         canvas: &mut sdl2::render::WindowCanvas,
         _cursor: bool,
         _r: &mut GameResources,
-        _send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+        _send: &mut tokio::sync::mpsc::UnboundedSender<MessageToAsync>,
     ) {
         let q = self.t.query();
         let _e = canvas.copy(

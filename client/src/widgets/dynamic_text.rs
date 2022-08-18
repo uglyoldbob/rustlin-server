@@ -68,7 +68,7 @@ impl<'a> Widget<'a> for DynamicTextWidget<'a> {
         canvas: &mut sdl2::render::WindowCanvas,
         _cursor: bool,
         _r: &mut GameResources,
-        _send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+        _send: &mut tokio::sync::mpsc::UnboundedSender<MessageToAsync>,
     ) {
         let t = &self.t;
         let q = t.query();

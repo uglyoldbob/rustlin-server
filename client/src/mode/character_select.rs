@@ -94,7 +94,7 @@ impl<'a> GameMode<'a> for CharacterSelect<'a> {
     fn process_frame(
         &mut self,
         r: &mut GameResources,
-        _send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+        _send: &mut tokio::sync::mpsc::UnboundedSender<MessageToAsync>,
         requests: &mut VecDeque<DrawModeRequest>,
     ) {
         self.char_sel[0].set_type(r.characters[(0 + self.page * 4) as usize].t);
@@ -170,7 +170,7 @@ impl<'a> GameMode<'a> for CharacterSelect<'a> {
         canvas: &mut sdl2::render::WindowCanvas,
         cursor: Option<(i16, i16)>,
         r: &mut GameResources<'a, '_, '_>,
-        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+        send: &mut tokio::sync::mpsc::UnboundedSender<MessageToAsync>,
     ) {
         canvas.set_draw_color(Color::RGB(0, 0, 0));
         canvas.clear();
@@ -181,7 +181,7 @@ impl<'a> GameMode<'a> for CharacterSelect<'a> {
             }
         } else {
             r.pngs.insert(value, Loading);
-            let _e = send.blocking_send(MessageToAsync::LoadPng(value));
+            let _e = send.send(MessageToAsync::LoadPng(value));
         }
 
         let value = if self.page == 0 { 0x6ea } else { 0x6e9 };
@@ -196,7 +196,7 @@ impl<'a> GameMode<'a> for CharacterSelect<'a> {
             }
         } else {
             r.imgs.insert(value, Loading);
-            let _e = send.blocking_send(MessageToAsync::LoadImg(value));
+            let _e = send.send(MessageToAsync::LoadImg(value));
         }
 
         let value = if self.page == 1 { 0x6ec } else { 0x6eb };
@@ -211,7 +211,7 @@ impl<'a> GameMode<'a> for CharacterSelect<'a> {
             }
         } else {
             r.imgs.insert(value, Loading);
-            let _e = send.blocking_send(MessageToAsync::LoadImg(value));
+            let _e = send.send(MessageToAsync::LoadImg(value));
         }
 
         for w in &mut self.b {
