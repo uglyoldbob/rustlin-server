@@ -19,7 +19,6 @@ pub struct ImgExplorer<'a, T> {
     current_img_obj: Option<Rc<Texture<'a>>>,
     previous_img_obj: Option<Rc<Texture<'a>>>,
     tc: &'a TextureCreator<T>,
-    displayed: bool,
 }
 
 impl<'a, T> ImgExplorer<'a, T> {
@@ -43,7 +42,6 @@ impl<'a, T> ImgExplorer<'a, T> {
             disp: disp,
             current_img: 0,
             tc: tc,
-            displayed: false,
             current_img_obj: cur,
             previous_img_obj: None,
         }
@@ -99,26 +97,20 @@ impl<'a, T> GameMode<'a> for ImgExplorer<'a, T> {
             match button {
                 sdl2::keyboard::Keycode::Left => {
                     if self.current_img > 0 {
-                        if self.displayed {
-                            self.previous_img_obj = r.get_or_load_img(self.current_img);
-                            self.current_img -= 1;
-                            self.current_img_obj = r.get_or_load_img(self.current_img);
-                            let words = format!("Displaying {}.img", self.current_img);
-                            self.disp[0].update_text(self.tc, &words, &r.font);
-                            self.displayed = false;
-                        }
+                        self.previous_img_obj = r.get_or_load_img(self.current_img);
+                        self.current_img -= 1;
+                        self.current_img_obj = r.get_or_load_img(self.current_img);
+                        let words = format!("Displaying {}.img", self.current_img);
+                        self.disp[0].update_text(self.tc, &words, &r.font);
                     }
                 }
                 sdl2::keyboard::Keycode::Right => {
                     if self.current_img < 65534 {
-                        if self.displayed {
-                            self.previous_img_obj = r.get_or_load_img(self.current_img);
-                            self.current_img += 1;
-                            self.current_img_obj = r.get_or_load_img(self.current_img);
-                            let words = format!("Displaying {}.img", self.current_img);
-                            self.disp[0].update_text(self.tc, &words, &r.font);
-                            self.displayed = false;
-                        }
+                        self.previous_img_obj = r.get_or_load_img(self.current_img);
+                        self.current_img += 1;
+                        self.current_img_obj = r.get_or_load_img(self.current_img);
+                        let words = format!("Displaying {}.img", self.current_img);
+                        self.disp[0].update_text(self.tc, &words, &r.font);
                     }
                 }
                 _ => {}
