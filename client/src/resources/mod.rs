@@ -337,7 +337,7 @@ impl<'a, 'b, 'c> GameResources<'a, 'b, 'c> {
         let p = PathBuf::from(path.clone());
         let pack = PackFiles::load(path).ok();
         Self {
-            resource_path: PathBuf::new(),
+            resource_path: p,
             tc: tc,
             pngs: LoadableMap::new(),
             imgs: LoadableMap::new(),

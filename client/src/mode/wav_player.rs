@@ -14,7 +14,6 @@ pub struct WavPlayer<'a, T> {
     b: Vec<Box<dyn Widget<'a> + 'a>>,
     disp: Vec<DynamicTextWidget<'a>>,
     current_wav: u16,
-    chunk: Option<Chunk>,
     play_wav: bool,
     tc: &'a TextureCreator<T>,
 }
@@ -39,7 +38,6 @@ impl<'a, T> WavPlayer<'a, T> {
             current_wav: 1,
             tc: tc,
             play_wav: false,
-            chunk: None,
         }
     }
 }
@@ -95,7 +93,6 @@ impl<'a, T> GameMode<'a> for WavPlayer<'a, T> {
                     if self.current_wav > 1 {
                         r.sfx.remove(&self.current_wav);
                         self.current_wav -= 1;
-                        //self.chunk = r.get_or_load_sfx(self.current_wav);
                         let words = format!("Ready to play {}.wav", self.current_wav);
                         self.disp[0].update_text(self.tc, &words, &r.font);
                     }
@@ -104,7 +101,6 @@ impl<'a, T> GameMode<'a> for WavPlayer<'a, T> {
                     if self.current_wav < 65534 {
                         r.sfx.remove(&self.current_wav);
                         self.current_wav += 1;
-                        //self.chunk = r.get_or_load_sfx(self.current_wav);
                         let words = format!("Ready to play {}.wav", self.current_wav);
                         self.disp[0].update_text(self.tc, &words, &r.font);
                     }
@@ -119,7 +115,7 @@ impl<'a, T> GameMode<'a> for WavPlayer<'a, T> {
 
     fn process_frame(&mut self, r: &mut GameResources, _requests: &mut VecDeque<DrawModeRequest>) {
         if self.play_wav {
-            if let Some(c) = &self.chunk {
+            if let Some(c) = r.get_or_load_sfx(self.current_wav) {
                 let chan = sdl2::mixer::Channel::all();
                 let _e = chan.play(c, 0);
             }
