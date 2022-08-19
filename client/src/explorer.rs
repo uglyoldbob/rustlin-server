@@ -11,7 +11,6 @@ mod pack;
 use crate::pack::*;
 
 mod font;
-use crate::font::*;
 
 mod exception;
 use crate::exception::*;

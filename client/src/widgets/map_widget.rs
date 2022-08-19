@@ -96,7 +96,6 @@ impl<'a> MapWidget<'a> {
 
         let mut temp_map: [Option<Rc<Box<MapSegmentGui<'a>>>>; 4] = [None, None, None, None];
         for (i, (ac, bc)) in required_segments.iter().enumerate() {
-            let key = (*ac as u32) << 16 | (*bc as u32);
             let s1: Option<Rc<Box<MapSegmentGui<'a>>>> = r.get_map_segment(self.mapnum, *ac, *bc);
             temp_map[i] = s1;
         }

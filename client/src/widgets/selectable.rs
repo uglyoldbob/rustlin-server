@@ -59,7 +59,7 @@ impl<'a> Widget<'a> for SelectableWidget<'a> {
         &mut self,
         canvas: &mut sdl2::render::WindowCanvas,
         _cursor: bool,
-        r: &mut GameResources,
+        _r: &mut GameResources,
     ) {
         let value = if self.selected {
             &self.active

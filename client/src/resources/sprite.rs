@@ -4,7 +4,6 @@ use sdl2::render::Texture;
 use sdl2::render::TextureCreator;
 use sdl2::surface::Surface;
 use std::io::Cursor;
-use std::io::Read;
 use std::io::Seek;
 
 const EMBEDDED_SPRITE_TABLE: &[u8] = include_bytes!("sprite_table.txt");

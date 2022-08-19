@@ -18,7 +18,6 @@ impl VecReader for std::fs::File {
         buf.clear();
         let mut partial: [u8; 32] = [0; 32];
         let mut remaining = buf.capacity();
-        let mut amt_read = 0;
         let mut done = false;
         loop {
             if remaining == 0 {
@@ -36,7 +35,6 @@ impl VecReader for std::fs::File {
                         buf.push(*b);
                     }
                     remaining -= n;
-                    amt_read += n;
                 }
                 Err(_e) => {
                     break;

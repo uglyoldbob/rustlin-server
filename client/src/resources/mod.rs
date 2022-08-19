@@ -1,4 +1,3 @@
-use crate::Font;
 use crate::Pack;
 use omnom::ReadExt;
 use sdl2::image::LoadTexture;
@@ -16,7 +15,6 @@ use std::rc::Rc;
 use std::rc::Weak;
 
 pub mod stringtable;
-use crate::resources::stringtable::*;
 
 use crate::widgets::CharacterDisplayType;
 
@@ -427,7 +425,7 @@ impl<'a, 'b, 'c> GameResources<'a, 'b, 'c> {
         let key = MapSegment::get_map_combined(a, b);
         let ms = lmap.sync_get_or_load(key, || None);
         if let None = ms {
-            let mut nms = GameResources::load_map_segment(map, a, b, resource_path);
+            let nms = GameResources::load_map_segment(map, a, b, resource_path);
             if let Some(mut ms) = nms {
                 ms.check_tilesets(self);
                 self.get_map(map).insert(key, ms);

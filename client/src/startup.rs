@@ -1,12 +1,8 @@
 use crate::mode::*;
 use crate::mouse::*;
-use crate::resources::map::MapSegmentGui;
 use crate::resources::*;
-use crate::Loadable::Loaded;
 use sdl2::event::Event;
-use sdl2::image::LoadTexture;
 use sdl2::keyboard::Keycode;
-use sdl2::mixer::LoaderRWops;
 use sdl2::mouse::MouseButton;
 use sdl2::pixels::Color;
 use sdl2::pixels::PixelFormatEnum;
@@ -97,11 +93,6 @@ pub fn startup(mode: DrawMode) {
         }
         DrawMode::Game => Box::new(Game::new(&texture_creator, &mut game_resources)),
         DrawMode::WavPlayer => Box::new(WavPlayer::new(&texture_creator, &mut game_resources)),
-    };
-
-    let windowed = match settings.get("general", "window").unwrap().as_str() {
-        "yes" => true,
-        _ => false,
     };
 
     println!(

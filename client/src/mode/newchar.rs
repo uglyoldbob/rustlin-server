@@ -263,7 +263,7 @@ impl<'a, T> GameMode<'a> for NewCharacterMode<'a, T> {
         &mut self,
         _button: sdl2::keyboard::Keycode,
         _down: bool,
-        r: &mut GameResources,
+        _r: &mut GameResources,
     ) {
     }
 

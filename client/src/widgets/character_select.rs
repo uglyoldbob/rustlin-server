@@ -427,13 +427,9 @@ impl<'a> Widget<'a> for CharacterSelectWidget<'a> {
         &mut self,
         canvas: &mut sdl2::render::WindowCanvas,
         cursor: bool,
-        r: &mut GameResources,
+        _r: &mut GameResources,
     ) {
         if self.animating {
-            let mut check_val = self.animate_index + 1;
-            if check_val >= (self.animate_quantity - 1) {
-                check_val = 0;
-            }
             if self.animate_index >= (self.animate_quantity - 1) {
                 self.animate_index = 0;
             }
@@ -446,7 +442,7 @@ impl<'a> Widget<'a> for CharacterSelectWidget<'a> {
             &self.images[val as usize]
         } else {
             if cursor {
-                if let Some(i) = &self.hover_obj {
+                if let Some(_i) = &self.hover_obj {
                     &self.hover_obj
                 } else {
                     &self.plain_obj

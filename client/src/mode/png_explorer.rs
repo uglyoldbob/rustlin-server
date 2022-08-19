@@ -129,7 +129,6 @@ impl<'a, T> GameMode<'a> for PngExplorer<'a, T> {
     ) {
         canvas.set_draw_color(Color::RGB(0, 0, 0));
         canvas.clear();
-        let value = self.current_png;
 
         if let Some(t) = &self.current_png_object {
             let q = t.query();

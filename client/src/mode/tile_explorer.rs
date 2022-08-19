@@ -156,7 +156,7 @@ impl<'a, T> GameMode<'a> for TileExplorer<'a, T> {
 
     fn process_frame(
         &mut self,
-        r: &mut GameResources<'a, '_, '_>,
+        _r: &mut GameResources<'a, '_, '_>,
         _requests: &mut VecDeque<DrawModeRequest>,
     ) {
     }

@@ -236,7 +236,7 @@ impl TileSet {
             let v: u32 = cursor.read_le().ok()?;
             offsets.push(v);
         }
-        let w32: u32 = cursor.read_le().ok()?;
+        let _w32: u32 = cursor.read_le().ok()?;
         let base_offset = cursor.position();
         let mut tiles = Vec::with_capacity(num_tiles as usize);
         for t in offsets {
@@ -702,9 +702,9 @@ impl MapSegment {
                 cursor.position()
             ));
             for _ in 0..amount {
-                let a: u16 = cursor.read_le().ok().ok_or("Not enough data")?;
-                let b: u16 = cursor.read_le().ok().ok_or("Not enough data")?;
-                let c: u16 = cursor.read_le().ok().ok_or("Not enough data")?;
+                let _a: u16 = cursor.read_le().ok().ok_or("Not enough data")?;
+                let _b: u16 = cursor.read_le().ok().ok_or("Not enough data")?;
+                let _c: u16 = cursor.read_le().ok().ok_or("Not enough data")?;
             }
         }
 
@@ -820,23 +820,22 @@ impl MapSegment {
                 for _ in 0..mys1 {
                     let _i: u8 = cursor.read_le().ok().ok_or("Not enough data")?;
                 }
-                let mys2: u8 = cursor.read_le().ok().ok_or("Not enough data")?;
-                let mys3: u8 = cursor.read_le().ok().ok_or("Not enough data")?;
-                let mys4: u16 = cursor.read_le().ok().ok_or("Not enough data")?;
-                let mys5: u16 = cursor.read_le().ok().ok_or("Not enough data")?;
-                let mys6: u16 = cursor.read_le().ok().ok_or("Not enough data")?;
+                let _mys2: u8 = cursor.read_le().ok().ok_or("Not enough data")?;
+                let _mys3: u8 = cursor.read_le().ok().ok_or("Not enough data")?;
+                let _mys4: u16 = cursor.read_le().ok().ok_or("Not enough data")?;
+                let _mys5: u16 = cursor.read_le().ok().ok_or("Not enough data")?;
+                let _mys6: u16 = cursor.read_le().ok().ok_or("Not enough data")?;
             }
         }
 
         let amount_stuff: Option<u16> = cursor.read_le().ok();
         if let Some(amount) = amount_stuff {
             for _ in 0..amount {
-                let a: u16 = cursor.read_le().ok().ok_or("Not enough data")?;
-                let b: u16 = cursor.read_le().ok().ok_or("Not enough data")?;
-                let c: u16 = cursor.read_le().ok().ok_or("Not enough data")?;
+                let _a: u16 = cursor.read_le().ok().ok_or("Not enough data")?;
+                let _b: u16 = cursor.read_le().ok().ok_or("Not enough data")?;
+                let _c: u16 = cursor.read_le().ok().ok_or("Not enough data")?;
             }
         }
-        let pos = cursor.position();
         let mut v = Vec::new();
         cursor.read_to_end(&mut v).ok().ok_or("Not enough data")?;
 

@@ -1,22 +1,17 @@
 #![allow(dead_code)]
-use crate::map::MapSegment;
 use crate::map::MapSegmentGui;
-use crate::map::TileSet;
 use crate::map::TileSetGui;
 use crate::startup::EMBEDDED_FONT;
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use sdl2::render::TextureCreator;
-use std::cell::RefCell;
 use std::fs;
 use std::path::PathBuf;
-use std::rc::Rc;
 
 mod pack;
 use crate::pack::*;
+mod exception;
 mod font;
 mod startup;
-use crate::font::*;
-mod exception;
 use crate::exception::*;
 mod mode;
 use crate::mode::*;
@@ -66,9 +61,9 @@ pub fn bench1(c: &mut Criterion) {
     let sdl = sdl2::init().unwrap();
     let video = sdl.video().unwrap();
     let mut vid_win = video.window("benchmark", 640, 480);
-    let mut window = vid_win.position_centered();
+    let window = vid_win.position_centered();
     let window = window.opengl().build().unwrap();
-    let mut canvas = window.into_canvas().build().unwrap();
+    let canvas = window.into_canvas().build().unwrap();
     let tc = canvas.texture_creator();
 
     let ttf_context = sdl2::ttf::init().unwrap();

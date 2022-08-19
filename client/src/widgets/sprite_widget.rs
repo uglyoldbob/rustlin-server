@@ -1,7 +1,6 @@
 use crate::widgets::Widget;
 use crate::GameResources;
 use crate::ImageBox;
-use crate::Loadable::*;
 use sdl2::render::TextureCreator;
 
 pub struct SpriteWidget {
