@@ -3,6 +3,7 @@ use std::rc::Rc;
 use crate::widgets::Widget;
 use crate::GameResources;
 use crate::ImageBox;
+use sdl2::rect::Rect;
 use sdl2::render::Texture;
 
 #[derive(PartialEq, Clone, Copy, Debug)]
@@ -198,7 +199,10 @@ impl CharacterDisplayType {
 
 pub struct CharacterSelectWidget<'a> {
     plain: u16,
+    plain_obj: Option<Rc<Texture<'a>>>,
     hover: u16,
+    hover_obj: Option<Rc<Texture<'a>>>,
+    locked_obj: Option<Rc<Texture<'a>>>,
     images: Vec<Option<Rc<Texture<'a>>>>,
     last_png: u16,
     pub t: CharacterDisplayType,
@@ -216,11 +220,14 @@ pub struct CharacterSelectWidget<'a> {
 }
 
 impl<'a> CharacterSelectWidget<'a> {
-    pub fn new(x: u16, y: u16) -> Self {
+    pub fn new(x: u16, y: u16, r: &mut GameResources<'a, '_, '_>) -> Self {
         Self {
             images: Vec::new(),
             plain: 0,
+            plain_obj: r.get_or_load_png(0),
             hover: 1,
+            hover_obj: r.get_or_load_png(1),
+            locked_obj: r.get_or_load_img(1764),
             last_png: 0,
             t: CharacterDisplayType::Blank,
             animating: false,
@@ -252,7 +259,7 @@ impl<'a> CharacterSelectWidget<'a> {
         }
     }
 
-    pub fn set_type(&mut self, t: CharacterDisplayType) {
+    pub fn set_type(&mut self, t: CharacterDisplayType, r: &mut GameResources<'a, '_, '_>) {
         if self.t != t {
             self.drawn = false;
             self.t = t;
@@ -388,6 +395,12 @@ impl<'a> CharacterSelectWidget<'a> {
                 }
             }
             self.images.clear();
+            for i in 0..self.animate_quantity {
+                let img = r.get_or_load_png(self.animate_start + i);
+                self.images.push(img);
+            }
+            self.plain_obj = r.get_or_load_png(self.plain);
+            self.hover_obj = r.get_or_load_png(self.hover);
         }
     }
 }
@@ -414,5 +427,54 @@ impl<'a> Widget<'a> for CharacterSelectWidget<'a> {
         cursor: bool,
         r: &mut GameResources,
     ) {
+        if self.animating {
+            let mut check_val = self.animate_index + 1;
+            if check_val >= (self.animate_quantity - 1) {
+                check_val = 0;
+            }
+            if self.animate_index >= (self.animate_quantity - 1) {
+                self.animate_index = 0;
+            }
+        }
+
+        let value = if self.locked {
+            &self.locked_obj
+        } else if self.animating {
+            let val: u16 = self.animate_index;
+            &self.images[val as usize]
+        } else {
+            if cursor {
+                if let Some(i) = &self.hover_obj {
+                    &self.hover_obj
+                } else {
+                    &self.plain_obj
+                }
+            } else {
+                &self.plain_obj
+            }
+        };
+
+        self.last_draw = if let Some(t) = value {
+            let q = t.query();
+            self.animate_index += 1;
+            let _e = canvas.copy(
+                t,
+                None,
+                Rect::new(
+                    self.x as i32,
+                    self.y as i32,
+                    q.width.into(),
+                    q.height.into(),
+                ),
+            );
+            Some(ImageBox {
+                x: self.x,
+                y: self.y,
+                w: q.width as u16,
+                h: q.height as u16,
+            })
+        } else {
+            None
+        };
     }
 }

@@ -43,7 +43,7 @@ impl<'a, T> NewCharacterMode<'a, T> {
         b.push(Box::new(ImgButton::new(554, 509, 332, r)));
         b.push(Box::new(ImgButton::new(556, 498, 347, r)));
         b.push(Box::new(ImgButton::new(554, 509, 347, r)));
-        let mut c = CharacterSelectWidget::new(410, 0);
+        let mut c = CharacterSelectWidget::new(410, 0, r);
         c.set_animating(true);
         let mut o = Vec::new();
         o.push(SelectableWidget::new(1753, 332, 11, r));
@@ -160,7 +160,7 @@ impl<'a, T> NewCharacterMode<'a, T> {
         self.disp[6].update_text(self.tc, &word, &r.font);
     }
 
-    fn update_selected_char(&mut self) {
+    fn update_selected_char(&mut self, r: &mut GameResources<'a, '_, '_>) {
         let newtype = match self.selected_class {
             0 => {
                 if self.selected_gender {
@@ -212,7 +212,7 @@ impl<'a, T> NewCharacterMode<'a, T> {
                 }
             }
         };
-        self.c.set_type(newtype);
+        self.c.set_type(newtype, r);
         self.base_stats = self.c.t.get_base_stats();
         self.current_stats = self.base_stats;
         self.max_stats = self.c.t.get_max_stats();
@@ -263,11 +263,15 @@ impl<'a, T> GameMode<'a> for NewCharacterMode<'a, T> {
         &mut self,
         _button: sdl2::keyboard::Keycode,
         _down: bool,
-        _r: &mut GameResources,
+        r: &mut GameResources,
     ) {
     }
 
-    fn process_frame(&mut self, r: &mut GameResources, requests: &mut VecDeque<DrawModeRequest>) {
+    fn process_frame(
+        &mut self,
+        r: &mut GameResources<'a, '_, '_>,
+        requests: &mut VecDeque<DrawModeRequest>,
+    ) {
         if self.b[1].was_clicked() {
             requests.push_back(DrawModeRequest::ChangeDrawMode(DrawMode::CharacterSelect));
         }
@@ -370,7 +374,7 @@ impl<'a, T> GameMode<'a> for NewCharacterMode<'a, T> {
                 self.options[6].set_selected(false);
                 self.options[i].set_selected(true);
                 self.selected_class = i as u8;
-                self.update_selected_char();
+                self.update_selected_char(r);
                 self.update_stats(r);
             }
         }
@@ -380,7 +384,7 @@ impl<'a, T> GameMode<'a> for NewCharacterMode<'a, T> {
                 self.options[8].set_selected(false);
                 self.options[i].set_selected(true);
                 self.selected_gender = if i == 7 { true } else { false };
-                self.update_selected_char();
+                self.update_selected_char(r);
                 self.update_stats(r);
             }
         }

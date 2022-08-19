@@ -33,10 +33,10 @@ impl<'a> CharacterSelect<'a> {
         b.push(Box::new(ImgButton::new(0x134, 0x20d, 0x1b5, r)));
         let mut ch = Vec::new();
 
-        ch.push(CharacterSelectWidget::new(0x13, 0));
-        ch.push(CharacterSelectWidget::new(0xb0, 0));
-        ch.push(CharacterSelectWidget::new(0x14d, 0));
-        ch.push(CharacterSelectWidget::new(0x1ea, 0));
+        ch.push(CharacterSelectWidget::new(0x13, 0, r));
+        ch.push(CharacterSelectWidget::new(0xb0, 0, r));
+        ch.push(CharacterSelectWidget::new(0x14d, 0, r));
+        ch.push(CharacterSelectWidget::new(0x1ea, 0, r));
         Self {
             b: b,
             char_sel: ch,
@@ -97,11 +97,15 @@ impl<'a> GameMode<'a> for CharacterSelect<'a> {
     ) {
     }
 
-    fn process_frame(&mut self, r: &mut GameResources, requests: &mut VecDeque<DrawModeRequest>) {
-        self.char_sel[0].set_type(r.characters[(0 + self.page * 4) as usize].t);
-        self.char_sel[1].set_type(r.characters[(1 + self.page * 4) as usize].t);
-        self.char_sel[2].set_type(r.characters[(2 + self.page * 4) as usize].t);
-        self.char_sel[3].set_type(r.characters[(3 + self.page * 4) as usize].t);
+    fn process_frame(
+        &mut self,
+        r: &mut GameResources<'a, '_, '_>,
+        requests: &mut VecDeque<DrawModeRequest>,
+    ) {
+        self.char_sel[0].set_type(r.characters[(0 + self.page * 4) as usize].t, r);
+        self.char_sel[1].set_type(r.characters[(1 + self.page * 4) as usize].t, r);
+        self.char_sel[2].set_type(r.characters[(2 + self.page * 4) as usize].t, r);
+        self.char_sel[3].set_type(r.characters[(3 + self.page * 4) as usize].t, r);
 
         if self.b[0].was_clicked() {
             if self.page > 0 {

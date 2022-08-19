@@ -44,7 +44,6 @@ impl Img {
         let height: u16 = cursor.read_le().ok()?;
         let unknown: u16 = cursor.read_le().ok()?;
         let colorkey: u16 = cursor.read_le().ok()?;
-        println!("IMG is {} x {} {} {}", width, height, unknown, colorkey);
 
         let mut data = Vec::new();
         cursor.read_to_end(&mut data).ok()?;
@@ -71,8 +70,6 @@ impl Img {
             self.colorkey.into(),
         );
         let _e = surface.set_color_key(true, color);
-
-        //TODO set colorkey
         let text = Texture::from_surface(&surface, t).unwrap();
         Some(text)
     }
@@ -130,7 +127,6 @@ impl PackFiles {
             }
         }
         if let Some(d) = data {
-            println!("Found IMG {}", name);
             let mut cursor = std::io::Cursor::new(&d);
             let img = Img::from_cursor(&mut cursor);
             return img;
