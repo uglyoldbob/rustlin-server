@@ -21,7 +21,7 @@ pub struct MapWidget<'a> {
     h: u16,
     map: MapCoordinate,
     mapnum: u16,
-    segments: [Option<Rc<MapSegmentGui<'a>>>; 4],
+    segments: [Option<Rc<Box<MapSegmentGui<'a>>>>; 4],
     buffer: Texture<'a>,
     cursor: Option<(i16, i16)>,
     tile_ref: Option<Rc<TileSetGui<'a>>>,
@@ -94,10 +94,10 @@ impl<'a> MapWidget<'a> {
             (*amin + 64, *bmin + 64),
         ];
 
-        let mut temp_map: [Option<Rc<MapSegmentGui<'a>>>; 4] = [None, None, None, None];
+        let mut temp_map: [Option<Rc<Box<MapSegmentGui<'a>>>>; 4] = [None, None, None, None];
         for (i, (ac, bc)) in required_segments.iter().enumerate() {
             let key = (*ac as u32) << 16 | (*bc as u32);
-            let s1: Option<Rc<MapSegmentGui<'a>>> = r.get_map(self.mapnum).get_or_load(key, || {});
+            let s1: Option<Rc<Box<MapSegmentGui<'a>>>> = r.get_map_segment(self.mapnum, *ac, *bc);
             temp_map[i] = s1;
         }
 

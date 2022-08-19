@@ -388,7 +388,7 @@ impl<'a> MapSegmentGui<'a> {
         for tileset in &self.tilesets {
             if !self.tile_ref.contains_key(tileset) {
                 done = false;
-                let t = r.tilesets.get_or_load(*tileset, || {});
+                let t = r.get_or_load_tileset(*tileset);
                 if let Some(t) = t {
                     self.tile_ref.insert(*tileset, t);
                 }
@@ -564,6 +564,13 @@ impl MapSegment {
             max_object_depth: 0,
             partial: false,
         }
+    }
+
+    pub fn get_map_combined(x: u16, y: u16) -> u32 {
+        let modx = x & 0xFFC0;
+        let mody = y & 0xFFC0;
+        let combined = (modx as u32) << 16 | (mody as u32);
+        combined
     }
 
     pub fn get_map_name(x: u16, y: u16) -> String {

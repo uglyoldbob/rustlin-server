@@ -122,9 +122,6 @@ pub fn startup(mode: DrawMode) {
     let mut mouse = Mouse::new();
     let mut drawmode_commands: VecDeque<DrawModeRequest> = VecDeque::new();
 
-    let mut parsing_map = None;
-    let mut temporary_maps: Vec<MapSegmentGui> = Vec::new();
-
     'running: loop {
         for event in event_pump.poll_iter() {
             match event {
@@ -226,19 +223,6 @@ pub fn startup(mode: DrawMode) {
                     }
                 }
                 _ => {}
-            }
-        }
-
-        if let None = parsing_map {
-            parsing_map = temporary_maps.pop();
-        }
-
-        if let Some(ms) = &mut parsing_map {
-            if ms.check_tilesets(&mut game_resources) {
-                let map = ms.get_mapnum();
-                let combined = ms.combined();
-                game_resources.get_map(map).insert(combined, ms.clone());
-                parsing_map = None;
             }
         }
         mouse.parse();

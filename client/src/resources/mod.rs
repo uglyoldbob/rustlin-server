@@ -311,7 +311,7 @@ pub struct GameResources<'a, 'b, 'c> {
     pub sprites: HashMap<u32, Loadable<SpriteGui<'a>>>,
     pub sfx: HashMap<u16, Loadable<Chunk>>,
     pub tilesets: LoadableMap<u32, TileSetGui<'a>>,
-    maps: HashMap<u16, LoadableMap<u32, MapSegmentGui<'a>>>,
+    maps: HashMap<u16, LoadableMap<u32, Box<MapSegmentGui<'a>>>>,
     pub packs: Option<PackFiles>,
 }
 
@@ -351,11 +351,93 @@ impl<'a, 'b, 'c> GameResources<'a, 'b, 'c> {
         }
     }
 
-    pub fn get_map(&mut self, map: u16) -> &mut LoadableMap<u32, MapSegmentGui<'a>> {
+    pub fn get_map(&mut self, map: u16) -> &mut LoadableMap<u32, Box<MapSegmentGui<'a>>> {
         if !self.maps.contains_key(&map) {
             self.maps.insert(map, LoadableMap::new());
         }
         self.maps.get_mut(&map).unwrap()
+    }
+
+    fn load_map_segment(
+        map: u16,
+        a: u16,
+        b: u16,
+        resource_path: PathBuf,
+    ) -> Option<Box<MapSegmentGui<'a>>> {
+        let mapn = MapSegment::get_map_name(a, b);
+        let mut f = resource_path.clone();
+        f.push("map");
+        f.push(format!("{}", map));
+        f.push(format!("{}.s32", mapn));
+        let p = f.as_os_str().to_str().unwrap().to_string();
+        let data = std::fs::File::open(p);
+        let ms = if let Ok(mut data) = data {
+            println!("Parsing s32");
+            let mut buf = Vec::new();
+            let _e = data.read_to_end(&mut buf);
+            let mut c = std::io::Cursor::new(&buf);
+            let ms = MapSegment::load_map_s32(&mut c, a, b, map);
+            if let Err(e) = &ms {
+                println!("Map s32 error");
+                println!("{}", e);
+                Some(MapSegment::empty_segment(a, b, map))
+            } else {
+                ms.ok()
+            }
+        } else {
+            let mut f = resource_path.clone();
+            f.push("map");
+            f.push(format!("{}", map));
+            f.push(format!("{}.seg", mapn));
+            let p = f.as_os_str().to_str().unwrap().to_string();
+            let data = std::fs::File::open(p);
+            if let Ok(mut data) = data {
+                println!("Parsing seg");
+                let mut buf = Vec::new();
+                let _e = data.read_to_end(&mut buf);
+                let mut c = std::io::Cursor::new(&buf);
+                let ms = MapSegment::load_map_seg(&mut c, a, b, map);
+                if let Err(e) = &ms {
+                    println!("Map seg error");
+                    println!("{}", e);
+                    Some(MapSegment::empty_segment(a, b, map))
+                } else {
+                    ms.ok()
+                }
+            } else {
+                Some(MapSegment::empty_segment(a, b, map))
+            }
+        };
+        if let Some(mapseg) = ms {
+            Some(Box::new(mapseg.to_gui()))
+        } else {
+            println!("Map segment was not loaded");
+            None
+        }
+    }
+
+    pub fn get_map_segment(
+        &mut self,
+        map: u16,
+        a: u16,
+        b: u16,
+    ) -> Option<Rc<Box<MapSegmentGui<'a>>>> {
+        let resource_path = self.resource_path.clone();
+        let lmap = self.get_map(map);
+        let key = MapSegment::get_map_combined(a, b);
+        let ms = lmap.sync_get_or_load(key, || None);
+        if let None = ms {
+            let mut nms = GameResources::load_map_segment(map, a, b, resource_path);
+            if let Some(mut ms) = nms {
+                ms.check_tilesets(self);
+                self.get_map(map).insert(key, ms);
+                self.get_map(map).sync_get_or_load(key, || None)
+            } else {
+                None
+            }
+        } else {
+            ms
+        }
     }
 
     pub fn get_or_load_sfx(&mut self, i: u16) -> Option<&Chunk> {
