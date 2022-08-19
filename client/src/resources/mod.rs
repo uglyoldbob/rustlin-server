@@ -1,16 +1,19 @@
 use crate::Font;
 use crate::Pack;
+use omnom::ReadExt;
+use sdl2::image::LoadTexture;
 use sdl2::mixer::Chunk;
+use sdl2::mixer::LoaderRWops;
 use sdl2::pixels::PixelFormatEnum;
 use sdl2::render::Texture;
 use sdl2::render::TextureCreator;
 use sdl2::surface::Surface;
 use sdl2::video::WindowContext;
 use std::collections::HashMap;
+use std::io::Read;
 use std::path::PathBuf;
 use std::rc::Rc;
 use std::rc::Weak;
-use tokio::io::AsyncReadExt;
 
 pub mod stringtable;
 use crate::resources::stringtable::*;
@@ -26,13 +29,6 @@ use crate::resources::sprite::*;
 pub mod map;
 use crate::resources::map::*;
 
-use async_trait::async_trait;
-/// Represents data and code that can be transferred to the async runtime for execution.
-#[async_trait]
-pub trait AsyncRunner: Send {
-    async fn do_stuff(&mut self, res: &mut Resources);
-}
-
 #[derive(Clone)]
 pub struct Img {
     width: u16,
@@ -43,15 +39,15 @@ pub struct Img {
 }
 
 impl Img {
-    async fn from_cursor(cursor: &mut std::io::Cursor<&Vec<u8>>) -> Option<Self> {
-        let width = cursor.read_u16_le().await.ok()?;
-        let height = cursor.read_u16_le().await.ok()?;
-        let unknown = cursor.read_u16_le().await.ok()?;
-        let colorkey = cursor.read_u16_le().await.ok()?;
+    fn from_cursor(cursor: &mut std::io::Cursor<&Vec<u8>>) -> Option<Self> {
+        let width: u16 = cursor.read_le().ok()?;
+        let height: u16 = cursor.read_le().ok()?;
+        let unknown: u16 = cursor.read_le().ok()?;
+        let colorkey: u16 = cursor.read_le().ok()?;
         println!("IMG is {} x {} {} {}", width, height, unknown, colorkey);
 
         let mut data = Vec::new();
-        cursor.read_to_end(&mut data).await.ok()?;
+        cursor.read_to_end(&mut data).ok()?;
         Some(Self {
             width: width,
             height: height,
@@ -82,31 +78,6 @@ impl Img {
     }
 }
 
-pub enum MessageToAsync {
-    LoadResources(String),
-    LoadFont(String),
-    LoadSpriteTable,
-    LoadTable(String),
-    LoadPng(u16),
-    LoadImg(u16),
-    LoadRunner(Box<dyn AsyncRunner + Send>),
-    LoadSprite(u16, u16),
-    LoadSfx(u16),
-    LoadTileset(u32),
-    LoadMapSegment(u16, u16, u16),
-}
-
-pub enum MessageFromAsync {
-    ResourceStatus(bool),
-    StringTable(String, StringTable),
-    Png(u16, Vec<u8>),
-    Img(u16, Img),
-    Sprite(u32, Sprite),
-    Sfx(u16, Vec<u8>),
-    Tileset(u32, TileSet),
-    MapSegment(u16, u16, u16, Box<MapSegment>),
-}
-
 pub struct PackFiles {
     pub tile: Pack,
     pub text: Pack,
@@ -123,13 +94,11 @@ impl PackFiles {
         j as u8 & 0xf
     }
 
-    pub async fn load_png(&mut self, name: String) -> Option<Vec<u8>> {
+    pub fn load_png(&mut self, name: String) -> Option<Vec<u8>> {
         let hash = PackFiles::get_hash_index(name.clone());
-        let mut contents = self.sprites[hash as usize]
-            .raw_file_contents(name.clone())
-            .await;
+        let mut contents = self.sprites[hash as usize].raw_file_contents(name.clone());
         if let None = contents {
-            contents = self.sprite.raw_file_contents(name.clone()).await;
+            contents = self.sprite.raw_file_contents(name.clone());
         }
         if let Some(c) = &mut contents {
             if c[3] == 0x58 {
@@ -145,25 +114,25 @@ impl PackFiles {
         contents
     }
 
-    pub async fn load_img(&mut self, name: u16) -> Option<Img> {
+    pub fn load_img(&mut self, name: u16) -> Option<Img> {
         let name1 = format!("{}e.img", name);
         let hash = PackFiles::get_hash_index(name1.clone()) as usize;
-        let mut data = self.sprites[hash].raw_file_contents(name1.clone()).await;
+        let mut data = self.sprites[hash].raw_file_contents(name1.clone());
         if let None = data {
-            data = self.sprite.raw_file_contents(name1.clone()).await;
+            data = self.sprite.raw_file_contents(name1.clone());
             if let None = data {
                 let name1 = format!("{}.img", name);
                 let hash = PackFiles::get_hash_index(name1.clone()) as usize;
-                data = self.sprites[hash].raw_file_contents(name1.clone()).await;
+                data = self.sprites[hash].raw_file_contents(name1.clone());
                 if let None = data {
-                    data = self.sprite.raw_file_contents(name1.clone()).await;
+                    data = self.sprite.raw_file_contents(name1.clone());
                 }
             }
         }
         if let Some(d) = data {
             println!("Found IMG {}", name);
             let mut cursor = std::io::Cursor::new(&d);
-            let img = Img::from_cursor(&mut cursor).await;
+            let img = Img::from_cursor(&mut cursor);
             return img;
         } else {
             println!("Failed to load IMG{}", name);
@@ -171,12 +140,12 @@ impl PackFiles {
         None
     }
 
-    pub async fn load(path: String) -> Result<Self, ()> {
+    pub fn load(path: String) -> Result<Self, ()> {
         let start = std::time::Instant::now();
         let mut packs: Vec<Pack> = Vec::new();
         for i in 0..16 {
             let mut pack = Pack::new(format!("{}/Sprite{:02}", path, i), false);
-            let e = pack.load().await;
+            let e = pack.load();
             for (key, v) in pack.file_extensions().iter() {
                 println!("Contains {} {}", key, v);
             }
@@ -187,21 +156,21 @@ impl PackFiles {
             packs.push(pack);
         }
         let mut tile = Pack::new(format!("{}/Tile", path), false);
-        let _e = tile.load().await;
+        let _e = tile.load();
         println!("TILE");
         for (key, v) in tile.file_extensions().iter() {
             println!("Contains {} {}", key, v);
         }
         println!("Time elapsed is {:?}", start.elapsed());
         let mut text = Pack::new(format!("{}/Text", path), true);
-        let _e = text.load().await;
+        let _e = text.load();
         println!("TEXT");
         for (key, v) in text.file_extensions().iter() {
             println!("Contains {} {}", key, v);
         }
         println!("Time elapsed is {:?}", start.elapsed());
         let mut sprite = Pack::new(format!("{}/Sprite", path), false);
-        let _e = sprite.load().await;
+        let _e = sprite.load();
         println!("SPRITE");
         for (key, v) in sprite.file_extensions().iter() {
             println!("Contains {} {}", key, v);
@@ -223,6 +192,7 @@ pub enum Loadable<T> {
 
 pub enum LoadableReference<T> {
     Loading,
+    NotFound,
     Strong(Rc<T>),
     Weak(Weak<T>),
 }
@@ -231,6 +201,7 @@ impl<T> LoadableReference<T> {
     pub fn get_ref(&mut self) -> Option<Rc<T>> {
         match self {
             LoadableReference::Loading => None,
+            LoadableReference::NotFound => None,
             LoadableReference::Strong(r) => {
                 let s = r.clone();
                 let w = Rc::<T>::downgrade(&r);
@@ -259,6 +230,48 @@ impl<T, U> LoadableMap<T, U> {
     {
         self.map
             .insert(key, LoadableReference::Strong(Rc::new(val)));
+    }
+
+    fn run_load<F>(&mut self, key: T, func: F) -> Option<Rc<U>>
+    where
+        F: FnOnce() -> Option<U>,
+        T: Eq + std::hash::Hash,
+    {
+        let nobj = func();
+        match nobj {
+            Some(o) => {
+                let sp = Rc::new(o);
+                self.map
+                    .insert(key, LoadableReference::Weak(Rc::downgrade(&sp)));
+                Some(sp)
+            }
+            None => {
+                self.map.insert(key, LoadableReference::NotFound);
+                None
+            }
+        }
+    }
+
+    pub fn sync_get_or_load<F>(&mut self, key: T, func: F) -> Option<Rc<U>>
+    where
+        F: FnOnce() -> Option<U>,
+        T: Eq + std::hash::Hash,
+    {
+        let check = self.map.get_mut(&key);
+        match check {
+            None => self.run_load(key, func),
+            Some(v) => match v {
+                LoadableReference::NotFound => None,
+                LoadableReference::Loading => self.run_load(key, func),
+                _ => {
+                    let r = v.get_ref();
+                    match r {
+                        None => self.run_load(key, func),
+                        Some(r) => Some(r),
+                    }
+                }
+            },
+        }
     }
 
     pub fn get_or_load<F>(&mut self, key: T, func: F) -> Option<Rc<U>>
@@ -293,19 +306,25 @@ impl<T, U> LoadableMap<T, U> {
 }
 
 pub struct GameResources<'a, 'b, 'c> {
+    resource_path: PathBuf,
     tc: &'a TextureCreator<WindowContext>,
-    pub pngs: HashMap<u16, Loadable<Texture<'a>>>,
-    pub imgs: HashMap<u16, Loadable<Texture<'a>>>,
+    pngs: LoadableMap<u16, Texture<'a>>,
+    imgs: LoadableMap<u16, Texture<'a>>,
     pub font: sdl2::ttf::Font<'b, 'c>,
     pub characters: [CharacterData; 8],
     pub sprites: HashMap<u32, Loadable<SpriteGui<'a>>>,
     pub sfx: HashMap<u16, Loadable<Chunk>>,
     pub tilesets: LoadableMap<u32, TileSetGui<'a>>,
     maps: HashMap<u16, LoadableMap<u32, MapSegmentGui<'a>>>,
+    pub packs: Option<PackFiles>,
 }
 
 impl<'a, 'b, 'c> GameResources<'a, 'b, 'c> {
-    pub fn new(font: sdl2::ttf::Font<'b, 'c>, tc: &'a TextureCreator<WindowContext>) -> Self {
+    pub fn new(
+        font: sdl2::ttf::Font<'b, 'c>,
+        path: String,
+        tc: &'a TextureCreator<WindowContext>,
+    ) -> Self {
         let mut chars = [
             CharacterData::new(),
             CharacterData::new(),
@@ -318,16 +337,21 @@ impl<'a, 'b, 'c> GameResources<'a, 'b, 'c> {
         ];
         chars[1].t = CharacterDisplayType::MaleDarkElf;
         chars[2].t = CharacterDisplayType::Locked;
+
+        let p = PathBuf::from(path.clone());
+        let pack = PackFiles::load(path).ok();
         Self {
+            resource_path: PathBuf::new(),
             tc: tc,
-            pngs: HashMap::new(),
-            imgs: HashMap::new(),
+            pngs: LoadableMap::new(),
+            imgs: LoadableMap::new(),
             font: font,
             characters: chars,
             sprites: HashMap::new(),
             sfx: HashMap::new(),
             tilesets: LoadableMap::new(),
             maps: HashMap::new(),
+            packs: pack,
         }
     }
 
@@ -337,208 +361,113 @@ impl<'a, 'b, 'c> GameResources<'a, 'b, 'c> {
         }
         self.maps.get_mut(&map).unwrap()
     }
-}
 
-pub struct Resources {
-    pub packs: Option<PackFiles>,
-}
-
-impl Resources {
-    pub fn new() -> Self {
-        Self { packs: None }
-    }
-}
-
-pub async fn async_main(
-    mut r: tokio::sync::mpsc::Receiver<MessageToAsync>,
-    s: tokio::sync::mpsc::Sender<MessageFromAsync>,
-) {
-    println!("Async main");
-
-    let mut resource_path: PathBuf = PathBuf::new();
-    let mut res: Resources = Resources::new();
-
-    loop {
-        let message = r.recv().await;
-        match message {
-            None => break,
-            Some(msg) => match msg {
-                MessageToAsync::LoadRunner(mut r) => {
-                    r.do_stuff(&mut res).await;
+    pub fn get_or_load_sfx(&mut self, i: u16) -> Option<&Chunk> {
+        if self.sfx.contains_key(&i) {
+            let t = self.sfx.get(&i);
+            if let Some(t) = t {
+                if let Loadable::Loaded(t) = t {
+                    Some(t)
+                } else {
+                    None
                 }
-                MessageToAsync::LoadResources(path) => {
-                    resource_path = PathBuf::from(path.clone());
-                    println!("Loading resources {}", path);
-                    match PackFiles::load(path).await {
-                        Ok(p) => {
-                            res.packs = Some(p);
-                            let _e = s.send(MessageFromAsync::ResourceStatus(true)).await;
-                        }
-                        Err(()) => {
-                            let _e = s.send(MessageFromAsync::ResourceStatus(false)).await;
-                        }
+            } else {
+                None
+            }
+        } else {
+            let mut f = self.resource_path.clone();
+            f.push("sound");
+            f.push(format!("{}.wav", i));
+            let f = f.as_os_str().to_str().unwrap().to_string();
+            let data = std::fs::File::open(f);
+            if let Ok(mut data) = data {
+                let mut c = Vec::new();
+                data.read_to_end(&mut c).unwrap();
+                let rwops = sdl2::rwops::RWops::from_bytes(&c[..]).unwrap();
+                let chnk = rwops.load_wav().unwrap();
+                self.sfx.insert(i, Loadable::Loaded(chnk));
+                if let Some(t) = self.sfx.get(&i) {
+                    match t {
+                        Loadable::Loaded(t) => Some(t),
+                        _ => None,
                     }
+                } else {
+                    None
                 }
-                MessageToAsync::LoadFont(file) => {
-                    let mut f = resource_path.clone();
-                    f.push(file);
-                    let path = f.as_os_str().to_str().unwrap().to_string();
-                    let _font = Font::load(path).await;
-                }
-                MessageToAsync::LoadSpriteTable => {
-                    let _st = SpriteTableEntry::load_embedded_table().await;
-                }
-                MessageToAsync::LoadTable(name) => {
-                    if let Some(p) = &mut res.packs {
-                        let data = p.text.decrypted_file_contents(name.clone()).await;
-                        match data {
-                            Some(d) => {
-                                let table = StringTable::from(d);
-                                let _e = s
-                                    .send(MessageFromAsync::StringTable(name, table.clone()))
-                                    .await;
-                            }
-                            None => {
-                                println!("{} failed to load", name);
-                            }
-                        }
-                    }
-                }
-                MessageToAsync::LoadPng(name) => {
-                    if let Some(p) = &mut res.packs {
-                        let name2 = format!("{}.png", name);
-                        let data = p.load_png(name2.clone()).await;
-                        match data {
-                            Some(d) => {
-                                let _e = s.send(MessageFromAsync::Png(name, d)).await;
-                            }
-                            None => {
-                                println!("{} failed to load", name2);
-                            }
-                        }
-                    }
-                }
-                MessageToAsync::LoadImg(name) => {
-                    if let Some(p) = &mut res.packs {
-                        let data = p.load_img(name).await;
-                        match data {
-                            Some(d) => {
-                                let _e = s.send(MessageFromAsync::Img(name, d)).await;
-                            }
-                            None => {
-                                println!("{} failed to load", name);
-                            }
-                        }
-                    }
-                }
-                MessageToAsync::LoadSprite(a, b) => {
-                    let name = format!("{}-{}.spr", a, b);
-                    println!("Loading sprite {}", name);
-                    let id = (a as u32) << 16 | (b as u32);
-                    if let Some(p) = &mut res.packs {
-                        let hash = PackFiles::get_hash_index(name.clone());
-                        let mut contents = p.sprites[hash as usize]
-                            .raw_file_contents(name.clone())
-                            .await;
-                        if let None = contents {
-                            contents = p.sprite.raw_file_contents(name.clone()).await;
-                        }
-                        if let Some(c) = &contents {
-                            println!("Sprite file is {} file", c.len());
-                            let mut cursor = std::io::Cursor::new(c);
-                            let spr = Sprite::parse_sprite(&mut cursor).await;
-                            if let Some(spr) = spr {
-                                println!("Success {}", name);
-                                let _e = s.send(MessageFromAsync::Sprite(id, spr)).await;
-                            } else {
-                                println!("Failed to load sprite file {}", name);
-                            }
-                        }
-                    }
-                }
-                MessageToAsync::LoadSfx(id) => {
-                    let mut f = resource_path.clone();
-                    f.push("sound");
-                    f.push(format!("{}.wav", id));
-                    let f = f.as_os_str().to_str().unwrap().to_string();
-                    println!("I need to load {}", f);
-                    let data = tokio::fs::File::open(f).await;
-                    if let Ok(mut data) = data {
-                        let mut c = Vec::new();
-                        data.read_to_end(&mut c).await.unwrap();
-                        let _e = s.send(MessageFromAsync::Sfx(id, c.clone())).await;
-                    }
-                }
-                MessageToAsync::LoadTileset(id) => {
-                    if let Some(p) = &mut res.packs {
-                        let name = format!("{}.til", id);
-                        let data = p.tile.raw_file_contents(name.clone()).await;
-                        if let Some(data) = data {
-                            let mut cursor = std::io::Cursor::new(&data);
-                            let tileset = TileSet::decode_tileset_data(&mut cursor).await;
-                            if let Some(t) = tileset {
-                                let _e = s.send(MessageFromAsync::Tileset(id, t)).await;
-                            }
-                        }
-                    }
-                }
-                MessageToAsync::LoadMapSegment(map, x, y) => {
-                    println!("Loading map {} {} {}", map, x, y);
-                    let mapn = MapSegment::get_map_name(x, y);
-                    println!("Looking for {}", &mapn);
-                    let mut f = resource_path.clone();
-                    f.push("map");
-                    f.push(format!("{}", map));
-                    f.push(format!("{}.s32", mapn));
-                    let p = f.as_os_str().to_str().unwrap().to_string();
-                    let data = tokio::fs::File::open(p).await;
-                    let ms = if let Ok(mut data) = data {
-                        println!("Parsing s32");
-                        let mut buf = Vec::new();
-                        let _e = data.read_to_end(&mut buf).await;
-                        let mut c = std::io::Cursor::new(&buf);
-                        let ms = MapSegment::load_map_s32(&mut c, x, y, map).await;
-                        if let Err(e) = &ms {
-                            println!("Map s32 error");
-                            println!("{}", e);
-                            Some(MapSegment::empty_segment(x, y, map))
-                        } else {
-                            ms.ok()
-                        }
-                    } else {
-                        let mut f = resource_path.clone();
-                        f.push("map");
-                        f.push(format!("{}", map));
-                        f.push(format!("{}.seg", mapn));
-                        let p = f.as_os_str().to_str().unwrap().to_string();
-                        let data = tokio::fs::File::open(p).await;
-                        if let Ok(mut data) = data {
-                            println!("Parsing seg");
-                            let mut buf = Vec::new();
-                            let _e = data.read_to_end(&mut buf).await;
-                            let mut c = std::io::Cursor::new(&buf);
-                            let ms = MapSegment::load_map_seg(&mut c, x, y, map).await;
-                            if let Err(e) = &ms {
-                                println!("Map seg error");
-                                println!("{}", e);
-                                Some(MapSegment::empty_segment(x, y, map))
-                            } else {
-                                ms.ok()
-                            }
-                        } else {
-                            Some(MapSegment::empty_segment(x, y, map))
-                        }
-                    };
-                    if let Some(mapseg) = ms {
-                        println!("Map segment was loaded");
-                        let _e = s
-                            .send(MessageFromAsync::MapSegment(map, x, y, Box::new(mapseg)))
-                            .await;
-                    } else {
-                        println!("Map segment was not loaded");
-                    }
-                }
-            },
+            } else {
+                None
+            }
         }
+    }
+
+    pub fn get_or_load_tileset(&mut self, i: u32) -> Option<Rc<TileSetGui<'a>>> {
+        self.tilesets.sync_get_or_load(i, || {
+            if let Some(p) = &mut self.packs {
+                let name = format!("{}.til", i);
+                let data = p.tile.raw_file_contents(name.clone());
+                if let Some(data) = data {
+                    let mut cursor = std::io::Cursor::new(&data);
+                    let tileset = TileSet::decode_tileset_data(&mut cursor);
+                    if let Some(t) = tileset {
+                        let t = t.to_gui(&self.tc);
+                        Some(t)
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        })
+    }
+
+    pub fn get_or_load_img(&mut self, i: u16) -> Option<Rc<Texture<'a>>> {
+        self.imgs.sync_get_or_load(i, || {
+            if let Some(p) = &mut self.packs {
+                let data = p.load_img(i);
+                match data {
+                    Some(mut d) => {
+                        let img = d.convert_img_data(&self.tc);
+                        img
+                    }
+                    None => None,
+                }
+            } else {
+                None
+            }
+        })
+    }
+
+    pub fn get_or_load_png(&mut self, i: u16) -> Option<Rc<Texture<'a>>> {
+        self.pngs.sync_get_or_load(i, || {
+            if let Some(p) = &mut self.packs {
+                let name2 = format!("{}.png", i);
+                let data = p.load_png(name2.clone());
+                match data {
+                    Some(d) => {
+                        let png = self.tc.load_texture_bytes(&d);
+                        match png {
+                            Ok(mut a) => {
+                                a.set_blend_mode(sdl2::render::BlendMode::Add);
+                                Some(a)
+                            }
+                            Err(e) => {
+                                println!("PNG {} fail {}", i, e);
+                                println!("PNG DATA {:x?}", &d[0..25]);
+                                None
+                            }
+                        }
+                    }
+                    None => {
+                        println!("{} failed to load", name2);
+                        None
+                    }
+                }
+            } else {
+                None
+            }
+        })
     }
 }

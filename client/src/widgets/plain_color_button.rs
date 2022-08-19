@@ -1,7 +1,6 @@
 use crate::widgets::Widget;
 use crate::GameResources;
 use crate::ImageBox;
-use crate::MessageToAsync;
 use sdl2::pixels::PixelFormatEnum;
 use sdl2::rect::Rect;
 use sdl2::render::Texture;
@@ -57,7 +56,6 @@ impl<'a> Widget<'a> for PlainColorButton<'a> {
         canvas: &mut sdl2::render::WindowCanvas,
         _cursor: bool,
         _r: &mut GameResources,
-        _send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
     ) {
         let q = self.t.query();
         let _e = canvas.copy(

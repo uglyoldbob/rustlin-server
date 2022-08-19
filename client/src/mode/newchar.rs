@@ -4,18 +4,19 @@ use crate::DrawMode;
 use crate::DrawModeRequest;
 use crate::GameMode;
 use crate::GameResources;
-use crate::Loadable::*;
-use crate::MessageToAsync;
 use sdl2::pixels::Color;
+use sdl2::render::Texture;
 use sdl2::render::TextureCreator;
 use std::collections::VecDeque;
+use std::rc::Rc;
 
 /// This is for exploring the resources of the game client
 pub struct NewCharacterMode<'a, T> {
     tc: &'a TextureCreator<T>,
+    background: Option<Rc<Texture<'a>>>,
     b: Vec<Box<dyn Widget<'a> + 'a>>,
-    c: CharacterSelectWidget,
-    options: Vec<SelectableWidget>,
+    c: CharacterSelectWidget<'a>,
+    options: Vec<SelectableWidget<'a>>,
     selected_class: u8,
     /// true is male, false is female
     selected_gender: bool,
@@ -26,34 +27,34 @@ pub struct NewCharacterMode<'a, T> {
 }
 
 impl<'a, T> NewCharacterMode<'a, T> {
-    pub fn new(tc: &'a TextureCreator<T>, r: &mut GameResources) -> Self {
+    pub fn new(tc: &'a TextureCreator<T>, r: &mut GameResources<'a, '_, '_>) -> Self {
         let mut b: Vec<Box<dyn Widget>> = Vec::new();
-        b.push(Box::new(ImgButton::new(825, 476, 403)));
-        b.push(Box::new(ImgButton::new(827, 476, 430)));
-        b.push(Box::new(ImgButton::new(556, 424, 317)));
-        b.push(Box::new(ImgButton::new(554, 435, 317)));
-        b.push(Box::new(ImgButton::new(556, 424, 332)));
-        b.push(Box::new(ImgButton::new(554, 435, 332)));
-        b.push(Box::new(ImgButton::new(556, 424, 347)));
-        b.push(Box::new(ImgButton::new(554, 435, 347)));
-        b.push(Box::new(ImgButton::new(556, 498, 317)));
-        b.push(Box::new(ImgButton::new(554, 509, 317)));
-        b.push(Box::new(ImgButton::new(556, 498, 332)));
-        b.push(Box::new(ImgButton::new(554, 509, 332)));
-        b.push(Box::new(ImgButton::new(556, 498, 347)));
-        b.push(Box::new(ImgButton::new(554, 509, 347)));
+        b.push(Box::new(ImgButton::new(825, 476, 403, r)));
+        b.push(Box::new(ImgButton::new(827, 476, 430, r)));
+        b.push(Box::new(ImgButton::new(556, 424, 317, r)));
+        b.push(Box::new(ImgButton::new(554, 435, 317, r)));
+        b.push(Box::new(ImgButton::new(556, 424, 332, r)));
+        b.push(Box::new(ImgButton::new(554, 435, 332, r)));
+        b.push(Box::new(ImgButton::new(556, 424, 347, r)));
+        b.push(Box::new(ImgButton::new(554, 435, 347, r)));
+        b.push(Box::new(ImgButton::new(556, 498, 317, r)));
+        b.push(Box::new(ImgButton::new(554, 509, 317, r)));
+        b.push(Box::new(ImgButton::new(556, 498, 332, r)));
+        b.push(Box::new(ImgButton::new(554, 509, 332, r)));
+        b.push(Box::new(ImgButton::new(556, 498, 347, r)));
+        b.push(Box::new(ImgButton::new(554, 509, 347, r)));
         let mut c = CharacterSelectWidget::new(410, 0);
         c.set_animating(true);
         let mut o = Vec::new();
-        o.push(SelectableWidget::new(1753, 332, 11));
-        o.push(SelectableWidget::new(1755, 542, 11));
-        o.push(SelectableWidget::new(1757, 332, 67));
-        o.push(SelectableWidget::new(1759, 542, 67));
-        o.push(SelectableWidget::new(1761, 332, 118));
-        o.push(SelectableWidget::new(1749, 542, 118));
-        o.push(SelectableWidget::new(1751, 332, 166));
-        o.push(SelectableWidget::new(306, 348, 248));
-        o.push(SelectableWidget::new(304, 533, 248));
+        o.push(SelectableWidget::new(1753, 332, 11, r));
+        o.push(SelectableWidget::new(1755, 542, 11, r));
+        o.push(SelectableWidget::new(1757, 332, 67, r));
+        o.push(SelectableWidget::new(1759, 542, 67, r));
+        o.push(SelectableWidget::new(1761, 332, 118, r));
+        o.push(SelectableWidget::new(1749, 542, 118, r));
+        o.push(SelectableWidget::new(1751, 332, 166, r));
+        o.push(SelectableWidget::new(306, 348, 248, r));
+        o.push(SelectableWidget::new(304, 533, 248, r));
         o[7].set_selected(true);
         let mut d = Vec::new();
         d.push(DynamicTextWidget::new(
@@ -116,6 +117,7 @@ impl<'a, T> NewCharacterMode<'a, T> {
         let ms = c.t.get_max_stats();
         let mut s = Self {
             tc: tc,
+            background: r.get_or_load_png(824),
             b: b,
             c: c,
             options: o,
@@ -265,12 +267,7 @@ impl<'a, T> GameMode<'a> for NewCharacterMode<'a, T> {
     ) {
     }
 
-    fn process_frame(
-        &mut self,
-        r: &mut GameResources,
-        _send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
-        requests: &mut VecDeque<DrawModeRequest>,
-    ) {
+    fn process_frame(&mut self, r: &mut GameResources, requests: &mut VecDeque<DrawModeRequest>) {
         if self.b[1].was_clicked() {
             requests.push_back(DrawModeRequest::ChangeDrawMode(DrawMode::CharacterSelect));
         }
@@ -394,30 +391,23 @@ impl<'a, T> GameMode<'a> for NewCharacterMode<'a, T> {
         canvas: &mut sdl2::render::WindowCanvas,
         cursor: Option<(i16, i16)>,
         r: &mut GameResources<'a, '_, '_>,
-        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
     ) {
         canvas.set_draw_color(Color::RGB(0, 0, 0));
         canvas.clear();
-        let value = 824;
-        if r.imgs.contains_key(&value) {
-            if let Loaded(t) = &r.imgs[&value] {
-                let _e = canvas.copy(t, None, None);
-            }
-        } else {
-            r.imgs.insert(value, Loading);
-            let _e = send.blocking_send(MessageToAsync::LoadImg(value));
+        if let Some(t) = &self.background {
+            let _e = canvas.copy(&t, None, None);
         }
 
         for w in &mut self.b {
-            w.draw(canvas, cursor, r, send);
+            w.draw(canvas, cursor, r);
         }
         for w in &mut self.options {
-            w.draw(canvas, cursor, r, send);
+            w.draw(canvas, cursor, r);
         }
         for w in &mut self.disp {
-            w.draw(canvas, cursor, r, send);
+            w.draw(canvas, cursor, r);
         }
-        self.c.draw(canvas, cursor, r, send);
+        self.c.draw(canvas, cursor, r);
     }
 
     fn framerate(&self) -> u8 {

@@ -1,21 +1,26 @@
+use std::rc::Rc;
+
 use crate::widgets::Widget;
 use crate::GameResources;
 use crate::ImageBox;
-use crate::Loadable::*;
-use crate::MessageToAsync;
 use sdl2::rect::Rect;
+use sdl2::render::Texture;
 
-pub struct ImgButton {
+pub struct ImgButton<'a> {
     num: u16,
     x: u16,
     y: u16,
     clicked: bool,
     last_draw: Option<ImageBox>,
+    inactive: Option<Rc<Texture<'a>>>,
+    active: Option<Rc<Texture<'a>>>,
 }
 
-impl ImgButton {
-    pub fn new(num: u16, x: u16, y: u16) -> Self {
+impl<'a> ImgButton<'a> {
+    pub fn new(num: u16, x: u16, y: u16, r: &mut GameResources<'a, '_, '_>) -> Self {
         Self {
+            inactive: r.get_or_load_img(num),
+            active: r.get_or_load_img(num + 1),
             num: num,
             x: x,
             y: y,
@@ -25,7 +30,7 @@ impl ImgButton {
     }
 }
 
-impl<'a> Widget<'a> for ImgButton {
+impl<'a> Widget<'a> for ImgButton<'a> {
     fn last_draw(&self) -> Option<ImageBox> {
         self.last_draw
     }
@@ -44,50 +49,29 @@ impl<'a> Widget<'a> for ImgButton {
         &mut self,
         canvas: &mut sdl2::render::WindowCanvas,
         cursor: bool,
-        r: &mut GameResources,
-        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+        _r: &mut GameResources,
     ) {
-        let value = if cursor {
-            if let Some(i) = r.imgs.get(&(self.num + 1)) {
-                if let Loaded(_) = i {
-                    self.num + 1
-                } else {
-                    self.num
-                }
-            } else {
-                r.imgs.insert(self.num + 1, Loading);
-                let _e = send.blocking_send(MessageToAsync::LoadImg(self.num + 1));
-                self.num
-            }
-        } else {
-            self.num
-        };
+        let value = if cursor { &self.active } else { &self.inactive };
 
-        self.last_draw = if r.imgs.contains_key(&value) {
-            if let Loaded(t) = &r.imgs[&value] {
-                let q = t.query();
-                let _e = canvas.copy(
-                    t,
-                    None,
-                    Rect::new(
-                        self.x as i32,
-                        self.y as i32,
-                        q.width.into(),
-                        q.height.into(),
-                    ),
-                );
-                Some(ImageBox {
-                    x: self.x,
-                    y: self.y,
-                    w: q.width as u16,
-                    h: q.height as u16,
-                })
-            } else {
-                None
-            }
+        self.last_draw = if let Some(t) = value {
+            let q = t.query();
+            let _e = canvas.copy(
+                &t,
+                None,
+                Rect::new(
+                    self.x as i32,
+                    self.y as i32,
+                    q.width.into(),
+                    q.height.into(),
+                ),
+            );
+            Some(ImageBox {
+                x: self.x,
+                y: self.y,
+                w: q.width as u16,
+                h: q.height as u16,
+            })
         } else {
-            r.imgs.insert(value, Loading);
-            let _e = send.blocking_send(MessageToAsync::LoadImg(value));
             None
         };
     }

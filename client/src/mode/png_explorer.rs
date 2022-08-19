@@ -4,23 +4,25 @@ use crate::DrawMode;
 use crate::DrawModeRequest;
 use crate::GameMode;
 use crate::GameResources;
-use crate::Loadable::*;
-use crate::MessageToAsync;
 use sdl2::pixels::Color;
 use sdl2::rect::Rect;
+use sdl2::render::Texture;
 use sdl2::render::TextureCreator;
 use std::collections::VecDeque;
+use std::rc::Rc;
 
 /// The screen that allows for user login
 pub struct PngExplorer<'a, T> {
     b: Vec<Box<dyn Widget<'a> + 'a>>,
     disp: Vec<DynamicTextWidget<'a>>,
     current_png: u16,
+    previous_png_object: Option<Rc<Texture<'a>>>,
+    current_png_object: Option<Rc<Texture<'a>>>,
     tc: &'a TextureCreator<T>,
 }
 
 impl<'a, T> PngExplorer<'a, T> {
-    pub fn new(tc: &'a TextureCreator<T>, r: &mut GameResources) -> Self {
+    pub fn new(tc: &'a TextureCreator<T>, r: &mut GameResources<'a, '_, '_>) -> Self {
         let mut b: Vec<Box<dyn Widget + 'a>> = Vec::new();
         b.push(Box::new(TextButton::new(tc, 320, 400, "Go Back", &r.font)));
         let mut disp = Vec::new();
@@ -33,11 +35,15 @@ impl<'a, T> PngExplorer<'a, T> {
             sdl2::pixels::Color::RED,
         ));
 
+        let cur = r.get_or_load_png(0);
+
         Self {
             b: b,
             disp: disp,
             current_png: 0,
             tc: tc,
+            previous_png_object: None,
+            current_png_object: cur,
         }
     }
 }
@@ -85,22 +91,24 @@ impl<'a, T> GameMode<'a> for PngExplorer<'a, T> {
         &mut self,
         button: sdl2::keyboard::Keycode,
         down: bool,
-        r: &mut GameResources,
+        r: &mut GameResources<'a, '_, '_>,
     ) {
         if down {
             match button {
                 sdl2::keyboard::Keycode::Left => {
                     if self.current_png > 0 {
-                        r.pngs.remove(&self.current_png);
+                        self.previous_png_object = r.get_or_load_png(self.current_png);
                         self.current_png -= 1;
+                        self.current_png_object = r.get_or_load_png(self.current_png);
                         let words = format!("Displaying {}.png", self.current_png);
                         self.disp[0].update_text(self.tc, &words, &r.font);
                     }
                 }
                 sdl2::keyboard::Keycode::Right => {
                     if self.current_png < 65534 {
-                        r.pngs.remove(&self.current_png);
+                        self.previous_png_object = r.get_or_load_png(self.current_png);
                         self.current_png += 1;
+                        self.current_png_object = r.get_or_load_png(self.current_png);
                         let words = format!("Displaying {}.png", self.current_png);
                         self.disp[0].update_text(self.tc, &words, &r.font);
                     }
@@ -110,12 +118,7 @@ impl<'a, T> GameMode<'a> for PngExplorer<'a, T> {
         }
     }
 
-    fn process_frame(
-        &mut self,
-        _r: &mut GameResources,
-        _send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
-        _requests: &mut VecDeque<DrawModeRequest>,
-    ) {
+    fn process_frame(&mut self, _r: &mut GameResources, _requests: &mut VecDeque<DrawModeRequest>) {
     }
 
     fn draw(
@@ -123,26 +126,24 @@ impl<'a, T> GameMode<'a> for PngExplorer<'a, T> {
         canvas: &mut sdl2::render::WindowCanvas,
         cursor: Option<(i16, i16)>,
         r: &mut GameResources<'a, '_, '_>,
-        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
     ) {
         canvas.set_draw_color(Color::RGB(0, 0, 0));
         canvas.clear();
         let value = self.current_png;
-        if r.pngs.contains_key(&value) {
-            if let Loaded(t) = &r.pngs[&value] {
-                let q = t.query();
-                let _e = canvas.copy(t, None, Rect::new(0, 0, q.width.into(), q.height.into()));
-            }
-        } else {
-            r.pngs.insert(value, Loading);
-            let _e = send.blocking_send(MessageToAsync::LoadPng(value));
+
+        if let Some(t) = &self.current_png_object {
+            let q = t.query();
+            let _e = canvas.copy(&t, None, Rect::new(0, 0, q.width.into(), q.height.into()));
+        } else if let Some(t) = &self.previous_png_object {
+            let q = t.query();
+            let _e = canvas.copy(&t, None, Rect::new(0, 0, q.width.into(), q.height.into()));
         }
 
         for w in &mut self.b {
-            w.draw(canvas, cursor, r, send);
+            w.draw(canvas, cursor, r);
         }
         for w in &mut self.disp {
-            w.draw(canvas, cursor, r, send);
+            w.draw(canvas, cursor, r);
         }
     }
 

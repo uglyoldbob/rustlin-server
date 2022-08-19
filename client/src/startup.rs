@@ -75,10 +75,9 @@ pub fn startup(mode: DrawMode) {
     let audio = sdl2::mixer::open_audio(44100, 16, 2, 1024);
     println!("Audio is {:?}", audio);
 
-    let (mut s1, r1) = tokio::sync::mpsc::channel(100);
-    let (s2, mut r2) = tokio::sync::mpsc::channel(100);
+    let resources = settings.get("general", "resources").unwrap();
 
-    let mut game_resources = GameResources::new(font, &texture_creator);
+    let mut game_resources = GameResources::new(font, resources, &texture_creator);
     let mut mode: Box<dyn GameMode> = match mode {
         DrawMode::Explorer => Box::new(ExplorerMenu::new(&texture_creator, &mut game_resources)),
         DrawMode::PngExplorer => Box::new(PngExplorer::new(&texture_creator, &mut game_resources)),
@@ -87,13 +86,9 @@ pub fn startup(mode: DrawMode) {
         DrawMode::TileExplorer => {
             Box::new(TileExplorer::new(&texture_creator, &mut game_resources))
         }
-        DrawMode::MapExplorer => Box::new(MapExplorer::new(
-            &texture_creator,
-            &mut game_resources,
-            &mut s1,
-        )),
+        DrawMode::MapExplorer => Box::new(MapExplorer::new(&texture_creator, &mut game_resources)),
         DrawMode::GameLoader => Box::new(GameLoader::new(&texture_creator, &mut game_resources)),
-        DrawMode::Login => Box::new(Login::new(&texture_creator)),
+        DrawMode::Login => Box::new(Login::new(&mut game_resources)),
         DrawMode::CharacterSelect => {
             Box::new(CharacterSelect::new(&texture_creator, &mut game_resources))
         }
@@ -109,26 +104,11 @@ pub fn startup(mode: DrawMode) {
         _ => false,
     };
 
-    let resources = settings.get("general", "resources").unwrap();
-
     println!(
         "Struct GameResources has size {}",
         std::mem::size_of::<GameResources>()
     );
     dbg!(stacker::remaining_stack());
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    rt.spawn(std::pin::Pin::from(Box::new(async_main(r1, s2))));
-
-    println!("Loading resources from {}", resources);
-
-    let _e = s1.blocking_send(MessageToAsync::LoadResources(resources.clone()));
-    let _e = s1.blocking_send(MessageToAsync::LoadTable("obscene-e.tbl".to_string()));
-    let _e = s1.blocking_send(MessageToAsync::LoadFont("Font/eng.fnt".to_string()));
-    let _e = s1.blocking_send(MessageToAsync::LoadSpriteTable);
-    //load Font/SMALL.FNT
-
-    //load pack files
-    //Text, Tile, Sprite0-Sprite15
 
     canvas.set_draw_color(Color::RGB(0, 0, 0));
     canvas.clear();
@@ -146,87 +126,6 @@ pub fn startup(mode: DrawMode) {
     let mut temporary_maps: Vec<MapSegmentGui> = Vec::new();
 
     'running: loop {
-        while let Ok(msg) = r2.try_recv() {
-            match msg {
-                MessageFromAsync::ResourceStatus(b) => {
-                    if !b {
-                        println!("Failed to load game resources");
-                        let scheme = sdl2::messagebox::MessageBoxColorScheme {
-                            background: (0, 0, 255),
-                            text: (0, 0, 0),
-                            button_border: (0, 0, 0),
-                            button_background: (255, 255, 255),
-                            button_selected: (0, 255, 255),
-                        };
-                        let mut vid_win = video_subsystem.window("l1j-client", 320, 240);
-                        let mut windowb = vid_win.position_centered();
-                        if !windowed {
-                            windowb = windowb.fullscreen();
-                        }
-                        let window = windowb.build().unwrap();
-                        let _e = sdl2::messagebox::show_message_box(
-                            sdl2::messagebox::MessageBoxFlag::ERROR,
-                            &[sdl2::messagebox::ButtonData {
-                                flags: sdl2::messagebox::MessageBoxButtonFlag::RETURNKEY_DEFAULT,
-                                button_id: 0,
-                                text: "OK",
-                            }],
-                            "ERROR",
-                            "Unable to load game resources",
-                            &window,
-                            scheme,
-                        );
-                        break 'running;
-                    }
-                }
-                MessageFromAsync::StringTable(name, _data) => {
-                    println!("Loaded string table {}", name);
-                }
-                MessageFromAsync::Png(name, data) => {
-                    let png = texture_creator.load_texture_bytes(&data);
-                    match png {
-                        Ok(mut a) => {
-                            a.set_blend_mode(sdl2::render::BlendMode::Add);
-                            game_resources.pngs.insert(name, Loaded(a));
-                        }
-                        Err(e) => {
-                            println!("PNG {} fail {}", name, e);
-                            println!("PNG DATA {:x?}", &data[0..25]);
-                        }
-                    }
-                }
-                MessageFromAsync::Img(name, mut data) => {
-                    println!("Loaded IMG {}", name);
-                    let img = data.convert_img_data(&texture_creator);
-                    match img {
-                        Some(a) => {
-                            game_resources.imgs.insert(name, Loaded(a));
-                        }
-                        None => {
-                            println!("IMG {} fail", name);
-                        }
-                    }
-                }
-                MessageFromAsync::Sprite(id, spr) => {
-                    let sprite = spr.to_gui(&texture_creator);
-                    game_resources.sprites.insert(id, Loaded(sprite));
-                }
-                MessageFromAsync::Sfx(id, data) => {
-                    let rwops = sdl2::rwops::RWops::from_bytes(&data[..]).unwrap();
-                    let chnk = rwops.load_wav().unwrap();
-                    game_resources.sfx.insert(id, Loaded(chnk));
-                }
-                MessageFromAsync::Tileset(id, tileset) => {
-                    let ts = tileset;
-                    let ts = ts.to_gui(&texture_creator);
-                    game_resources.tilesets.insert(id, ts);
-                }
-                MessageFromAsync::MapSegment(_map, _x, _y, data) => {
-                    let ms = data.to_gui();
-                    temporary_maps.push(ms);
-                }
-            }
-        }
         for event in event_pump.poll_iter() {
             match event {
                 Event::Quit { .. }
@@ -335,7 +234,7 @@ pub fn startup(mode: DrawMode) {
         }
 
         if let Some(ms) = &mut parsing_map {
-            if ms.check_tilesets(&mut game_resources, &mut s1) {
+            if ms.check_tilesets(&mut game_resources) {
                 let map = ms.get_mapnum();
                 let combined = ms.combined();
                 game_resources.get_map(map).insert(combined, ms.clone());
@@ -345,7 +244,7 @@ pub fn startup(mode: DrawMode) {
         mouse.parse();
         mode.process_mouse(mouse.events(), &mut drawmode_commands);
         mouse.clear();
-        mode.process_frame(&mut game_resources, &mut s1, &mut drawmode_commands);
+        mode.process_frame(&mut game_resources, &mut drawmode_commands);
         while let Some(m) = drawmode_commands.pop_front() {
             match m {
                 DrawModeRequest::ChangeDrawMode(m) => {
@@ -365,15 +264,13 @@ pub fn startup(mode: DrawMode) {
                         DrawMode::TileExplorer => {
                             Box::new(TileExplorer::new(&texture_creator, &mut game_resources))
                         }
-                        DrawMode::MapExplorer => Box::new(MapExplorer::new(
-                            &texture_creator,
-                            &mut game_resources,
-                            &mut s1,
-                        )),
+                        DrawMode::MapExplorer => {
+                            Box::new(MapExplorer::new(&texture_creator, &mut game_resources))
+                        }
                         DrawMode::GameLoader => {
                             Box::new(GameLoader::new(&texture_creator, &mut game_resources))
                         }
-                        DrawMode::Login => Box::new(Login::new(&texture_creator)),
+                        DrawMode::Login => Box::new(Login::new(&mut game_resources)),
                         DrawMode::CharacterSelect => {
                             Box::new(CharacterSelect::new(&texture_creator, &mut game_resources))
                         }
@@ -390,7 +287,7 @@ pub fn startup(mode: DrawMode) {
                 }
             }
         }
-        mode.draw(&mut canvas, mouse.cursor(), &mut game_resources, &mut s1);
+        mode.draw(&mut canvas, mouse.cursor(), &mut game_resources);
         let _e = canvas.copy(&dummy_texture, None, None);
         canvas.present();
         let framerate = mode.framerate() as u64;

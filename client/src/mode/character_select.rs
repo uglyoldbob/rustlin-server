@@ -4,30 +4,33 @@ use crate::DrawMode;
 use crate::DrawModeRequest;
 use crate::GameMode;
 use crate::GameResources;
-use crate::Loadable::*;
-use crate::MessageToAsync;
 use sdl2::pixels::Color;
 use sdl2::rect::Rect;
+use sdl2::render::Texture;
 use sdl2::render::TextureCreator;
 use std::collections::VecDeque;
+use std::rc::Rc;
 
 /// The screen that allows for selection of which character to play
 pub struct CharacterSelect<'a> {
     b: Vec<Box<dyn Widget<'a> + 'a>>,
-    char_sel: Vec<CharacterSelectWidget>,
+    char_sel: Vec<CharacterSelectWidget<'a>>,
     page: u8,
     selection: Option<u8>,
+    background: Option<Rc<Texture<'a>>>,
+    page1: [Option<Rc<Texture<'a>>>; 2],
+    page2: [Option<Rc<Texture<'a>>>; 2],
     //1764.img for disabled slot
 }
 
 impl<'a> CharacterSelect<'a> {
-    pub fn new<T>(_tc: &'a TextureCreator<T>, _r: &mut GameResources<'a, '_, '_>) -> Self {
+    pub fn new<T>(_tc: &'a TextureCreator<T>, r: &mut GameResources<'a, '_, '_>) -> Self {
         let mut b: Vec<Box<dyn Widget<'a> + 'a>> = Vec::new();
-        b.push(Box::new(ImgButton::new(0x6e5, 0x0f7, 0x10b)));
-        b.push(Box::new(ImgButton::new(0x6e7, 0x16c, 0x10b)));
-        b.push(Box::new(ImgButton::new(0x334, 0x20d, 0x185)));
-        b.push(Box::new(ImgButton::new(0x336, 0x20d, 0x19a)));
-        b.push(Box::new(ImgButton::new(0x134, 0x20d, 0x1b5)));
+        b.push(Box::new(ImgButton::new(0x6e5, 0x0f7, 0x10b, r)));
+        b.push(Box::new(ImgButton::new(0x6e7, 0x16c, 0x10b, r)));
+        b.push(Box::new(ImgButton::new(0x334, 0x20d, 0x185, r)));
+        b.push(Box::new(ImgButton::new(0x336, 0x20d, 0x19a, r)));
+        b.push(Box::new(ImgButton::new(0x134, 0x20d, 0x1b5, r)));
         let mut ch = Vec::new();
 
         ch.push(CharacterSelectWidget::new(0x13, 0));
@@ -39,6 +42,9 @@ impl<'a> CharacterSelect<'a> {
             char_sel: ch,
             page: 0,
             selection: None,
+            background: r.get_or_load_png(815),
+            page1: [r.get_or_load_img(0x6ea), r.get_or_load_img(0x6e9)],
+            page2: [r.get_or_load_img(0x6ec), r.get_or_load_img(0x6eb)],
         }
     }
 }
@@ -87,16 +93,11 @@ impl<'a> GameMode<'a> for CharacterSelect<'a> {
         &mut self,
         _button: sdl2::keyboard::Keycode,
         _down: bool,
-        _r: &mut GameResources,
+        _r: &mut GameResources<'a, '_, '_>,
     ) {
     }
 
-    fn process_frame(
-        &mut self,
-        r: &mut GameResources,
-        _send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
-        requests: &mut VecDeque<DrawModeRequest>,
-    ) {
+    fn process_frame(&mut self, r: &mut GameResources, requests: &mut VecDeque<DrawModeRequest>) {
         self.char_sel[0].set_type(r.characters[(0 + self.page * 4) as usize].t);
         self.char_sel[1].set_type(r.characters[(1 + self.page * 4) as usize].t);
         self.char_sel[2].set_type(r.characters[(2 + self.page * 4) as usize].t);
@@ -170,55 +171,47 @@ impl<'a> GameMode<'a> for CharacterSelect<'a> {
         canvas: &mut sdl2::render::WindowCanvas,
         cursor: Option<(i16, i16)>,
         r: &mut GameResources<'a, '_, '_>,
-        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
     ) {
         canvas.set_draw_color(Color::RGB(0, 0, 0));
         canvas.clear();
-        let value = 815;
-        if r.pngs.contains_key(&value) {
-            if let Loaded(t) = &r.pngs[&value] {
-                let _e = canvas.copy(t, None, None);
-            }
-        } else {
-            r.pngs.insert(value, Loading);
-            let _e = send.blocking_send(MessageToAsync::LoadPng(value));
+        if let Some(t) = &self.background {
+            let q = t.query();
+            let _e = canvas.copy(&t, None, Rect::new(0, 0, q.width.into(), q.height.into()));
         }
 
-        let value = if self.page == 0 { 0x6ea } else { 0x6e9 };
-        if r.imgs.contains_key(&value) {
-            if let Loaded(t) = &r.imgs[&value] {
-                let q = t.query();
-                let _e = canvas.copy(
-                    t,
-                    None,
-                    Rect::new(0x127, 0x10f, q.width.into(), q.height.into()),
-                );
-            }
+        let value = if self.page == 0 {
+            &self.page1[0]
         } else {
-            r.imgs.insert(value, Loading);
-            let _e = send.blocking_send(MessageToAsync::LoadImg(value));
+            &self.page1[1]
+        };
+        if let Some(t) = value {
+            let q = t.query();
+            let _e = canvas.copy(
+                &t,
+                None,
+                Rect::new(0x127, 0x10f, q.width.into(), q.height.into()),
+            );
         }
 
-        let value = if self.page == 1 { 0x6ec } else { 0x6eb };
-        if r.imgs.contains_key(&value) {
-            if let Loaded(t) = &r.imgs[&value] {
-                let q = t.query();
-                let _e = canvas.copy(
-                    t,
-                    None,
-                    Rect::new(0x146, 0x10f, q.width.into(), q.height.into()),
-                );
-            }
+        let value = if self.page == 1 {
+            &self.page2[0]
         } else {
-            r.imgs.insert(value, Loading);
-            let _e = send.blocking_send(MessageToAsync::LoadImg(value));
+            &self.page2[1]
+        };
+        if let Some(t) = value {
+            let q = t.query();
+            let _e = canvas.copy(
+                &t,
+                None,
+                Rect::new(0x146, 0x10f, q.width.into(), q.height.into()),
+            );
         }
 
         for w in &mut self.b {
-            w.draw(canvas, cursor, r, send);
+            w.draw(canvas, cursor, r);
         }
         for w in &mut self.char_sel {
-            w.draw(canvas, cursor, r, send);
+            w.draw(canvas, cursor, r);
         }
     }
 

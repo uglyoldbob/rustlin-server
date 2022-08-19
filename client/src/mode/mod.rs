@@ -1,6 +1,5 @@
 use crate::mouse::MouseEventOutput;
 use crate::GameResources;
-use crate::MessageToAsync;
 use std::collections::VecDeque;
 
 pub enum DrawMode {
@@ -49,7 +48,6 @@ pub trait GameMode<'a> {
     fn process_frame(
         &mut self,
         r: &mut GameResources<'a, '_, '_>,
-        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
         requests: &mut VecDeque<DrawModeRequest>,
     );
     fn draw(
@@ -57,7 +55,6 @@ pub trait GameMode<'a> {
         canvas: &mut sdl2::render::WindowCanvas,
         cursor: Option<(i16, i16)>,
         r: &mut GameResources<'a, '_, '_>,
-        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
     );
     /// Framerate is specified in frames per second
     fn framerate(&self) -> u8;

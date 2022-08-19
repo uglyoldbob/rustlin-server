@@ -5,7 +5,6 @@ use crate::DrawMode;
 use crate::DrawModeRequest;
 use crate::GameMode;
 use crate::GameResources;
-use crate::MessageToAsync;
 use sdl2::pixels::Color;
 use sdl2::render::TextureCreator;
 use std::collections::VecDeque;
@@ -22,7 +21,7 @@ pub struct TileExplorer<'a, T> {
 }
 
 impl<'a, T> TileExplorer<'a, T> {
-    pub fn new(tc: &'a TextureCreator<T>, r: &mut GameResources) -> Self {
+    pub fn new(tc: &'a TextureCreator<T>, r: &mut GameResources<'a, '_, '_>) -> Self {
         let mut b: Vec<Box<dyn Widget + 'a>> = Vec::new();
         b.push(Box::new(TextButton::new(tc, 320, 400, "Go Back", &r.font)));
         let mut disp = Vec::new();
@@ -42,7 +41,7 @@ impl<'a, T> TileExplorer<'a, T> {
             current_subtile: 0,
             tc: tc,
             displayed: false,
-            tile_ref: None,
+            tile_ref: r.get_or_load_tileset(0),
         }
     }
 }
@@ -90,7 +89,7 @@ impl<'a, T> GameMode<'a> for TileExplorer<'a, T> {
         &mut self,
         button: sdl2::keyboard::Keycode,
         down: bool,
-        r: &mut GameResources,
+        r: &mut GameResources<'a, '_, '_>,
     ) {
         if down {
             match button {
@@ -99,7 +98,7 @@ impl<'a, T> GameMode<'a> for TileExplorer<'a, T> {
                         if true {
                             self.current_tile -= 1;
                             self.current_subtile = 0;
-                            self.tile_ref = None;
+                            self.tile_ref = r.get_or_load_tileset(self.current_tile);
                             let words = format!(
                                 "Displaying {}.til subtile {}",
                                 self.current_tile, self.current_subtile
@@ -114,7 +113,7 @@ impl<'a, T> GameMode<'a> for TileExplorer<'a, T> {
                         if true {
                             self.current_tile += 1;
                             self.current_subtile = 0;
-                            self.tile_ref = None;
+                            self.tile_ref = r.get_or_load_tileset(self.current_tile);
                             let words = format!(
                                 "Displaying {}.til subtile {}",
                                 self.current_tile, self.current_subtile
@@ -158,14 +157,8 @@ impl<'a, T> GameMode<'a> for TileExplorer<'a, T> {
     fn process_frame(
         &mut self,
         r: &mut GameResources<'a, '_, '_>,
-        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
         _requests: &mut VecDeque<DrawModeRequest>,
     ) {
-        if let None = self.tile_ref {
-            self.tile_ref = r.tilesets.get_or_load(self.current_tile, || {
-                let _e = send.blocking_send(MessageToAsync::LoadTileset(self.current_tile));
-            });
-        }
     }
 
     fn draw(
@@ -173,16 +166,15 @@ impl<'a, T> GameMode<'a> for TileExplorer<'a, T> {
         canvas: &mut sdl2::render::WindowCanvas,
         cursor: Option<(i16, i16)>,
         r: &mut GameResources<'a, '_, '_>,
-        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
     ) {
         canvas.set_draw_color(Color::RGB(0, 0, 0));
         canvas.clear();
 
         for w in &mut self.b {
-            w.draw(canvas, cursor, r, send);
+            w.draw(canvas, cursor, r);
         }
         for w in &mut self.disp {
-            w.draw(canvas, cursor, r, send);
+            w.draw(canvas, cursor, r);
         }
 
         if let Some(t) = &self.tile_ref {

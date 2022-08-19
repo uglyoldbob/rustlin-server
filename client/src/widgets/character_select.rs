@@ -1,9 +1,9 @@
+use std::rc::Rc;
+
 use crate::widgets::Widget;
 use crate::GameResources;
 use crate::ImageBox;
-use crate::Loadable::*;
-use crate::MessageToAsync;
-use sdl2::rect::Rect;
+use sdl2::render::Texture;
 
 #[derive(PartialEq, Clone, Copy, Debug)]
 pub enum CharacterDisplayType {
@@ -196,9 +196,10 @@ impl CharacterDisplayType {
     }
 }
 
-pub struct CharacterSelectWidget {
+pub struct CharacterSelectWidget<'a> {
     plain: u16,
     hover: u16,
+    images: Vec<Option<Rc<Texture<'a>>>>,
     last_png: u16,
     pub t: CharacterDisplayType,
     animate_start: u16,
@@ -214,9 +215,10 @@ pub struct CharacterSelectWidget {
     last_draw: Option<ImageBox>,
 }
 
-impl CharacterSelectWidget {
+impl<'a> CharacterSelectWidget<'a> {
     pub fn new(x: u16, y: u16) -> Self {
         Self {
+            images: Vec::new(),
             plain: 0,
             hover: 1,
             last_png: 0,
@@ -236,7 +238,7 @@ impl CharacterSelectWidget {
     }
 }
 
-impl CharacterSelectWidget {
+impl<'a> CharacterSelectWidget<'a> {
     pub fn set_animating(&mut self, a: bool) {
         if a {
             if !self.animating {
@@ -385,11 +387,12 @@ impl CharacterSelectWidget {
                     self.animate_quantity = 87;
                 }
             }
+            self.images.clear();
         }
     }
 }
 
-impl<'a> Widget<'a> for CharacterSelectWidget {
+impl<'a> Widget<'a> for CharacterSelectWidget<'a> {
     fn last_draw(&self) -> Option<ImageBox> {
         self.last_draw
     }
@@ -410,152 +413,6 @@ impl<'a> Widget<'a> for CharacterSelectWidget {
         canvas: &mut sdl2::render::WindowCanvas,
         cursor: bool,
         r: &mut GameResources,
-        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
     ) {
-        let value = if self.animating {
-            let val: u16 = self.animate_start + self.animate_index;
-            val
-        } else {
-            if cursor {
-                if let Some(i) = r.pngs.get(&self.hover) {
-                    if let Loaded(_) = i {
-                        self.hover
-                    } else {
-                        self.plain
-                    }
-                } else {
-                    r.pngs.insert(self.hover, Loading);
-                    let _e = send.blocking_send(MessageToAsync::LoadPng(self.hover));
-                    self.plain
-                }
-            } else {
-                self.plain
-            }
-        };
-        if self.animating {
-            let mut check_val = self.animate_index + 1;
-            if check_val == self.animate_quantity {
-                check_val = 0;
-            }
-            if let Some(i) = r.pngs.get(&check_val) {
-                if let Loaded(_) = i {
-                    if self.drawn {
-                        self.drawn = false;
-                        self.animate_index += 1;
-                    }
-                }
-            } else {
-                r.pngs.insert(check_val, Loading);
-                let _e = send.blocking_send(MessageToAsync::LoadPng(check_val));
-            }
-            if self.animate_index == self.animate_quantity {
-                self.animate_index = 0;
-            }
-        }
-
-        self.last_draw = if !self.no_draw {
-            if self.locked {
-                let value = 1764;
-                if r.imgs.contains_key(&value) {
-                    if let Loaded(t) = &r.imgs[&value] {
-                        let q = t.query();
-                        let _e = canvas.copy(
-                            t,
-                            None,
-                            Rect::new(
-                                self.x.into(),
-                                (self.y + 0x10).into(),
-                                q.width.into(),
-                                q.height.into(),
-                            ),
-                        );
-                    }
-                } else {
-                    r.imgs.insert(value, Loading);
-                    let _e = send.blocking_send(MessageToAsync::LoadImg(value));
-                }
-                None
-            } else {
-                if r.pngs.contains_key(&value) {
-                    if let Loaded(t) = &r.pngs[&value] {
-                        let q = t.query();
-                        self.last_png = value;
-                        self.drawn = true;
-                        let _e = canvas.copy(
-                            t,
-                            None,
-                            Rect::new(
-                                self.x as i32,
-                                self.y as i32,
-                                q.width.into(),
-                                q.height.into(),
-                            ),
-                        );
-                        Some(ImageBox {
-                            x: self.x,
-                            y: self.y,
-                            w: q.width as u16,
-                            h: q.height as u16,
-                        })
-                    } else {
-                        if let Some(i) = r.pngs.get(&self.last_png) {
-                            if let Loaded(t) = i {
-                                let q = t.query();
-                                let _e = canvas.copy(
-                                    t,
-                                    None,
-                                    Rect::new(
-                                        self.x as i32,
-                                        self.y as i32,
-                                        q.width.into(),
-                                        q.height.into(),
-                                    ),
-                                );
-                                Some(ImageBox {
-                                    x: self.x,
-                                    y: self.y,
-                                    w: q.width as u16,
-                                    h: q.height as u16,
-                                })
-                            } else {
-                                None
-                            }
-                        } else {
-                            None
-                        }
-                    }
-                } else {
-                    r.pngs.insert(value, Loading);
-                    let _e = send.blocking_send(MessageToAsync::LoadPng(value));
-                    if let Some(i) = r.pngs.get(&self.last_png) {
-                        if let Loaded(t) = i {
-                            let q = t.query();
-                            let _e = canvas.copy(
-                                t,
-                                None,
-                                Rect::new(
-                                    self.x as i32,
-                                    self.y as i32,
-                                    q.width.into(),
-                                    q.height.into(),
-                                ),
-                            );
-                            Some(ImageBox {
-                                x: self.x,
-                                y: self.y,
-                                w: q.width as u16,
-                                h: q.height as u16,
-                            })
-                        } else {
-                            None
-                        }
-                    } else {
-                        None
-                    }
-                }
-            }
-        } else {
-            None
-        };
     }
 }

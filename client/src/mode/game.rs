@@ -4,22 +4,23 @@ use crate::DrawMode;
 use crate::DrawModeRequest;
 use crate::GameMode;
 use crate::GameResources;
-use crate::Loadable::*;
-use crate::MessageToAsync;
 use sdl2::pixels::Color;
 use sdl2::rect::Rect;
+use sdl2::render::Texture;
 use sdl2::render::TextureCreator;
 use std::collections::VecDeque;
+use std::rc::Rc;
 
 /// The screen that allows for selection of which character to play
 pub struct Game<'a> {
     b: Vec<Box<dyn Widget<'a> + 'a>>,
     disp: Vec<DynamicTextWidget<'a>>,
     sprites: Vec<SpriteWidget>,
+    framing: [Option<Rc<Texture<'a>>>; 5],
 }
 
 impl<'a> Game<'a> {
-    pub fn new<T>(tc: &'a TextureCreator<T>, r: &mut GameResources) -> Self {
+    pub fn new<T>(tc: &'a TextureCreator<T>, r: &mut GameResources<'a, '_, '_>) -> Self {
         let mut b: Vec<Box<dyn Widget + 'a>> = Vec::new();
         b.push(Box::new(PlainColorButton::new(tc, 50, 50, 50, 50)));
         let mut d = Vec::new();
@@ -52,6 +53,13 @@ impl<'a> Game<'a> {
             b: b,
             disp: d,
             sprites: Vec::new(),
+            framing: [
+                r.get_or_load_img(1028),
+                r.get_or_load_img(1019),
+                r.get_or_load_img(1029),
+                r.get_or_load_img(1030),
+                r.get_or_load_img(1031),
+            ],
         }
     }
 }
@@ -103,12 +111,7 @@ impl<'a> GameMode<'a> for Game<'a> {
     ) {
     }
 
-    fn process_frame(
-        &mut self,
-        _r: &mut GameResources,
-        _send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
-        _requests: &mut VecDeque<DrawModeRequest>,
-    ) {
+    fn process_frame(&mut self, _r: &mut GameResources, _requests: &mut VecDeque<DrawModeRequest>) {
     }
 
     fn draw(
@@ -116,76 +119,45 @@ impl<'a> GameMode<'a> for Game<'a> {
         canvas: &mut sdl2::render::WindowCanvas,
         cursor: Option<(i16, i16)>,
         r: &mut GameResources<'a, '_, '_>,
-        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
     ) {
         canvas.set_draw_color(Color::RGB(0, 0, 0));
         canvas.clear();
 
-        let value = 1028;
-        if r.imgs.contains_key(&value) {
-            if let Loaded(t) = &r.imgs[&value] {
-                let q = t.query();
-                let _e = canvas.copy(t, None, Rect::new(0, 368, q.width.into(), q.height.into()));
-            }
-        } else {
-            r.imgs.insert(value, Loading);
-            let _e = send.blocking_send(MessageToAsync::LoadImg(value));
+        if let Some(t) = &self.framing[0] {
+            let q = t.query();
+            let _e = canvas.copy(&t, None, Rect::new(0, 368, q.width.into(), q.height.into()));
         }
 
-        let value = 1019;
-        if r.imgs.contains_key(&value) {
-            if let Loaded(t) = &r.imgs[&value] {
-                let q = t.query();
-                let _e = canvas.copy(
-                    t,
-                    None,
-                    Rect::new(485, 366, q.width.into(), q.height.into()),
-                );
-            }
-        } else {
-            r.imgs.insert(value, Loading);
-            let _e = send.blocking_send(MessageToAsync::LoadImg(value));
+        if let Some(t) = &self.framing[1] {
+            let q = t.query();
+            let _e = canvas.copy(
+                &t,
+                None,
+                Rect::new(485, 366, q.width.into(), q.height.into()),
+            );
         }
 
-        let value = 1029;
-        if r.imgs.contains_key(&value) {
-            if let Loaded(t) = &r.imgs[&value] {
-                let q = t.query();
-                let _e = canvas.copy(t, None, Rect::new(3, 386, q.width.into(), q.height.into()));
-            }
-        } else {
-            r.imgs.insert(value, Loading);
-            let _e = send.blocking_send(MessageToAsync::LoadImg(value));
+        if let Some(t) = &self.framing[2] {
+            let q = t.query();
+            let _e = canvas.copy(&t, None, Rect::new(3, 386, q.width.into(), q.height.into()));
         }
 
-        let value = 1030;
-        if r.imgs.contains_key(&value) {
-            if let Loaded(t) = &r.imgs[&value] {
-                let q = t.query();
-                let _e = canvas.copy(t, None, Rect::new(3, 402, q.width.into(), q.height.into()));
-            }
-        } else {
-            r.imgs.insert(value, Loading);
-            let _e = send.blocking_send(MessageToAsync::LoadImg(value));
+        if let Some(t) = &self.framing[3] {
+            let q = t.query();
+            let _e = canvas.copy(&t, None, Rect::new(3, 402, q.width.into(), q.height.into()));
         }
 
-        let value = 1031;
-        if r.imgs.contains_key(&value) {
-            if let Loaded(t) = &r.imgs[&value] {
-                let q = t.query();
-                let _e = canvas.copy(t, None, Rect::new(3, 423, q.width.into(), q.height.into()));
-            }
-        } else {
-            r.imgs.insert(value, Loading);
-            let _e = send.blocking_send(MessageToAsync::LoadImg(value));
+        if let Some(t) = &self.framing[4] {
+            let q = t.query();
+            let _e = canvas.copy(&t, None, Rect::new(3, 423, q.width.into(), q.height.into()));
         }
 
         for w in &mut self.disp {
-            w.draw(canvas, cursor, r, send);
+            w.draw(canvas, cursor, r);
         }
 
         for w in &mut self.b {
-            w.draw(canvas, cursor, r, send);
+            w.draw(canvas, cursor, r);
         }
     }
 

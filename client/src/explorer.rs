@@ -3,9 +3,9 @@
 use crate::map::MapSegment;
 use std::collections::HashSet;
 use std::fs;
+use std::io::Read;
+use std::io::Write;
 use std::path::PathBuf;
-use tokio::io::AsyncReadExt;
-use tokio::io::AsyncWriteExt;
 
 mod pack;
 use crate::pack::*;
@@ -137,39 +137,35 @@ async fn test_map_load() {
     let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     d.pop();
     d.push("map_testing_results.txt");
-    let mut fo = tokio::fs::File::create(d).await.unwrap();
+    let mut fo = std::fs::File::create(d).unwrap();
 
     let w = format!("Number of seg maps {}\n", seg_maps.len());
     fo.write_all(w.as_bytes())
-        .await
         .expect("Failed writing results to file");
 
     let w = format!("Number of s32 maps {}\n", maps.len());
     fo.write_all(w.as_bytes())
-        .await
         .expect("Failed writing results to file");
 
     for f in &maps {
         println!("Map file {}", f.display());
-        let data = tokio::fs::File::open(f).await;
+        let data = std::fs::File::open(f);
         if let Ok(mut data) = data {
             let mut buf = Vec::new();
-            let _e = data.read_to_end(&mut buf).await;
+            let _e = data.read_to_end(&mut buf);
             let mut c = std::io::Cursor::new(&buf);
-            let ms = MapSegment::load_map_s32(&mut c, 32768, 32768, 0).await;
+            let ms = MapSegment::load_map_s32(&mut c, 32768, 32768, 0);
             match ms {
                 Ok(_m) => {
                     num_success += 1;
                     let w = format!("Map success {}\n", f.display());
                     fo.write_all(w.as_bytes())
-                        .await
                         .expect("Failed writing results to file");
                 }
                 Err(e) => {
                     map_s32_failures.push(f);
                     let w = format!("Map failure {} is:\n{}\n", f.display(), e);
                     fo.write_all(w.as_bytes())
-                        .await
                         .expect("Failed writing results to file");
                 }
             }
@@ -178,25 +174,23 @@ async fn test_map_load() {
 
     for f in &seg_maps {
         println!("Map file {}", f.display());
-        let data = tokio::fs::File::open(f).await;
+        let data = std::fs::File::open(f);
         if let Ok(mut data) = data {
             let mut buf = Vec::new();
-            let _e = data.read_to_end(&mut buf).await;
+            let _e = data.read_to_end(&mut buf);
             let mut c = std::io::Cursor::new(&buf);
-            let ms = MapSegment::load_map_seg(&mut c, 32768, 32768, 0).await;
+            let ms = MapSegment::load_map_seg(&mut c, 32768, 32768, 0);
             match ms {
                 Ok(_m) => {
                     num_success += 1;
                     let w = format!("Map seg success {}\n", f.display());
                     fo.write_all(w.as_bytes())
-                        .await
                         .expect("Failed writing results to file");
                 }
                 Err(e) => {
                     map_seg_failures.push(f);
                     let w = format!("Map seg failure {} is:\n{}\n", f.display(), e);
                     fo.write_all(w.as_bytes())
-                        .await
                         .expect("Failed writing results to file");
                 }
             }

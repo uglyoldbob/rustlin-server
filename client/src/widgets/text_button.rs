@@ -1,7 +1,6 @@
 use crate::widgets::Widget;
 use crate::GameResources;
 use crate::ImageBox;
-use crate::MessageToAsync;
 use sdl2::rect::Rect;
 use sdl2::render::Texture;
 use sdl2::render::TextureCreator;
@@ -59,7 +58,6 @@ impl<'a> Widget<'a> for TextButton<'a> {
         canvas: &mut sdl2::render::WindowCanvas,
         cursor: bool,
         _r: &mut GameResources,
-        _send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
     ) {
         let t = if cursor { &self.t2 } else { &self.t };
         let q = t.query();

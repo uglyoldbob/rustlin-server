@@ -1113,6 +1113,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "omnom"
+version = "3.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "66562a92c66d5937e9d549597c2d3cafe3d2367dd08dc257da730587c2cfc218"
+dependencies = [
+ "memchr",
+]
+
+[[package]]
 name = "once_cell"
 version = "1.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1509,6 +1518,7 @@ dependencies = [
  "criterion",
  "des",
  "generic-array",
+ "omnom",
  "rand 0.8.5",
  "sdl2",
  "stacker",
@@ -1918,7 +1928,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1f559b464de2e2bdabcac6a210d12e9b5a5973c251e102c44c585c71d51bd78e"
 dependencies = [
  "cfg-if",
- "rand 0.4.6",
+ "rand 0.8.5",
  "static_assertions",
 ]
 

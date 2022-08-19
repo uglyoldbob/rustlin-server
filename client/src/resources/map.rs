@@ -1,16 +1,15 @@
 use std::collections::HashMap;
 use std::collections::HashSet;
+use std::io::Read;
+use std::io::Seek;
 use std::rc::Rc;
 
 use crate::GameResources;
+use omnom::ReadExt;
 use sdl2::pixels::PixelFormatEnum;
 use sdl2::rect::Rect;
 use sdl2::render::Texture;
 use sdl2::render::TextureCreator;
-use tokio::io::AsyncReadExt;
-use tokio::io::AsyncSeekExt;
-
-use super::MessageToAsync;
 
 ///Represents the top left pixel of a map coordinate on the screen. This is where the tile for that coordinate is rendered.
 #[derive(Debug, PartialEq)]
@@ -228,36 +227,38 @@ pub struct TileSet {
 }
 
 impl TileSet {
-    pub async fn decode_tileset_data(cursor: &mut std::io::Cursor<&Vec<u8>>) -> Option<Self> {
-        let num_tiles = cursor.read_u16_le().await.ok()?;
-        cursor.read_u16_le().await.ok()?;
+    pub fn decode_tileset_data(cursor: &mut std::io::Cursor<&Vec<u8>>) -> Option<Self> {
+        let num16: u16 = cursor.read_le().ok()?;
+        let num_tiles = num16 as u32;
+        let _waste16: u16 = cursor.read_le().ok()?;
         let mut offsets = Vec::with_capacity(num_tiles as usize);
         for _ in 0..num_tiles {
-            offsets.push(cursor.read_u32_le().await.ok()?);
+            let v: u32 = cursor.read_le().ok()?;
+            offsets.push(v);
         }
-        cursor.read_u32_le().await.ok()?;
+        let w32: u32 = cursor.read_le().ok()?;
         let base_offset = cursor.position();
         let mut tiles = Vec::with_capacity(num_tiles as usize);
         for t in offsets {
-            let _e = cursor
-                .seek(tokio::io::SeekFrom::Start(base_offset + t as u64))
-                .await;
-            let v1 = cursor.read_u8().await.ok()?;
+            let _e = cursor.seek(std::io::SeekFrom::Start(base_offset + t as u64));
+            let v1: u8 = cursor.read_le().ok()?;
             let mirrored_tile_data = if (v1 & 2) != 0 {
                 let mut mirrored_tile_data = [0 as u16; 24 * 48];
-                let x = cursor.read_u8().await.ok()?;
-                let y = cursor.read_u8().await.ok()?;
-                let _w = cursor.read_u8().await.ok()?;
-                let h = cursor.read_u8().await.ok()?;
+                let x: u8 = cursor.read_le().ok()?;
+                let y: u8 = cursor.read_le().ok()?;
+                let _w: u8 = cursor.read_le().ok()?;
+                let h: u8 = cursor.read_le().ok()?;
                 for i in 0..h {
-                    let num_segments = cursor.read_u8().await.ok()?;
+                    let num8: u8 = cursor.read_le().ok()?;
+                    let num_segments = num8 as u32;
                     let mut skip_index = 0;
                     for _ in 0..num_segments {
-                        let skip = cursor.read_u8().await.ok()? / 2;
-                        let seg_width = cursor.read_u8().await.ok()?;
+                        let num: u8 = cursor.read_le().ok()?;
+                        let skip = num / 2;
+                        let seg_width: u8 = cursor.read_le().ok()?;
                         skip_index += skip;
                         for pixel in 0..seg_width {
-                            let val = cursor.read_u16_le().await.ok()?;
+                            let val: u16 = cursor.read_le().ok()?;
                             let index = x as usize
                                 + (y + i) as usize * 48
                                 + skip_index as usize
@@ -271,7 +272,7 @@ impl TileSet {
             } else {
                 let mut tile_data: [u16; 288] = [0; 288];
                 for i in 0..288 {
-                    tile_data[i] = cursor.read_u16_le().await.ok()?;
+                    tile_data[i] = cursor.read_le().ok()?;
                 }
                 let mut mirrored_tile_data = [0 as u16; 24 * 48];
                 let mut ind_offset = 0;
@@ -382,18 +383,12 @@ impl<'a> MapSegmentGui<'a> {
         c
     }
 
-    pub fn check_tilesets(
-        &mut self,
-        r: &mut GameResources<'a, '_, '_>,
-        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
-    ) -> bool {
+    pub fn check_tilesets(&mut self, r: &mut GameResources<'a, '_, '_>) -> bool {
         let mut done = true;
         for tileset in &self.tilesets {
             if !self.tile_ref.contains_key(tileset) {
                 done = false;
-                let t = r.tilesets.get_or_load(*tileset, || {
-                    let _e = send.blocking_send(MessageToAsync::LoadTileset(*tileset));
-                });
+                let t = r.tilesets.get_or_load(*tileset, || {});
                 if let Some(t) = t {
                     self.tile_ref.insert(*tileset, t);
                 }
@@ -577,7 +572,7 @@ impl MapSegment {
         format!("{:4x}{:4x}", modx, mody)
     }
 
-    pub async fn load_map_seg(
+    pub fn load_map_seg(
         cursor: &mut std::io::Cursor<&Vec<u8>>,
         x: u16,
         y: u16,
@@ -587,20 +582,20 @@ impl MapSegment {
         let mut ts = HashSet::new();
         let mut t = [0; 64 * 128];
         for t in t.iter_mut() {
-            let data = cursor.read_u16_le().await.ok().ok_or("Not enough data")? as u32;
+            let v: u16 = cursor.read_le().ok().ok_or("Not enough data")?;
+            let data = v as u32;
             ts.insert(data >> 8);
             *t = data;
         }
 
         ts.insert(2); // for testing
-        let quant = cursor.read_u16_le().await.ok().ok_or("Not enough data")?;
+        let quant: u16 = cursor.read_le().ok().ok_or("Not enough data")?;
         let mut extra_floor_tiles = Vec::with_capacity(quant as usize);
         for _ in 0..quant {
-            let (a, b, c): (u8, u8, u32) = (
-                cursor.read_u8().await.ok().ok_or("Not enough data")?,
-                cursor.read_u8().await.ok().ok_or("Not enough data")?,
-                cursor.read_u16_le().await.ok().ok_or("Not enough data")? as u32,
-            );
+            let t: u8 = cursor.read_le().ok().ok_or("Not enough data")?;
+            let u: u8 = cursor.read_le().ok().ok_or("Not enough data")?;
+            let v: u16 = cursor.read_le().ok().ok_or("Not enough data")?;
+            let (a, b, c): (u8, u8, u32) = (t, u, v as u32);
             ts.insert(c >> 8);
             extra_floor_tiles.push((a, b, c));
         }
@@ -608,29 +603,31 @@ impl MapSegment {
         //read attributes
         let mut t2 = [0; 64 * 128];
         for t in t2.iter_mut() {
-            *t = cursor.read_u8().await.ok().ok_or("Not enough data")? as u16;
+            let v: u8 = cursor.read_le().ok().ok_or("Not enough data")?;
+            *t = v as u16;
         }
 
-        let num_objects = cursor.read_u32_le().await.ok().ok_or("Not enough data")?;
+        let num_objects: u32 = cursor.read_le().ok().ok_or("Not enough data")?;
         let mut objs = Vec::with_capacity(num_objects as usize);
         let mut min_depth = 255;
         let mut max_depth = 0;
         for _ in 0..num_objects {
-            let _index = cursor.read_u16_le().await.ok().ok_or("Not enough data")?;
-            let num_tiles = cursor.read_u16_le().await.ok().ok_or("Not enough data")?;
+            let _index: u16 = cursor.read_le().ok().ok_or("Not enough data")?;
+            let num_tiles: u16 = cursor.read_le().ok().ok_or("Not enough data")?;
             let mut t = Vec::with_capacity(num_tiles as usize);
             for _ in 0..num_tiles {
-                let b = cursor.read_u8().await.ok().ok_or("Not enough data")?;
-                let c = cursor.read_u8().await.ok().ok_or("Not enough data")?;
+                let b: u8 = cursor.read_le().ok().ok_or("Not enough data")?;
+                let c: u8 = cursor.read_le().ok().ok_or("Not enough data")?;
                 if b == 205 && c == 205 {
                     for _ in 0..3 {
-                        cursor.read_u8().await.ok().ok_or("Not enough data")?;
+                        let _i: u8 = cursor.read_le().ok().ok_or("Not enough data")?;
                     }
                     serr.push_str(&format!("This map segment feature is unimplemented?\n"));
                     return Err(serr);
                 } else {
-                    let h = cursor.read_u8().await.ok().ok_or("Not enough data")?;
-                    let data = cursor.read_u16_le().await.ok().ok_or("Not enough data")? as u32;
+                    let h: u8 = cursor.read_le().ok().ok_or("Not enough data")?;
+                    let v: u16 = cursor.read_le().ok().ok_or("Not enough data")?;
+                    let data = v as u32;
                     ts.insert(data >> 8);
                     if min_depth > h {
                         min_depth = h;
@@ -651,38 +648,38 @@ impl MapSegment {
             objs.push(obj);
         }
 
-        let num_switches = cursor.read_u32_le().await.ok().ok_or("Not enough data")?;
+        let num_switches: u32 = cursor.read_le().ok().ok_or("Not enough data")?;
         let mut switches = Vec::with_capacity(num_switches as usize);
         for _ in 0..num_switches {
-            let mys1 = cursor.read_u8().await.ok().ok_or("Not enough data")?;
-            let mys2 = cursor.read_u8().await.ok().ok_or("Not enough data")?;
-            let val = cursor.read_u16_le().await.ok().ok_or("Not enough data")?;
-            let mys3 = cursor.read_u8().await.ok().ok_or("Not enough data")?;
+            let mys1: u8 = cursor.read_le().ok().ok_or("Not enough data")?;
+            let mys2: u8 = cursor.read_le().ok().ok_or("Not enough data")?;
+            let val: u16 = cursor.read_le().ok().ok_or("Not enough data")?;
+            let mys3: u8 = cursor.read_le().ok().ok_or("Not enough data")?;
             switches.push((mys1, mys2, val, mys3));
         }
 
-        let num_tilesets = cursor.read_u8().await.ok().ok_or("Not enough data")?;
+        let num_tilesets: u8 = cursor.read_le().ok().ok_or("Not enough data")?;
         for _ in 0..num_tilesets {
-            let _tileset = cursor.read_u8().await.ok().ok_or("Not enough data")?;
+            let _tileset: u8 = cursor.read_le().ok().ok_or("Not enough data")?;
         }
 
-        let amount_portal = cursor.read_u16_le().await;
-        if let Ok(num_portal) = amount_portal {
+        let amount_portal: Option<u16> = cursor.read_le().ok();
+        if let Some(num_portal) = amount_portal {
             serr.push_str(&format!(
                 "There are {} portals at 0x{:x}\n",
                 num_portal,
                 cursor.position()
             ));
             for _ in 0..num_portal {
-                let mys1 = cursor.read_u8().await.ok().ok_or(serr.clone())?;
+                let mys1: u8 = cursor.read_le().ok().ok_or("Not enough data")?;
                 for _ in 0..mys1 {
-                    cursor.read_u8().await.ok().ok_or(serr.clone())?;
+                    let _i: u8 = cursor.read_le().ok().ok_or("Not enough data")?;
                 }
-                let mys2 = cursor.read_u8().await.ok().ok_or(serr.clone())?;
-                let mys3 = cursor.read_u8().await.ok().ok_or(serr.clone())?;
-                let mys4 = cursor.read_u16_le().await.ok().ok_or("Not enough data")?;
-                let mys5 = cursor.read_u16_le().await.ok().ok_or("Not enough data")?;
-                let mys6 = cursor.read_u16_le().await.ok().ok_or("Not enough data")?;
+                let mys2: u8 = cursor.read_le().ok().ok_or("Not enough data")?;
+                let mys3: u8 = cursor.read_le().ok().ok_or("Not enough data")?;
+                let mys4: u16 = cursor.read_le().ok().ok_or("Not enough data")?;
+                let mys5: u16 = cursor.read_le().ok().ok_or("Not enough data")?;
+                let mys6: u16 = cursor.read_le().ok().ok_or("Not enough data")?;
                 serr.push_str(&format!(
                     "portal data {} {} {} {} {}\n",
                     mys2, mys3, mys4, mys5, mys6
@@ -690,39 +687,22 @@ impl MapSegment {
             }
         }
 
-        let amount_stuff = cursor.read_u16_le().await;
-        if let Ok(amount) = amount_stuff {
+        let amount_stuff: Option<u16> = cursor.read_le().ok();
+        if let Some(amount) = amount_stuff {
             serr.push_str(&format!(
                 "There are {} stuff at 0x{:x}\n",
                 amount,
                 cursor.position()
             ));
             for _ in 0..amount {
-                let a = cursor.read_u16_le().await.ok().ok_or_else(|| {
-                    let mut serr = serr.clone();
-                    serr.push_str("Not enough data");
-                    serr
-                })?;
-                let b = cursor.read_u16_le().await.ok().ok_or_else(|| {
-                    let mut serr = serr.clone();
-                    serr.push_str("Not enough data 2");
-                    serr
-                })?;
-                let c = cursor.read_u16_le().await.ok().ok_or_else(|| {
-                    let mut serr = serr.clone();
-                    serr.push_str("Not enough data 3");
-                    serr
-                })?;
-                serr.push_str(&format!("Stuff data {} {} {}", a, b, c));
+                let a: u16 = cursor.read_le().ok().ok_or("Not enough data")?;
+                let b: u16 = cursor.read_le().ok().ok_or("Not enough data")?;
+                let c: u16 = cursor.read_le().ok().ok_or("Not enough data")?;
             }
         }
 
         let mut v = Vec::new();
-        cursor
-            .read_to_end(&mut v)
-            .await
-            .ok()
-            .ok_or("Not enough data")?;
+        cursor.read_to_end(&mut v).ok().ok_or("Not enough data")?;
         if v.len() > 0 {
             return Err(serr);
         }
@@ -743,7 +723,7 @@ impl MapSegment {
         })
     }
 
-    pub async fn load_map_s32(
+    pub fn load_map_s32(
         cursor: &mut std::io::Cursor<&Vec<u8>>,
         x: u16,
         y: u16,
@@ -752,46 +732,46 @@ impl MapSegment {
         let mut ts = HashSet::new();
         let mut t = [0; 64 * 128];
         for t in t.iter_mut() {
-            let data = cursor.read_u32_le().await.ok().ok_or("Not enough data")?;
+            let data: u32 = cursor.read_le().ok().ok_or("Not enough data")?;
             ts.insert(data >> 8);
             *t = data;
         }
         ts.insert(2); // for testing
-        let quant = cursor.read_u16_le().await.ok().ok_or("Not enough data")?;
+        let quant: u16 = cursor.read_le().ok().ok_or("Not enough data")?;
         let mut extra_floor_tiles = Vec::with_capacity(quant as usize);
         for _ in 0..quant {
             let (a, b, c): (u8, u8, u32) = (
-                cursor.read_u8().await.ok().ok_or("Not enough data")?,
-                cursor.read_u8().await.ok().ok_or("Not enough data")?,
-                cursor.read_u32_le().await.ok().ok_or("Not enough data")?,
+                cursor.read_le().ok().ok_or("Not enough data")?,
+                cursor.read_le().ok().ok_or("Not enough data")?,
+                cursor.read_le().ok().ok_or("Not enough data")?,
             );
             ts.insert(c >> 8);
             extra_floor_tiles.push((a, b, c));
         }
         let mut attr = [0; 64 * 128];
         for t in attr.iter_mut() {
-            *t = cursor.read_u16_le().await.ok().ok_or("Not enough data")?;
+            *t = cursor.read_le().ok().ok_or("Not enough data")?;
         }
 
-        let num_objects = cursor.read_u32_le().await.ok().ok_or("Not enough data")?;
+        let num_objects: u32 = cursor.read_le().ok().ok_or("Not enough data")?;
         let mut objs = Vec::with_capacity(num_objects as usize);
         let mut min_depth = 255;
         let mut max_depth = 0;
         for _ in 0..num_objects {
-            let _index = cursor.read_u16_le().await.ok().ok_or("Not enough data")?;
-            let num_tiles = cursor.read_u16_le().await.ok().ok_or("Not enough data")?;
+            let _index: u16 = cursor.read_le().ok().ok_or("Not enough data")?;
+            let num_tiles: u16 = cursor.read_le().ok().ok_or("Not enough data")?;
             let mut t = Vec::with_capacity(num_tiles as usize);
             for _ in 0..num_tiles {
-                let b = cursor.read_u8().await.ok().ok_or("Not enough data")?;
-                let c = cursor.read_u8().await.ok().ok_or("Not enough data")?;
+                let b: u8 = cursor.read_le().ok().ok_or("Not enough data")?;
+                let c: u8 = cursor.read_le().ok().ok_or("Not enough data")?;
                 if b == 205 && c == 205 {
                     for _ in 0..5 {
-                        cursor.read_u8().await.ok().ok_or("Not enough data")?;
+                        let _i: u8 = cursor.read_le().ok().ok_or("Not enough data")?;
                     }
                     return Err("Unimplemented object".to_string());
                 } else {
-                    let h = cursor.read_u8().await.ok().ok_or("Not enough data")?;
-                    let data = cursor.read_u32_le().await.ok().ok_or("Not enough data")?;
+                    let h: u8 = cursor.read_le().ok().ok_or("Not enough data")?;
+                    let data: u32 = cursor.read_le().ok().ok_or("Not enough data")?;
                     ts.insert(data >> 8);
                     if min_depth > h {
                         min_depth = h;
@@ -811,56 +791,51 @@ impl MapSegment {
             let obj = MapObject { tiles: t };
             objs.push(obj);
         }
-        let num_switches = cursor.read_u32_le().await.ok().ok_or("Not enough data")?;
+        let num_switches: u32 = cursor.read_le().ok().ok_or("Not enough data")?;
         let mut switches = Vec::with_capacity(num_switches as usize);
         for _ in 0..num_switches {
-            let mys1 = cursor.read_u8().await.ok().ok_or("Not enough data")?;
-            let mys2 = cursor.read_u8().await.ok().ok_or("Not enough data")?;
-            let val = cursor.read_u16_le().await.ok().ok_or("Not enough data")?;
-            let mys3 = cursor.read_u8().await.ok().ok_or("Not enough data")?;
+            let mys1: u8 = cursor.read_le().ok().ok_or("Not enough data")?;
+            let mys2: u8 = cursor.read_le().ok().ok_or("Not enough data")?;
+            let val: u16 = cursor.read_le().ok().ok_or("Not enough data")?;
+            let mys3: u8 = cursor.read_le().ok().ok_or("Not enough data")?;
             switches.push((mys1, mys2, val, mys3));
         }
-        let num_tilesets = cursor.read_u32_le().await.ok().ok_or("Not enough data")?;
+        let num_tilesets: u32 = cursor.read_le().ok().ok_or("Not enough data")?;
         for _ in 0..num_tilesets {
-            let _val = cursor.read_u32_le().await.ok().ok_or("Not enough data")?;
+            let _val: u32 = cursor.read_le().ok().ok_or("Not enough data")?;
         }
 
         // if there is data left
-        let amount_portal = cursor.read_u16_le().await;
-        if let Ok(num_portal) = amount_portal {
+        let amount_portal: Option<u16> = cursor.read_le().ok();
+        if let Some(num_portal) = amount_portal {
             for _ in 0..num_portal {
-                let mys1 = cursor.read_u8().await.ok().ok_or("Not enough data")?;
+                let mys1: u8 = cursor.read_le().ok().ok_or("Not enough data")?;
                 for _ in 0..mys1 {
-                    cursor.read_u8().await.ok().ok_or("Not enough data")?;
+                    let _i: u8 = cursor.read_le().ok().ok_or("Not enough data")?;
                 }
-                let mys2 = cursor.read_u8().await.ok().ok_or("Not enough data")?;
-                let mys3 = cursor.read_u8().await.ok().ok_or("Not enough data")?;
-                let mys4 = cursor.read_u16_le().await.ok().ok_or("Not enough data")?;
-                let mys5 = cursor.read_u16_le().await.ok().ok_or("Not enough data")?;
-                let mys6 = cursor.read_u16_le().await.ok().ok_or("Not enough data")?;
+                let mys2: u8 = cursor.read_le().ok().ok_or("Not enough data")?;
+                let mys3: u8 = cursor.read_le().ok().ok_or("Not enough data")?;
+                let mys4: u16 = cursor.read_le().ok().ok_or("Not enough data")?;
+                let mys5: u16 = cursor.read_le().ok().ok_or("Not enough data")?;
+                let mys6: u16 = cursor.read_le().ok().ok_or("Not enough data")?;
             }
         }
 
-        let amount_stuff = cursor.read_u16_le().await;
-        if let Ok(amount) = amount_stuff {
+        let amount_stuff: Option<u16> = cursor.read_le().ok();
+        if let Some(amount) = amount_stuff {
             for _ in 0..amount {
-                let a = cursor.read_u16_le().await.ok().ok_or("Not enough data")?;
-                let b = cursor.read_u16_le().await.ok().ok_or("Not enough data")?;
-                let c = cursor.read_u16_le().await.ok().ok_or("Not enough data")?;
+                let a: u16 = cursor.read_le().ok().ok_or("Not enough data")?;
+                let b: u16 = cursor.read_le().ok().ok_or("Not enough data")?;
+                let c: u16 = cursor.read_le().ok().ok_or("Not enough data")?;
             }
         }
         let pos = cursor.position();
         let mut v = Vec::new();
-        cursor
-            .read_to_end(&mut v)
-            .await
-            .ok()
-            .ok_or("Not enough data")?;
+        cursor.read_to_end(&mut v).ok().ok_or("Not enough data")?;
 
         if v.len() > 0 {
             return Err("Bytes were remaining".to_string());
         }
-
 
         Ok(Self {
             tiles: t,

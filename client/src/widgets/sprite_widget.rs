@@ -2,7 +2,6 @@ use crate::widgets::Widget;
 use crate::GameResources;
 use crate::ImageBox;
 use crate::Loadable::*;
-use crate::MessageToAsync;
 use sdl2::render::TextureCreator;
 
 pub struct SpriteWidget {
@@ -59,7 +58,6 @@ impl<'a> Widget<'a> for SpriteWidget {
         canvas: &mut sdl2::render::WindowCanvas,
         _cursor: bool,
         r: &mut GameResources,
-        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
     ) {
         let id = (self.id_major as u32) << 16 | self.id_minor as u32;
         if let Some(i) = r.sprites.get(&id) {
@@ -78,7 +76,6 @@ impl<'a> Widget<'a> for SpriteWidget {
             }
         } else {
             r.sprites.insert(id, Loading);
-            let _e = send.blocking_send(MessageToAsync::LoadSprite(self.id_major, self.id_minor));
             self.last_draw = None;
         }
     }

@@ -1,9 +1,10 @@
 use crate::Exception;
 use des::cipher::BlockDecryptMut;
 use des::cipher::KeyInit;
+use omnom::ReadExt;
 use std::collections::HashMap;
-use tokio::io::AsyncReadExt;
-use tokio::io::AsyncSeekExt;
+use std::io::Read;
+use std::io::Seek;
 
 /// This structure describes a single pack file used as a container for
 /// game resources in the client.
@@ -11,7 +12,7 @@ pub struct Pack {
     encrypted: bool,
     name: String,
     file_data: HashMap<String, FileEntry>,
-    contents: Option<tokio::fs::File>,
+    contents: Option<std::fs::File>,
 }
 
 #[derive(Clone)]
@@ -60,20 +61,20 @@ impl Pack {
         self.file_data.get(&name).cloned()
     }
 
-    pub async fn raw_file_contents(&mut self, name: String) -> Option<Vec<u8>> {
+    pub fn raw_file_contents(&mut self, name: String) -> Option<Vec<u8>> {
         let index = self.get_file_index(name.clone());
         if let Some(f) = &mut self.contents {
             if let Some(i) = index {
                 let offset = i.offset;
                 let size = i.size;
-                if let Err(_e) = f.seek(std::io::SeekFrom::Start(offset as u64)).await {
+                if let Err(_e) = f.seek(std::io::SeekFrom::Start(offset as u64)) {
                     return None;
                 }
                 let mut buffer = bytes::BytesMut::with_capacity(size as usize);
 
                 let mut amount_read: u64 = 0;
                 loop {
-                    let val = f.read_buf(&mut buffer).await;
+                    let val = f.read(&mut buffer);
                     if let Err(_e) = val {
                         return None;
                     }
@@ -93,8 +94,8 @@ impl Pack {
         }
     }
 
-    pub async fn decrypted_file_contents(&mut self, name: String) -> Option<Vec<u8>> {
-        let mut file = self.raw_file_contents(name).await;
+    pub fn decrypted_file_contents(&mut self, name: String) -> Option<Vec<u8>> {
+        let mut file = self.raw_file_contents(name);
         if let Some(f) = &mut file {
             des_decrypt("~!@#%^$<".to_string(), f);
             Some(f.to_vec())
@@ -103,16 +104,17 @@ impl Pack {
         }
     }
 
-    pub async fn load(&mut self) -> Result<(), Exception> {
+    pub fn load(&mut self) -> Result<(), Exception> {
         let content = format!("{}.pak", self.name);
         let index = format!("{}.idx", self.name);
-        let contents = tokio::fs::File::open(content).await?;
+        let contents = std::fs::File::open(content)?;
         self.contents = Some(contents);
         if let Some(contents) = &self.contents {
-            let mut indx: tokio::fs::File = tokio::fs::File::open(index).await?;
-            let size = indx.read_u32_le().await? as u64;
-            let size2 = (indx.metadata().await?.len() - 4) / 28;
-            let content_size = contents.metadata().await?.len() as u64;
+            let mut indx: std::fs::File = std::fs::File::open(index)?;
+            let size32: u32 = indx.read_le()?;
+            let size = size32 as u64;
+            let size2 = (indx.metadata()?.len() - 4) / 28;
+            let content_size = contents.metadata()?.len() as u64;
             if size != size2 {
                 println!(
                     "File size mismatch {:x} {:x} for {}",
@@ -121,16 +123,16 @@ impl Pack {
                 return Err(Exception::ContentError);
             }
             let mut index_contents = Vec::new();
-            indx.read_to_end(&mut index_contents).await?;
+            indx.read_to_end(&mut index_contents)?;
             if self.encrypted {
                 des_decrypt("~!@#%^$<".to_string(), &mut index_contents);
             }
             let mut indx = std::io::Cursor::new(index_contents);
             for _i in 0..size {
-                let offset = indx.read_u32_le().await?;
+                let offset: u32 = indx.read_le()?;
                 let mut name: [u8; 20] = [0; 20];
-                indx.read_exact(&mut name[..]).await?;
-                let size = indx.read_u32_le().await?;
+                indx.read_exact(&mut name[..])?;
+                let size: u32 = indx.read_le()?;
                 let mut name = String::from_utf8_lossy(&name[..]).into_owned();
                 name.make_ascii_lowercase();
                 name = name.trim_matches(char::from(0)).to_string();

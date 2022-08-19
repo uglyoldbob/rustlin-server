@@ -4,26 +4,31 @@ use crate::DrawMode;
 use crate::DrawModeRequest;
 use crate::GameMode;
 use crate::GameResources;
-use crate::Loadable::*;
-use crate::MessageToAsync;
 use sdl2::pixels::Color;
 use sdl2::rect::Rect;
-use sdl2::render::TextureCreator;
+use sdl2::render::Texture;
 use std::collections::VecDeque;
+use std::rc::Rc;
 
 /// The screen that allows for user login
 pub struct Login<'a> {
     b: Vec<Box<dyn Widget<'a> + 'a>>,
+    background: Option<Rc<Texture<'a>>>,
+    detail: Option<Rc<Texture<'a>>>,
 }
 
 impl<'a> Login<'a> {
-    pub fn new<T>(_tc: &'a TextureCreator<T>) -> Self {
+    pub fn new(r: &mut GameResources<'a, '_, '_>) -> Self {
         let mut b: Vec<Box<dyn Widget + 'a>> = Vec::new();
-        b.push(Box::new(ImgButton::new(53, 0x213, 0x183)));
-        b.push(Box::new(ImgButton::new(65, 0x213, 0x195)));
-        b.push(Box::new(ImgButton::new(55, 0x213, 0x1a8)));
-        b.push(Box::new(ImgButton::new(57, 0x213, 0x1c2)));
-        Self { b: b }
+        b.push(Box::new(ImgButton::new(53, 0x213, 0x183, r)));
+        b.push(Box::new(ImgButton::new(65, 0x213, 0x195, r)));
+        b.push(Box::new(ImgButton::new(55, 0x213, 0x1a8, r)));
+        b.push(Box::new(ImgButton::new(57, 0x213, 0x1c2, r)));
+        Self {
+            b: b,
+            background: r.get_or_load_png(814),
+            detail: r.get_or_load_img(59),
+        }
     }
 }
 
@@ -74,12 +79,7 @@ impl<'a> GameMode<'a> for Login<'a> {
     ) {
     }
 
-    fn process_frame(
-        &mut self,
-        _r: &mut GameResources,
-        _send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
-        _requests: &mut VecDeque<DrawModeRequest>,
-    ) {
+    fn process_frame(&mut self, _r: &mut GameResources, _requests: &mut VecDeque<DrawModeRequest>) {
     }
 
     fn draw(
@@ -87,37 +87,24 @@ impl<'a> GameMode<'a> for Login<'a> {
         canvas: &mut sdl2::render::WindowCanvas,
         cursor: Option<(i16, i16)>,
         r: &mut GameResources<'a, '_, '_>,
-        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
     ) {
         canvas.set_draw_color(Color::RGB(0, 0, 0));
         canvas.clear();
-        let value = 814;
-        if r.pngs.contains_key(&value) {
-            if let Loaded(t) = &r.pngs[&value] {
-                let _e = canvas.copy(t, None, None);
-            }
-        } else {
-            r.pngs.insert(value, Loading);
-            let _e = send.blocking_send(MessageToAsync::LoadPng(value));
+        if let Some(t) = &self.background {
+            let _e = canvas.copy(&t, None, None);
         }
 
-        let value = 59;
-        if r.imgs.contains_key(&value) {
-            if let Loaded(t) = &r.imgs[&value] {
-                let q = t.query();
-                let _e = canvas.copy(
-                    t,
-                    None,
-                    Rect::new(0x1a9, 0x138, q.width.into(), q.height.into()),
-                );
-            }
-        } else {
-            r.imgs.insert(value, Loading);
-            let _e = send.blocking_send(MessageToAsync::LoadImg(value));
+        if let Some(t) = &self.detail {
+            let q = t.query();
+            let _e = canvas.copy(
+                &t,
+                None,
+                Rect::new(0x1a9, 0x138, q.width.into(), q.height.into()),
+            );
         }
 
         for w in &mut self.b {
-            w.draw(canvas, cursor, r, send);
+            w.draw(canvas, cursor, r);
         }
     }
 

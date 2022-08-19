@@ -6,7 +6,6 @@ use crate::resources::map::TileSetGui;
 use crate::widgets::Widget;
 use crate::GameResources;
 use crate::ImageBox;
-use crate::MessageToAsync;
 use sdl2::pixels::Color;
 use sdl2::pixels::PixelFormatEnum;
 use sdl2::rect::Rect;
@@ -36,7 +35,6 @@ impl<'a> MapWidget<'a> {
         w: u16,
         h: u16,
         _r: &mut GameResources<'a, '_, '_>,
-        _send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
     ) -> Self {
         let texture = tc
             .create_texture_target(PixelFormatEnum::RGB555, w as u32, h as u32)
@@ -61,11 +59,7 @@ impl<'a> MapWidget<'a> {
         self.cursor = cursor;
     }
 
-    pub fn check_segments(
-        &mut self,
-        r: &mut GameResources<'a, '_, '_>,
-        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
-    ) {
+    pub fn check_segments(&mut self, r: &mut GameResources<'a, '_, '_>) {
         for seg in &mut self.segments {
             if let Some(segment) = seg {
                 if segment.get_mapnum() != self.mapnum {
@@ -103,9 +97,7 @@ impl<'a> MapWidget<'a> {
         let mut temp_map: [Option<Rc<MapSegmentGui<'a>>>; 4] = [None, None, None, None];
         for (i, (ac, bc)) in required_segments.iter().enumerate() {
             let key = (*ac as u32) << 16 | (*bc as u32);
-            let s1: Option<Rc<MapSegmentGui<'a>>> = r.get_map(self.mapnum).get_or_load(key, || {
-                let _e = send.blocking_send(MessageToAsync::LoadMapSegment(self.mapnum, *ac, *bc));
-            });
+            let s1: Option<Rc<MapSegmentGui<'a>>> = r.get_map(self.mapnum).get_or_load(key, || {});
             temp_map[i] = s1;
         }
 
@@ -141,12 +133,9 @@ impl<'a> Widget<'a> for MapWidget<'a> {
         canvas: &mut sdl2::render::WindowCanvas,
         _cursor: bool,
         r: &mut GameResources<'a, '_, '_>,
-        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
     ) {
         if let None = self.tile_ref {
-            self.tile_ref = r.tilesets.get_or_load(2, || {
-                let _e = send.blocking_send(MessageToAsync::LoadTileset(2));
-            });
+            self.tile_ref = r.tilesets.get_or_load(2, || {});
         }
         let _e = canvas.with_texture_canvas(&mut self.buffer, |canvas| {
             canvas.set_draw_color(Color::RGB(0, 0, 0));

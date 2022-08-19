@@ -4,7 +4,6 @@ use crate::DrawMode;
 use crate::DrawModeRequest;
 use crate::GameMode;
 use crate::GameResources;
-use crate::MessageToAsync;
 use sdl2::pixels::Color;
 use sdl2::render::TextureCreator;
 use std::collections::VecDeque;
@@ -156,12 +155,7 @@ impl<'a, T> GameMode<'a> for SprExplorer<'a, T> {
         }
     }
 
-    fn process_frame(
-        &mut self,
-        _r: &mut GameResources,
-        _send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
-        _requests: &mut VecDeque<DrawModeRequest>,
-    ) {
+    fn process_frame(&mut self, _r: &mut GameResources, _requests: &mut VecDeque<DrawModeRequest>) {
     }
 
     fn draw(
@@ -169,18 +163,17 @@ impl<'a, T> GameMode<'a> for SprExplorer<'a, T> {
         canvas: &mut sdl2::render::WindowCanvas,
         cursor: Option<(i16, i16)>,
         r: &mut GameResources<'a, '_, '_>,
-        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
     ) {
         canvas.set_draw_color(Color::RGB(0, 0, 0));
         canvas.clear();
 
         for w in &mut self.b {
-            w.draw(canvas, cursor, r, send);
+            w.draw(canvas, cursor, r);
         }
         for w in &mut self.disp {
-            w.draw(canvas, cursor, r, send);
+            w.draw(canvas, cursor, r);
         }
-        self.sprite.draw(canvas, cursor, r, send);
+        self.sprite.draw(canvas, cursor, r);
     }
 
     fn framerate(&self) -> u8 {

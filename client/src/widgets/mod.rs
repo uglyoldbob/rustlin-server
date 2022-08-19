@@ -1,6 +1,5 @@
 use crate::GameResources;
 use crate::ImageBox;
-use crate::MessageToAsync;
 
 pub trait Widget<'a> {
     fn draw(
@@ -8,7 +7,6 @@ pub trait Widget<'a> {
         canvas: &mut sdl2::render::WindowCanvas,
         cursor: Option<(i16, i16)>,
         r: &mut GameResources<'a, '_, '_>,
-        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
     ) {
         let hover = if let Some(c) = cursor {
             let (x, y) = c;
@@ -16,14 +14,13 @@ pub trait Widget<'a> {
         } else {
             false
         };
-        self.draw_hover(canvas, hover, r, send);
+        self.draw_hover(canvas, hover, r);
     }
     fn draw_hover(
         &mut self,
         canvas: &mut sdl2::render::WindowCanvas,
         cursor: bool,
         r: &mut GameResources<'a, '_, '_>,
-        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
     );
     fn was_clicked(&mut self) -> bool;
     fn clicked(&mut self);

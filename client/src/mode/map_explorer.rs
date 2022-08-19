@@ -5,7 +5,6 @@ use crate::DrawMode;
 use crate::DrawModeRequest;
 use crate::GameMode;
 use crate::GameResources;
-use crate::MessageToAsync;
 use sdl2::pixels::Color;
 use sdl2::render::TextureCreator;
 use std::collections::VecDeque;
@@ -21,11 +20,7 @@ pub struct MapExplorer<'a, T> {
 }
 
 impl<'a, T> MapExplorer<'a, T> {
-    pub fn new(
-        tc: &'a TextureCreator<T>,
-        r: &mut GameResources<'a, '_, '_>,
-        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
-    ) -> Self {
+    pub fn new(tc: &'a TextureCreator<T>, r: &mut GameResources<'a, '_, '_>) -> Self {
         let mut b: Vec<Box<dyn Widget<'a> + 'a>> = Vec::new();
         b.push(Box::new(TextButton::new(tc, 320, 420, "Go Back", &r.font)));
         let mut disp = Vec::new();
@@ -46,7 +41,7 @@ impl<'a, T> MapExplorer<'a, T> {
             current_y: 32768,
             tc: tc,
             displayed: false,
-            map: MapWidget::new(tc, 0, 0, 640, 400, r, send),
+            map: MapWidget::new(tc, 0, 0, 640, 400, r),
         }
     }
 }
@@ -185,12 +180,7 @@ impl<'a, T> GameMode<'a> for MapExplorer<'a, T> {
         }
     }
 
-    fn process_frame(
-        &mut self,
-        _r: &mut GameResources,
-        _send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
-        _requests: &mut VecDeque<DrawModeRequest>,
-    ) {
+    fn process_frame(&mut self, _r: &mut GameResources, _requests: &mut VecDeque<DrawModeRequest>) {
         self.map.set_map(self.current_map);
         self.map
             .set_map_coord_center(self.current_x, self.current_y);
@@ -201,18 +191,17 @@ impl<'a, T> GameMode<'a> for MapExplorer<'a, T> {
         canvas: &mut sdl2::render::WindowCanvas,
         cursor: Option<(i16, i16)>,
         r: &mut GameResources<'a, '_, '_>,
-        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
     ) {
         canvas.set_draw_color(Color::RGB(0, 0, 0));
         canvas.clear();
-        self.map.check_segments(r, send);
+        self.map.check_segments(r);
         self.map.provide_cursor(cursor);
-        self.map.draw(canvas, cursor, r, send);
+        self.map.draw(canvas, cursor, r);
         for w in &mut self.b {
-            w.draw(canvas, cursor, r, send);
+            w.draw(canvas, cursor, r);
         }
         for w in &mut self.disp {
-            w.draw(canvas, cursor, r, send);
+            w.draw(canvas, cursor, r);
         }
     }
 

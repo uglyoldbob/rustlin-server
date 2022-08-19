@@ -4,19 +4,21 @@ use crate::DrawMode;
 use crate::DrawModeRequest;
 use crate::GameMode;
 use crate::GameResources;
-use crate::Loadable::*;
-use crate::MessageToAsync;
 use sdl2::pixels::Color;
+use sdl2::rect::Rect;
+use sdl2::render::Texture;
 use sdl2::render::TextureCreator;
 use std::collections::VecDeque;
+use std::rc::Rc;
 
 /// This is for exploring the resources of the game client
 pub struct ExplorerMenu<'a> {
     b: Vec<Box<dyn Widget<'a> + 'a>>,
+    background: Option<Rc<Texture<'a>>>,
 }
 
 impl<'a> ExplorerMenu<'a> {
-    pub fn new<T>(tc: &'a TextureCreator<T>, r: &mut GameResources) -> Self {
+    pub fn new<T>(tc: &'a TextureCreator<T>, r: &mut GameResources<'a, '_, '_>) -> Self {
         let mut b: Vec<Box<dyn Widget>> = Vec::new();
         b.push(Box::new(TextButton::new(
             tc,
@@ -60,7 +62,10 @@ impl<'a> ExplorerMenu<'a> {
             "Map browser",
             &r.font,
         )));
-        Self { b: b }
+        Self {
+            b: b,
+            background: r.get_or_load_png(811),
+        }
     }
 }
 
@@ -122,14 +127,13 @@ impl<'a> GameMode<'a> for ExplorerMenu<'a> {
         &mut self,
         _button: sdl2::keyboard::Keycode,
         _down: bool,
-        _r: &mut GameResources,
+        _r: &mut GameResources<'a, '_, '_>,
     ) {
     }
 
     fn process_frame(
         &mut self,
-        _r: &mut GameResources,
-        _send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
+        _r: &mut GameResources<'a, '_, '_>,
         _requests: &mut VecDeque<DrawModeRequest>,
     ) {
     }
@@ -139,22 +143,16 @@ impl<'a> GameMode<'a> for ExplorerMenu<'a> {
         canvas: &mut sdl2::render::WindowCanvas,
         cursor: Option<(i16, i16)>,
         r: &mut GameResources<'a, '_, '_>,
-        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
     ) {
         canvas.set_draw_color(Color::RGB(0, 0, 0));
         canvas.clear();
-        let value = 811;
-        if r.pngs.contains_key(&value) {
-            if let Loaded(t) = &r.pngs[&value] {
-                let _e = canvas.copy(t, None, None);
-            }
-        } else {
-            r.pngs.insert(value, Loading);
-            let _e = send.blocking_send(MessageToAsync::LoadPng(value));
+        if let Some(t) = &self.background {
+            let q = t.query();
+            let _e = canvas.copy(&t, None, Rect::new(0, 0, q.width.into(), q.height.into()));
         }
 
         for w in &mut self.b {
-            w.draw(canvas, cursor, r, send);
+            w.draw(canvas, cursor, r);
         }
     }
 

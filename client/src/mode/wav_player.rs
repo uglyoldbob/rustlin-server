@@ -4,8 +4,7 @@ use crate::DrawMode;
 use crate::DrawModeRequest;
 use crate::GameMode;
 use crate::GameResources;
-use crate::Loadable::*;
-use crate::MessageToAsync;
+use sdl2::mixer::Chunk;
 use sdl2::pixels::Color;
 use sdl2::render::TextureCreator;
 use std::collections::VecDeque;
@@ -15,12 +14,13 @@ pub struct WavPlayer<'a, T> {
     b: Vec<Box<dyn Widget<'a> + 'a>>,
     disp: Vec<DynamicTextWidget<'a>>,
     current_wav: u16,
+    chunk: Option<Chunk>,
     play_wav: bool,
     tc: &'a TextureCreator<T>,
 }
 
 impl<'a, T> WavPlayer<'a, T> {
-    pub fn new(tc: &'a TextureCreator<T>, r: &mut GameResources) -> Self {
+    pub fn new(tc: &'a TextureCreator<T>, r: &mut GameResources<'a, '_, '_>) -> Self {
         let mut b: Vec<Box<dyn Widget + 'a>> = Vec::new();
         b.push(Box::new(TextButton::new(tc, 320, 400, "Go Back", &r.font)));
         let mut disp = Vec::new();
@@ -39,18 +39,7 @@ impl<'a, T> WavPlayer<'a, T> {
             current_wav: 1,
             tc: tc,
             play_wav: false,
-        }
-    }
-
-    fn check_sfx(
-        &mut self,
-        r: &mut GameResources,
-        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
-    ) {
-        if r.sfx.contains_key(&self.current_wav) {
-        } else {
-            r.sfx.insert(self.current_wav, Loading);
-            let _e = send.blocking_send(MessageToAsync::LoadSfx(self.current_wav));
+            chunk: None,
         }
     }
 }
@@ -106,6 +95,7 @@ impl<'a, T> GameMode<'a> for WavPlayer<'a, T> {
                     if self.current_wav > 1 {
                         r.sfx.remove(&self.current_wav);
                         self.current_wav -= 1;
+                        //self.chunk = r.get_or_load_sfx(self.current_wav);
                         let words = format!("Ready to play {}.wav", self.current_wav);
                         self.disp[0].update_text(self.tc, &words, &r.font);
                     }
@@ -114,6 +104,7 @@ impl<'a, T> GameMode<'a> for WavPlayer<'a, T> {
                     if self.current_wav < 65534 {
                         r.sfx.remove(&self.current_wav);
                         self.current_wav += 1;
+                        //self.chunk = r.get_or_load_sfx(self.current_wav);
                         let words = format!("Ready to play {}.wav", self.current_wav);
                         self.disp[0].update_text(self.tc, &words, &r.font);
                     }
@@ -126,22 +117,11 @@ impl<'a, T> GameMode<'a> for WavPlayer<'a, T> {
         }
     }
 
-    fn process_frame(
-        &mut self,
-        r: &mut GameResources,
-        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
-        _requests: &mut VecDeque<DrawModeRequest>,
-    ) {
-        self.check_sfx(r, send);
+    fn process_frame(&mut self, r: &mut GameResources, _requests: &mut VecDeque<DrawModeRequest>) {
         if self.play_wav {
-            if r.sfx.contains_key(&self.current_wav) {
-                match &r.sfx[&self.current_wav] {
-                    Loading => {}
-                    Loaded(s) => {
-                        let chan = sdl2::mixer::Channel::all();
-                        let _e = chan.play(s, 0);
-                    }
-                }
+            if let Some(c) = &self.chunk {
+                let chan = sdl2::mixer::Channel::all();
+                let _e = chan.play(c, 0);
             }
             self.play_wav = false;
         }
@@ -152,16 +132,15 @@ impl<'a, T> GameMode<'a> for WavPlayer<'a, T> {
         canvas: &mut sdl2::render::WindowCanvas,
         cursor: Option<(i16, i16)>,
         r: &mut GameResources<'a, '_, '_>,
-        send: &mut tokio::sync::mpsc::Sender<MessageToAsync>,
     ) {
         canvas.set_draw_color(Color::RGB(0, 0, 0));
         canvas.clear();
 
         for w in &mut self.b {
-            w.draw(canvas, cursor, r, send);
+            w.draw(canvas, cursor, r);
         }
         for w in &mut self.disp {
-            w.draw(canvas, cursor, r, send);
+            w.draw(canvas, cursor, r);
         }
     }
 
