@@ -117,7 +117,7 @@ impl<'a, T> NewCharacterMode<'a, T> {
         let ms = c.t.get_max_stats();
         let mut s = Self {
             tc: tc,
-            background: r.get_or_load_png(824),
+            background: r.get_or_load_img(824),
             b: b,
             c: c,
             options: o,

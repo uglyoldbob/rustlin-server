@@ -221,7 +221,7 @@ pub struct CharacterSelectWidget<'a> {
 
 impl<'a> CharacterSelectWidget<'a> {
     pub fn new(x: u16, y: u16, r: &mut GameResources<'a, '_, '_>) -> Self {
-        Self {
+        let mut s = Self {
             images: Vec::new(),
             plain: 0,
             plain_obj: r.get_or_load_png(0),
@@ -229,7 +229,7 @@ impl<'a> CharacterSelectWidget<'a> {
             hover_obj: r.get_or_load_png(1),
             locked_obj: r.get_or_load_img(1764),
             last_png: 0,
-            t: CharacterDisplayType::Blank,
+            t: CharacterDisplayType::Locked,
             animating: false,
             drawn: false,
             animate_start: 1,
@@ -241,7 +241,9 @@ impl<'a> CharacterSelectWidget<'a> {
             last_draw: None,
             no_draw: true,
             locked: false,
-        }
+        };
+        s.set_type(CharacterDisplayType::Blank, r);
+        s
     }
 }
 

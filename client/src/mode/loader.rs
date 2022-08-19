@@ -24,7 +24,7 @@ impl<'a> GameLoader<'a> {
         b.push(Box::new(PlainColorButton::new(tc, 50, 50, 50, 50)));
         Self {
             b: b,
-            background: r.get_or_load_img(811),
+            background: r.get_or_load_png(811),
             progressbar: r.get_or_load_img(330),
         }
     }
