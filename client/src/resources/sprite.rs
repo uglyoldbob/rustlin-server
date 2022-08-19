@@ -1,24 +1,25 @@
+use omnom::ReadExt;
 use sdl2::pixels::PixelFormatEnum;
 use sdl2::render::Texture;
 use sdl2::render::TextureCreator;
 use sdl2::surface::Surface;
 use std::io::Cursor;
-use tokio::io::AsyncReadExt;
-use tokio::io::AsyncSeekExt;
+use std::io::Read;
+use std::io::Seek;
 
 const EMBEDDED_SPRITE_TABLE: &[u8] = include_bytes!("sprite_table.txt");
 
-async fn get_integer(c: &mut Cursor<Vec<u8>>) -> (Option<u8>, i32) {
-    let mut last_byte = c.read_u8().await;
+fn get_integer(c: &mut Cursor<Vec<u8>>) -> (Option<u8>, i32) {
+    let mut last_byte: Option<u8> = c.read_le().ok();
     loop {
         match last_byte {
-            Ok(last) => match last {
+            Some(last) => match last {
                 b'0'..=b'9' => break,
                 _ => {
-                    last_byte = c.read_u8().await;
+                    last_byte = c.read_le().ok();
                 }
             },
-            Err(_) => break,
+            None => break,
         }
     }
     let mut collected_value: i32 = 0;
@@ -26,7 +27,7 @@ async fn get_integer(c: &mut Cursor<Vec<u8>>) -> (Option<u8>, i32) {
     let mut found_minus = false;
     loop {
         match last_byte {
-            Ok(last_byte) => match last_byte {
+            Some(last_byte) => match last_byte {
                 b'0'..=b'9' => {
                     collected_value *= 10;
                     collected_value += (last_byte - b'0') as i32;
@@ -41,17 +42,17 @@ async fn get_integer(c: &mut Cursor<Vec<u8>>) -> (Option<u8>, i32) {
                     break;
                 }
             },
-            Err(_) => {
+            None => {
                 break;
             }
         }
-        last_byte = c.read_u8().await;
+        last_byte = c.read_le().ok();
     }
     if found_minus {
         collected_value = collected_value * -1;
     }
 
-    (last_byte.ok(), collected_value)
+    (last_byte, collected_value)
 }
 
 pub struct SpriteTableEntry {}
@@ -65,16 +66,16 @@ impl SpriteTableEntry {
             }
         }
         let mut cursor = Cursor::new(data);
-        let _e = cursor.read_u8().await; //first byte is ignored
+        let _e: Option<u8> = cursor.read_le().ok(); //first byte is ignored
         let sprite_val = 0;
         let last_byte: Option<u8>;
-        let (b, val) = get_integer(&mut cursor).await;
+        let (b, val) = get_integer(&mut cursor);
         last_byte = b;
         println!("SPR: {} {:?}", val, last_byte);
         println!("Sprite {} has {} frames", sprite_val, val);
         if let Some(b) = last_byte {
             if b == b'=' {
-                let (_v, val) = get_integer(&mut cursor).await;
+                let (_v, val) = get_integer(&mut cursor);
                 println!("Sprite {} has alias {}", sprite_val, val);
             }
         }
@@ -220,78 +221,79 @@ impl Sprite {
     }
 
     ///Contents of %d-%d.spr is given to this function in a cursor
-    pub async fn parse_sprite(cursor: &mut std::io::Cursor<&Vec<u8>>) -> Option<Self> {
+    pub fn parse_sprite(cursor: &mut std::io::Cursor<&Vec<u8>>) -> Option<Self> {
         let mut pallete = None;
-        let temp = cursor.read_i8().await.ok()?;
+        let temp: i8 = cursor.read_le().ok()?;
         let num_frames = if temp < 0 {
-            let mut num_pallete_entries: u16 = cursor.read_u8().await.ok()? as u16;
+            let num: u8 = cursor.read_le().ok()?;
+            let mut num_pallete_entries: u16 = num as u16;
             if num_pallete_entries == 0 {
                 num_pallete_entries = 0x100;
             }
             let mut p = Vec::new();
             for _ in 0..num_pallete_entries {
-                p.push(cursor.read_u16().await.ok()?);
+                p.push(cursor.read_be().ok()?);
             }
             pallete = Some(p);
-            cursor.read_u8().await.ok()?
+            let w: u8 = cursor.read_le().ok()?;
+            w
         } else {
             temp as u8
         };
         let mut frames = Vec::new();
         for _ in 0..num_frames {
             let mut frame: SpriteFrame = SpriteFrame::new();
-            frame.x1 = cursor.read_i16_le().await.ok()?;
-            frame.x2 = cursor.read_i16_le().await.ok()?;
-            frame.y1 = cursor.read_i16_le().await.ok()?;
-            frame.y2 = cursor.read_i16_le().await.ok()?;
-            frame.mystery1 = cursor.read_u32_le().await.ok()?;
-            let num_tiles = cursor.read_u16_le().await.ok()?;
+            frame.x1 = cursor.read_le().ok()?;
+            frame.x2 = cursor.read_le().ok()?;
+            frame.y1 = cursor.read_le().ok()?;
+            frame.y2 = cursor.read_le().ok()?;
+            frame.mystery1 = cursor.read_le().ok()?;
+            let num_tiles: i16 = cursor.read_le().ok()?;
             for _i in 0..num_tiles {
                 let mut tile = SpriteTileInfo::new();
-                tile.x = cursor.read_i8().await.ok()?;
-                tile.y = cursor.read_i8().await.ok()?;
-                tile.h = cursor.read_u8().await.ok()?;
-                tile.tile = cursor.read_u16_le().await.ok()?;
+                tile.x = cursor.read_le().ok()?;
+                tile.y = cursor.read_le().ok()?;
+                tile.h = cursor.read_le().ok()?;
+                tile.tile = cursor.read_le().ok()?;
                 frame.tiles.push(tile);
             }
             frames.push(frame);
         }
-        let num_tiles = cursor.read_u32_le().await.ok()?;
+        let num_tiles: u32 = cursor.read_le().ok()?;
         let mut tile_offset = Vec::with_capacity(num_tiles as usize);
         for _ in 0..num_tiles {
-            let val = cursor.read_u32_le().await.ok()?;
+            let val: u32 = cursor.read_le().ok()?;
             tile_offset.push(val);
         }
-        let _tile_size = cursor.read_u32_le().await.ok()?;
-        let tile_position = cursor.stream_position().await.ok()?;
+        let _tile_size: u32 = cursor.read_le().ok()?;
+        let tile_position = cursor.stream_position().ok()?;
         let mut tiles = Vec::with_capacity(num_tiles as usize);
         if let Some(p) = &pallete {
             for i in 0..num_tiles {
-                let _e = cursor
-                    .seek(tokio::io::SeekFrom::Start(
-                        tile_position + tile_offset[i as usize] as u64,
-                    ))
-                    .await;
+                let _e = cursor.seek(tokio::io::SeekFrom::Start(
+                    tile_position + tile_offset[i as usize] as u64,
+                ));
                 let mut t: SpriteTile = SpriteTile::new();
-                t.x = cursor.read_i8().await.ok()?;
-                t.y = cursor.read_i8().await.ok()?;
-                t.width = cursor.read_u8().await.ok()?;
-                t.height = cursor.read_u8().await.ok()?;
+                t.x = cursor.read_le().ok()?;
+                t.y = cursor.read_le().ok()?;
+                t.width = cursor.read_le().ok()?;
+                t.height = cursor.read_le().ok()?;
                 let size = t.width as usize * t.height as usize;
                 t.data = Vec::with_capacity(size);
                 for _i in 0..size {
                     t.data.push(0);
                 }
                 for row in 0..t.height {
-                    let row_segments = cursor.read_u8().await.ok()?;
+                    let row_segments: u8 = cursor.read_le().ok()?;
                     let mut row_offset = 0;
                     for _segment in 0..row_segments {
-                        let skip = cursor.read_u8().await.ok()? / 2;
-                        let w = cursor.read_u8().await.ok()?;
+                        let v: u8 = cursor.read_le().ok()?;
+                        let skip: u8 = v / 2;
+                        let w: u8 = cursor.read_le().ok()?;
                         row_offset += skip;
                         for i in 0..w {
                             let i: usize = i as usize;
-                            let index = cursor.read_u8().await.ok()?;
+                            let index: u8 = cursor.read_le().ok()?;
                             let val = p[index as usize];
                             t.data[row as usize * t.width as usize + row_offset as usize + i] = val;
                         }
@@ -301,32 +303,32 @@ impl Sprite {
                 tiles.push(t);
             }
         } else {
+            println!("Parsing non-pallete sprite");
             for i in 0..num_tiles {
-                let _e = cursor
-                    .seek(tokio::io::SeekFrom::Start(
-                        tile_position + tile_offset[i as usize] as u64,
-                    ))
-                    .await;
+                let _e = cursor.seek(tokio::io::SeekFrom::Start(
+                    tile_position + tile_offset[i as usize] as u64,
+                ));
                 let mut t: SpriteTile = SpriteTile::new();
-                t.x = cursor.read_i8().await.ok()?;
-                t.y = cursor.read_i8().await.ok()?;
-                t.width = cursor.read_u8().await.ok()?;
-                t.height = cursor.read_u8().await.ok()?;
+                t.x = cursor.read_le().ok()?;
+                t.y = cursor.read_le().ok()?;
+                t.width = cursor.read_le().ok()?;
+                t.height = cursor.read_le().ok()?;
                 let size = t.width as usize * t.height as usize;
                 t.data = Vec::with_capacity(size);
                 for _i in 0..size {
                     t.data.push(0);
                 }
                 for row in 0..t.height {
-                    let row_segments = cursor.read_u8().await.ok()?;
+                    let row_segments: u8 = cursor.read_le().ok()?;
                     let mut row_offset = 0;
                     for _segment in 0..row_segments {
-                        let skip = cursor.read_u8().await.ok()? / 2;
-                        let w = cursor.read_u8().await.ok()?;
+                        let v: u8 = cursor.read_le().ok()?;
+                        let skip: u8 = v / 2;
+                        let w: u8 = cursor.read_le().ok()?;
                         row_offset += skip;
                         for i in 0..w {
                             let i: usize = i as usize;
-                            let val = cursor.read_u16().await.ok()?;
+                            let val: u16 = cursor.read_be().ok()?;
                             t.data[row as usize * t.width as usize + row_offset as usize + i] = val;
                         }
                         row_offset += w;

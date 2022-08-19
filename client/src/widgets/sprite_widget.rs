@@ -59,24 +59,13 @@ impl<'a> Widget<'a> for SpriteWidget {
         _cursor: bool,
         r: &mut GameResources,
     ) {
-        let id = (self.id_major as u32) << 16 | self.id_minor as u32;
-        if let Some(i) = r.sprites.get(&id) {
-            match i {
-                Loading => {
-                    self.last_draw = None;
-                }
-                Loaded(spr) => {
-                    spr.draw(320, 240, self.frame_index as usize, canvas);
-                    if (self.frame_index + 1) < spr.num_frames() as u16 {
-                        self.frame_index += 1;
-                    } else {
-                        self.frame_index = 0;
-                    }
-                }
+        if let Some(spr) = r.get_or_load_sprite(self.id_major, self.id_minor) {
+            spr.draw(320, 240, self.frame_index as usize, canvas);
+            if (self.frame_index + 1) < spr.num_frames() as u16 {
+                self.frame_index += 1;
+            } else {
+                self.frame_index = 0;
             }
-        } else {
-            r.sprites.insert(id, Loading);
-            self.last_draw = None;
         }
     }
 }

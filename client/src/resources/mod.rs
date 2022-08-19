@@ -440,6 +440,41 @@ impl<'a, 'b, 'c> GameResources<'a, 'b, 'c> {
         }
     }
 
+    pub fn get_or_load_sprite(&mut self, a: u16, b: u16) -> Option<&SpriteGui> {
+        let id = (a as u32) << 16 | (b as u32);
+
+        if !self.sprites.contains_key(&id) {
+            let name = format!("{}-{}.spr", a, b);
+            if let Some(p) = &mut self.packs {
+                let hash = PackFiles::get_hash_index(name.clone());
+                let mut contents = p.sprites[hash as usize].raw_file_contents(name.clone());
+                if let None = contents {
+                    contents = p.sprite.raw_file_contents(name.clone());
+                }
+                if let Some(c) = &contents {
+                    println!("Sprite file is {} file", c.len());
+                    let mut cursor = std::io::Cursor::new(c);
+                    let spr = Sprite::parse_sprite(&mut cursor);
+                    if let Some(spr) = spr {
+                        let sprite = spr.to_gui(&self.tc);
+                        self.sprites.insert(id, Loadable::Loaded(sprite));
+                    } else {
+                        println!("Failed to load sprite file {}", name);
+                    }
+                }
+            }
+        }
+        let t = if let Some(s) = self.sprites.get(&id) {
+            match s {
+                Loadable::Loaded(t) => Some(t),
+                _ => None,
+            }
+        } else {
+            None
+        };
+        t
+    }
+
     pub fn get_or_load_sfx(&mut self, i: u16) -> Option<&Chunk> {
         if self.sfx.contains_key(&i) {
             let t = self.sfx.get(&i);
