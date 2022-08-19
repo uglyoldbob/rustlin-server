@@ -2,8 +2,7 @@
 use crate::map::MapSegmentGui;
 use crate::map::TileSetGui;
 use crate::startup::EMBEDDED_FONT;
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use sdl2::render::TextureCreator;
+use criterion::{criterion_group, criterion_main, Criterion};
 use std::fs;
 use std::path::PathBuf;
 
@@ -25,8 +24,7 @@ pub fn load_map<'a>(map: u16, x: u16, y: u16, rp: PathBuf) -> Option<Box<MapSegm
     GameResources::load_map_segment(map, x, y, rp)
 }
 
-pub fn load_tileset<'a, T>(
-    tc: &'a TextureCreator<T>,
+pub fn load_tileset<'a>(
     r: &mut GameResources<'a, '_, '_>,
     set: u32,
 ) -> Option<TileSetGui<'a>> {
@@ -51,7 +49,7 @@ pub fn bench1(c: &mut Criterion) {
 
     let resources = settings.get("general", "resources").unwrap();
 
-    let mut d = PathBuf::from(resources.clone());
+    let d = PathBuf::from(resources.clone());
 
     let mut group = c.benchmark_group("map loading");
     group.bench_function("map 1", |b| {
@@ -73,7 +71,7 @@ pub fn bench1(c: &mut Criterion) {
     let mut game_resources = GameResources::new(font, resources.clone(), &tc);
 
     group.bench_function("tileset 0", |b| {
-        b.iter(|| load_tileset(&tc, &mut game_resources, 0));
+        b.iter(|| load_tileset(&mut game_resources, 0));
     });
 
     group.finish();
