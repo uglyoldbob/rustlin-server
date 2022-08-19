@@ -358,7 +358,7 @@ impl<'a, 'b, 'c> GameResources<'a, 'b, 'c> {
         self.maps.get_mut(&map).unwrap()
     }
 
-    fn load_map_segment(
+    pub fn load_map_segment(
         map: u16,
         a: u16,
         b: u16,
@@ -475,6 +475,27 @@ impl<'a, 'b, 'c> GameResources<'a, 'b, 'c> {
             } else {
                 None
             }
+        }
+    }
+
+    pub fn load_tileset(&mut self, i: u32) -> Option<TileSetGui<'a>> {
+        if let Some(p) = &mut self.packs {
+            let name = format!("{}.til", i);
+            let data = p.tile.raw_file_contents(name.clone());
+            if let Some(data) = data {
+                let mut cursor = std::io::Cursor::new(&data);
+                let tileset = TileSet::decode_tileset_data(&mut cursor);
+                if let Some(t) = tileset {
+                    let t = t.to_gui(&self.tc);
+                    Some(t)
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        } else {
+            None
         }
     }
 

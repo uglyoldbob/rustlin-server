@@ -3,12 +3,13 @@ use crate::map::MapSegment;
 use crate::map::MapSegmentGui;
 use crate::map::TileSet;
 use crate::map::TileSetGui;
+use crate::startup::EMBEDDED_FONT;
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use sdl2::render::TextureCreator;
 use std::cell::RefCell;
 use std::fs;
 use std::path::PathBuf;
-use tokio::io::AsyncReadExt;
+use std::rc::Rc;
 
 mod pack;
 use crate::pack::*;
@@ -25,132 +26,16 @@ mod resources;
 use crate::resources::*;
 mod widgets;
 
-async fn async_bench1(
-    mut r: tokio::sync::mpsc::Receiver<MessageToAsync>,
-    s: tokio::sync::mpsc::Sender<MessageFromAsync>,
-    resource_path: PathBuf,
-) {
-    let mut res: Resources = Resources::new();
-    loop {
-        if let Some(msg) = r.recv().await {
-            match msg {
-                MessageToAsync::LoadResources(path) => {
-                    println!("Loading resources {}", path);
-                    match PackFiles::load(path).await {
-                        Ok(p) => {
-                            res.packs = Some(p);
-                            let _e = s.send(MessageFromAsync::ResourceStatus(true)).await;
-                        }
-                        Err(()) => {
-                            let _e = s.send(MessageFromAsync::ResourceStatus(false)).await;
-                        }
-                    }
-                }
-                MessageToAsync::LoadMapSegment(map, x, y) => {
-                    let mapn = MapSegment::get_map_name(x, y);
-                    let mut f = resource_path.clone();
-                    f.push("map");
-                    f.push(format!("{}", map));
-                    f.push(format!("{}.s32", mapn));
-                    let p = f.as_os_str().to_str().unwrap().to_string();
-                    let data = tokio::fs::File::open(p).await;
-                    let ms = if let Ok(mut data) = data {
-                        let mut buf = Vec::new();
-                        let _e = data.read_to_end(&mut buf).await;
-                        let mut c = std::io::Cursor::new(&buf);
-                        let ms = MapSegment::load_map_s32(&mut c, x, y, map).await;
-                        if let Err(e) = &ms {
-                            Some(MapSegment::empty_segment(x, y, map))
-                        } else {
-                            ms.ok()
-                        }
-                    } else {
-                        let mut f = resource_path.clone();
-                        f.push("map");
-                        f.push(format!("{}", map));
-                        f.push(format!("{}.seg", mapn));
-                        let p = f.as_os_str().to_str().unwrap().to_string();
-                        let data = tokio::fs::File::open(p).await;
-                        if let Ok(mut data) = data {
-                            let mut buf = Vec::new();
-                            let _e = data.read_to_end(&mut buf).await;
-                            let mut c = std::io::Cursor::new(&buf);
-                            let ms = MapSegment::load_map_seg(&mut c, x, y, map).await;
-                            if let Err(e) = &ms {
-                                Some(MapSegment::empty_segment(x, y, map))
-                            } else {
-                                ms.ok()
-                            }
-                        } else {
-                            Some(MapSegment::empty_segment(x, y, map))
-                        }
-                    };
-                    if let Some(mapseg) = ms {
-                        let _e = s
-                            .send(MessageFromAsync::MapSegment(map, x, y, Box::new(mapseg)))
-                            .await;
-                    }
-                }
-                MessageToAsync::LoadTileset(id) => {
-                    if let Some(p) = &mut res.packs {
-                        let name = format!("{}.til", id);
-                        let data = p.tile.raw_file_contents(name.clone()).await;
-                        if let Some(data) = data {
-                            let mut cursor = std::io::Cursor::new(&data);
-                            let tileset = TileSet::decode_tileset_data(&mut cursor).await;
-                            if let Some(t) = tileset {
-                                let _e = s.send(MessageFromAsync::Tileset(id, t)).await;
-                            }
-                        }
-                    }
-                }
-                _ => {}
-            }
-        }
-    }
-}
-
-pub fn load_map<'a>(
-    r: &mut tokio::sync::mpsc::Receiver<MessageFromAsync>,
-    s: tokio::sync::mpsc::Sender<MessageToAsync>,
-    map: u16,
-    x: u16,
-    y: u16,
-) -> MapSegmentGui<'a> {
-    let e = s.blocking_send(MessageToAsync::LoadMapSegment(map, x, y));
-    loop {
-        if let Ok(msg) = r.try_recv() {
-            match msg {
-                MessageFromAsync::MapSegment(_map, _x, _y, data) => {
-                    let data = data.clone();
-                    let ms = data.to_gui();
-                    return ms;
-                }
-                _ => {}
-            }
-        }
-    }
+pub fn load_map<'a>(map: u16, x: u16, y: u16, rp: PathBuf) -> Option<Box<MapSegmentGui<'a>>> {
+    GameResources::load_map_segment(map, x, y, rp)
 }
 
 pub fn load_tileset<'a, T>(
-    r: &mut tokio::sync::mpsc::Receiver<MessageFromAsync>,
-    s: tokio::sync::mpsc::Sender<MessageToAsync>,
     tc: &'a TextureCreator<T>,
+    r: &mut GameResources<'a, '_, '_>,
     set: u32,
-) -> TileSetGui<'a> {
-    let e = s.blocking_send(MessageToAsync::LoadTileset(set));
-    loop {
-        if let Ok(msg) = r.try_recv() {
-            match msg {
-                MessageFromAsync::Tileset(id, tileset) => {
-                    let data = tileset;
-                    let ms = data.to_gui(tc);
-                    return ms;
-                }
-                _ => {}
-            }
-        }
-    }
+) -> Option<TileSetGui<'a>> {
+    r.load_tileset(set)
 }
 
 pub fn bench1(c: &mut Criterion) {
@@ -171,30 +56,13 @@ pub fn bench1(c: &mut Criterion) {
 
     let resources = settings.get("general", "resources").unwrap();
 
-    let mut d = PathBuf::from(resources);
+    let mut d = PathBuf::from(resources.clone());
 
-    let (mut s1, r1) = tokio::sync::mpsc::channel(100);
-    let (s2, mut r2) = tokio::sync::mpsc::channel(100);
-    s1.blocking_send(MessageToAsync::LoadResources(
-        d.as_os_str().to_str().unwrap().to_string(),
-    ));
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    rt.spawn(async_bench1(r1, s2, d.clone()));
-
-    let mut r2 = RefCell::new(r2);
     let mut group = c.benchmark_group("map loading");
     group.bench_function("map 1", |b| {
-        b.iter(|| load_map(r2.get_mut(), s1.clone(), 4, 32768, 32768));
+        b.iter(|| load_map(4, 32768, 32768, d.clone()));
     });
-    drop(rt);
 
-    let (mut s1, r1) = tokio::sync::mpsc::channel(100);
-    let (s2, mut r2) = tokio::sync::mpsc::channel(100);
-    s1.blocking_send(MessageToAsync::LoadResources(
-        d.as_os_str().to_str().unwrap().to_string(),
-    ));
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    rt.spawn(async_bench1(r1, s2, d.clone()));
     let sdl = sdl2::init().unwrap();
     let video = sdl.video().unwrap();
     let mut vid_win = video.window("benchmark", 640, 480);
@@ -203,9 +71,14 @@ pub fn bench1(c: &mut Criterion) {
     let mut canvas = window.into_canvas().build().unwrap();
     let tc = canvas.texture_creator();
 
-    let mut r2 = RefCell::new(r2);
+    let ttf_context = sdl2::ttf::init().unwrap();
+    let efont = sdl2::rwops::RWops::from_bytes(EMBEDDED_FONT).unwrap();
+    let font = ttf_context.load_font_from_rwops(efont, 14).unwrap();
+
+    let mut game_resources = GameResources::new(font, resources.clone(), &tc);
+
     group.bench_function("tileset 0", |b| {
-        b.iter(|| load_tileset(r2.get_mut(), s1.clone(), &tc, 0));
+        b.iter(|| load_tileset(&tc, &mut game_resources, 0));
     });
 
     group.finish();

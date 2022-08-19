@@ -18,7 +18,7 @@ use std::time::Duration;
 
 mod settings;
 
-const EMBEDDED_FONT: &[u8] = include_bytes!("cmsltt10.ttf");
+pub const EMBEDDED_FONT: &[u8] = include_bytes!("cmsltt10.ttf");
 
 fn make_dummy_texture<'a, T>(tc: &'a TextureCreator<T>) -> Texture<'a> {
     let mut data: Vec<u8> = vec![0; (4 * 4 * 2) as usize];
