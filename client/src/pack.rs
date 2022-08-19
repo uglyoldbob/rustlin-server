@@ -6,6 +6,51 @@ use std::collections::HashMap;
 use std::io::Read;
 use std::io::Seek;
 
+trait VecReader
+where
+    Self: Read,
+{
+    fn read_vec(&mut self, buf: &mut Vec<u8>) -> Result<(), ()>;
+}
+
+impl VecReader for std::fs::File {
+    fn read_vec(&mut self, buf: &mut Vec<u8>) -> Result<(), ()> {
+        buf.clear();
+        let mut partial: [u8; 32] = [0; 32];
+        let mut remaining = buf.capacity();
+        let mut amt_read = 0;
+        let mut done = false;
+        loop {
+            if remaining == 0 {
+                done = true;
+                break;
+            }
+            let count = if remaining > 32 {
+                self.read(&mut partial[..])
+            } else {
+                self.read(&mut partial[0..remaining])
+            };
+            match count {
+                Ok(n) => {
+                    for b in partial[..n].iter() {
+                        buf.push(*b);
+                    }
+                    remaining -= n;
+                    amt_read += n;
+                }
+                Err(_e) => {
+                    break;
+                }
+            }
+        }
+        if done {
+            return Ok(());
+        } else {
+            return Err(());
+        }
+    }
+}
+
 /// This structure describes a single pack file used as a container for
 /// game resources in the client.
 pub struct Pack {
@@ -70,22 +115,12 @@ impl Pack {
                 if let Err(_e) = f.seek(std::io::SeekFrom::Start(offset as u64)) {
                     return None;
                 }
-                let mut buffer = bytes::BytesMut::with_capacity(size as usize);
-
-                let mut amount_read: u64 = 0;
-                loop {
-                    let val = f.read(&mut buffer);
-                    if let Err(_e) = val {
-                        return None;
-                    }
-                    if let Ok(val) = val {
-                        amount_read += val as u64;
-                    }
-                    if amount_read == size as u64 {
-                        break;
-                    }
+                let mut buffer: Vec<u8> = Vec::with_capacity(size as usize);
+                let val = f.read_vec(&mut buffer);
+                if let Err(_e) = val {
+                    return None;
                 }
-                Some(buffer.to_vec())
+                Some(buffer)
             } else {
                 None
             }
