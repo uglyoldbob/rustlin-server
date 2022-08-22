@@ -150,6 +150,12 @@ impl<'a, T> GameMode<'a> for SprExplorer<'a, T> {
                         }
                     }
                 }
+                sdl2::keyboard::Keycode::P => {
+                    println!(
+                        "The current animation has {} frames",
+                        self.sprite.num_frames(r)
+                    );
+                }
                 _ => {}
             }
         }

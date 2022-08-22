@@ -15,9 +15,9 @@ fn get_integer(c: &mut Cursor<Vec<u8>>) -> Option<i32> {
         match last_byte {
             Some(last) => match last {
                 b'0'..=b'9' => break,
-                0|0xd2 => {
+                0 | 0xd2 => {
                     c.seek(SeekFrom::Current(-1)).ok()?;
-                    return None
+                    return None;
                 }
                 _ => {
                     last_byte = c.read_le().ok();
@@ -61,14 +61,14 @@ fn get_integer(c: &mut Cursor<Vec<u8>>) -> Option<i32> {
     Some(collected_value)
 }
 
-#[derive(Copy,Clone)]
+#[derive(Copy, Clone)]
 pub struct SpriteAction {
-
+    fps: u8,
 }
 
 impl SpriteAction {
     fn new() -> Self {
-        Self {}
+        Self { fps: 24 }
     }
 }
 
@@ -92,7 +92,7 @@ impl SpriteTable {
     pub fn load_embedded_table() -> Option<Self> {
         let mut sprites: Vec<SpriteTableEntry> = Vec::new();
         let mut sprite: SpriteTableEntry = SpriteTableEntry::new();
-        let mut frame_rate = 24;
+        let mut frame_rate: i32 = 24;
         let mut data = EMBEDDED_SPRITE_TABLE.to_vec();
         for d in data.iter_mut() {
             if *d == 0xd {
@@ -134,6 +134,8 @@ impl SpriteTable {
                             println!("Action? Value is {}", v);
                             match v {
                                 0..=71 => {
+                                    let mut nspr = SpriteAction::new();
+                                    nspr.fps = frame_rate as u8;
                                     let signifier: u8 = cursor.read_le().ok()?;
                                     if signifier as char == '=' {
                                         let m1 = get_integer(&mut cursor)?;
@@ -188,6 +190,7 @@ impl SpriteTable {
                                             }
                                         }
                                     }
+                                    sprite.actions[v as usize] = nspr;
                                 }
                                 100 => {
                                     let num_switches = get_integer(&mut cursor)?;
@@ -207,8 +210,8 @@ impl SpriteTable {
                                     let _w: u8 = cursor.read_le().ok()?;
                                 }
                                 102 => {
-                                    let objectType = get_integer(&mut cursor)?;
-                                    println!("Object type {}", objectType);
+                                    let object_type = get_integer(&mut cursor)?;
+                                    println!("Object type {}", object_type);
                                     let _w: u8 = cursor.read_le().ok()?;
                                 }
                                 104 => {

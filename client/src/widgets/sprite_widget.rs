@@ -35,6 +35,13 @@ impl SpriteWidget {
             self.frame_index = 0;
         }
     }
+
+    pub fn num_frames(&self, r: &mut GameResources) -> u16 {
+        if let Some(spr) = r.get_or_load_sprite(self.id_major, self.id_minor) {
+            return spr.num_frames() as u16;
+        }
+        return 0;
+    }
 }
 
 impl<'a> Widget<'a> for SpriteWidget {
