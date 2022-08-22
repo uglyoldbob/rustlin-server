@@ -15,7 +15,10 @@ fn get_integer(c: &mut Cursor<Vec<u8>>) -> Option<i32> {
         match last_byte {
             Some(last) => match last {
                 b'0'..=b'9' => break,
-                0 => return None,
+                0|0xd2 => {
+                    c.seek(SeekFrom::Current(-1)).ok()?;
+                    return None
+                }
                 _ => {
                     last_byte = c.read_le().ok();
                 }
@@ -58,10 +61,37 @@ fn get_integer(c: &mut Cursor<Vec<u8>>) -> Option<i32> {
     Some(collected_value)
 }
 
-pub struct SpriteTableEntry {}
+#[derive(Copy,Clone)]
+pub struct SpriteAction {
+
+}
+
+impl SpriteAction {
+    fn new() -> Self {
+        Self {}
+    }
+}
+
+pub struct SpriteTableEntry {
+    actions: [SpriteAction; 72],
+}
 
 impl SpriteTableEntry {
+    fn new() -> Self {
+        Self {
+            actions: [SpriteAction::new(); 72],
+        }
+    }
+}
+
+pub struct SpriteTable {
+    entries: Vec<SpriteTableEntry>,
+}
+
+impl SpriteTable {
     pub fn load_embedded_table() -> Option<Self> {
+        let mut sprites: Vec<SpriteTableEntry> = Vec::new();
+        let mut sprite: SpriteTableEntry = SpriteTableEntry::new();
         let mut frame_rate = 24;
         let mut data = EMBEDDED_SPRITE_TABLE.to_vec();
         for d in data.iter_mut() {
@@ -73,23 +103,32 @@ impl SpriteTableEntry {
         let _e: Option<u8> = cursor.read_le().ok(); //first byte is ignored
         let mut sprite_val = 0;
         let mut last_byte: Option<u8>;
-        loop {
+        'file_loop: loop {
             let val = get_integer(&mut cursor)?;
             last_byte = cursor.read_le().ok();
             println!("SPR: {} {:?}", val, last_byte);
             println!("Sprite {} has {} frames", sprite_val, val);
+            if sprite_val == 8682 {
+                println!("Sprite 8682 processing");
+            }
             if let Some(b) = last_byte {
                 if b == b'=' {
                     let val = get_integer(&mut cursor)?;
                     println!("Sprite {} has alias {}", sprite_val, val);
                 }
-                loop {
+                'sprite_loop: loop {
                     let v = get_integer(&mut cursor);
                     match v {
                         None => {
                             sprite_val += 1;
+                            let w: u8 = cursor.read_le().ok()?;
                             println!("Parsing next sprite");
-                            break;
+                            sprites.push(sprite);
+                            sprite = SpriteTableEntry::new();
+                            if w == 0xd2 {
+                                break 'file_loop;
+                            }
+                            break 'sprite_loop;
                         }
                         Some(v) => {
                             println!("Action? Value is {}", v);
@@ -147,7 +186,6 @@ impl SpriteTableEntry {
                                                     markup = cursor.read_le().ok()?;
                                                 }
                                             }
-                                        } else {
                                         }
                                     }
                                 }
@@ -241,7 +279,8 @@ impl SpriteTableEntry {
                 break;
             }
         }
-        Some(Self {})
+        println!("{} sprites were loaded", sprites.len());
+        Some(Self { entries: sprites })
     }
 }
 

@@ -1,6 +1,6 @@
 use crate::mode::*;
 use crate::mouse::*;
-use crate::resources::sprite::SpriteTableEntry;
+use crate::resources::sprite::SpriteTable;
 use crate::resources::*;
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
@@ -76,7 +76,7 @@ pub fn startup(mode: DrawMode) {
 
     let mut game_resources = GameResources::new(font, resources, &texture_creator);
 
-    let sprtable = SpriteTableEntry::load_embedded_table();
+    let sprtable = SpriteTable::load_embedded_table();
 
     let mut mode: Box<dyn GameMode> = match mode {
         DrawMode::Explorer => Box::new(ExplorerMenu::new(&texture_creator, &mut game_resources)),
