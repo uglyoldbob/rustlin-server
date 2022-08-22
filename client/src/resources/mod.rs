@@ -370,7 +370,6 @@ impl<'a, 'b, 'c> GameResources<'a, 'b, 'c> {
         let p = f.as_os_str().to_str().unwrap().to_string();
         let data = std::fs::File::open(p);
         let ms = if let Ok(mut data) = data {
-            println!("Parsing s32");
             let mut buf = Vec::new();
             let _e = data.read_to_end(&mut buf);
             let mut c = std::io::Cursor::new(&buf);
@@ -390,7 +389,6 @@ impl<'a, 'b, 'c> GameResources<'a, 'b, 'c> {
             let p = f.as_os_str().to_str().unwrap().to_string();
             let data = std::fs::File::open(p);
             if let Ok(mut data) = data {
-                println!("Parsing seg");
                 let mut buf = Vec::new();
                 let _e = data.read_to_end(&mut buf);
                 let mut c = std::io::Cursor::new(&buf);

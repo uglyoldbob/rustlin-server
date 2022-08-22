@@ -5,15 +5,17 @@ use sdl2::render::TextureCreator;
 use sdl2::surface::Surface;
 use std::io::Cursor;
 use std::io::Seek;
+use std::io::SeekFrom;
 
 const EMBEDDED_SPRITE_TABLE: &[u8] = include_bytes!("sprite_table.txt");
 
-fn get_integer(c: &mut Cursor<Vec<u8>>) -> (Option<u8>, i32) {
+fn get_integer(c: &mut Cursor<Vec<u8>>) -> Option<i32> {
     let mut last_byte: Option<u8> = c.read_le().ok();
     loop {
         match last_byte {
             Some(last) => match last {
                 b'0'..=b'9' => break,
+                0 => return None,
                 _ => {
                     last_byte = c.read_le().ok();
                 }
@@ -50,14 +52,17 @@ fn get_integer(c: &mut Cursor<Vec<u8>>) -> (Option<u8>, i32) {
     if found_minus {
         collected_value = collected_value * -1;
     }
-
-    (last_byte, collected_value)
+    if let Some(b) = last_byte {
+        c.seek(SeekFrom::Current(-1)).ok()?;
+    }
+    Some(collected_value)
 }
 
 pub struct SpriteTableEntry {}
 
 impl SpriteTableEntry {
-    pub async fn load_embedded_table() -> Self {
+    pub fn load_embedded_table() -> Option<Self> {
+        let mut frame_rate = 24;
         let mut data = EMBEDDED_SPRITE_TABLE.to_vec();
         for d in data.iter_mut() {
             if *d == 0xd {
@@ -66,19 +71,177 @@ impl SpriteTableEntry {
         }
         let mut cursor = Cursor::new(data);
         let _e: Option<u8> = cursor.read_le().ok(); //first byte is ignored
-        let sprite_val = 0;
-        let last_byte: Option<u8>;
-        let (b, val) = get_integer(&mut cursor);
-        last_byte = b;
-        println!("SPR: {} {:?}", val, last_byte);
-        println!("Sprite {} has {} frames", sprite_val, val);
-        if let Some(b) = last_byte {
-            if b == b'=' {
-                let (_v, val) = get_integer(&mut cursor);
-                println!("Sprite {} has alias {}", sprite_val, val);
+        let mut sprite_val = 0;
+        let mut last_byte: Option<u8>;
+        loop {
+            let val = get_integer(&mut cursor)?;
+            last_byte = cursor.read_le().ok();
+            println!("SPR: {} {:?}", val, last_byte);
+            println!("Sprite {} has {} frames", sprite_val, val);
+            if let Some(b) = last_byte {
+                if b == b'=' {
+                    let val = get_integer(&mut cursor)?;
+                    println!("Sprite {} has alias {}", sprite_val, val);
+                }
+                loop {
+                    let v = get_integer(&mut cursor);
+                    match v {
+                        None => {
+                            sprite_val += 1;
+                            println!("Parsing next sprite");
+                            break;
+                        }
+                        Some(v) => {
+                            println!("Action? Value is {}", v);
+                            match v {
+                                0..=71 => {
+                                    let signifier: u8 = cursor.read_le().ok()?;
+                                    if signifier as char == '=' {
+                                        let m1 = get_integer(&mut cursor)?;
+                                        println!("Read {}={}", v, m1);
+                                    } else {
+                                        let m1 = get_integer(&mut cursor)?;
+                                        let num = get_integer(&mut cursor)?;
+                                        println!("Numbers {} {}", m1, num);
+                                        if num > 0 {
+                                            for _ in 0..num {
+                                                let ma1 = get_integer(&mut cursor)?;
+                                                let ma2 = get_integer(&mut cursor)?;
+                                                let ma3 = get_integer(&mut cursor)?;
+                                                let mut markup: u8 = cursor.read_le().ok()?;
+                                                println!("Read {} {} {}", ma1, ma2, ma3);
+                                                while markup as char != ' ' {
+                                                    match markup as char {
+                                                        '<' => {
+                                                            let m1 = get_integer(&mut cursor)?;
+                                                            println!("<{}", m1);
+                                                        }
+                                                        '[' => {
+                                                            let m1 = get_integer(&mut cursor)?;
+                                                            println!("[{}", m1);
+                                                        }
+                                                        '^' => {
+                                                            let m1 = get_integer(&mut cursor)?;
+                                                            println!("^{}", m1);
+                                                        }
+                                                        ']' => {
+                                                            let m1 = get_integer(&mut cursor)?;
+                                                            println!("]{}", m1);
+                                                        }
+                                                        '{' => {
+                                                            let m1 = get_integer(&mut cursor)?;
+                                                            println!("{{{}", m1);
+                                                        }
+                                                        '}' => {
+                                                            let m1 = get_integer(&mut cursor)?;
+                                                            println!("}}{}", m1);
+                                                        }
+                                                        '!' => {
+                                                            println!("!");
+                                                        }
+                                                        '>' => {
+                                                            println!(">");
+                                                        }
+                                                        _ => {}
+                                                    }
+                                                    markup = cursor.read_le().ok()?;
+                                                }
+                                            }
+                                        } else {
+                                        }
+                                    }
+                                }
+                                100 => {
+                                    let num_switches = get_integer(&mut cursor)?;
+                                    for _ in 0..num_switches {
+                                        let s1 = get_integer(&mut cursor)?;
+                                        let s2 = get_integer(&mut cursor)?;
+                                        let s3 = get_integer(&mut cursor)?;
+                                        let s4 = get_integer(&mut cursor)?;
+                                        //switchTable contains, s1, s2, s3, s4 for this sprite
+                                        println!("Read switch table {} {} {} {}", s1, s2, s3, s4);
+                                        let _w: u8 = cursor.read_le().ok()?;
+                                    }
+                                }
+                                101 => {
+                                    let shadow = get_integer(&mut cursor)?;
+                                    println!("Read shadow {}", shadow);
+                                    let _w: u8 = cursor.read_le().ok()?;
+                                }
+                                102 => {
+                                    let objectType = get_integer(&mut cursor)?;
+                                    println!("Object type {}", objectType);
+                                    let _w: u8 = cursor.read_le().ok()?;
+                                }
+                                104 => {
+                                    let attribute = get_integer(&mut cursor)?;
+                                    println!("Attribute {}", attribute);
+                                    let _w: u8 = cursor.read_le().ok()?;
+                                }
+                                105 => {
+                                    let num_clothes = get_integer(&mut cursor)?;
+                                    println!("{} clothes", num_clothes);
+                                    for _ in 0..num_clothes {
+                                        let clothes = get_integer(&mut cursor)?;
+                                        println!("clothing {}", clothes);
+                                    }
+                                    let _w: u8 = cursor.read_le().ok()?;
+                                }
+                                107 => {
+                                    let sizea = get_integer(&mut cursor)?;
+                                    let sizeb = get_integer(&mut cursor)?;
+                                    println!("Got {} {}", sizea, sizeb);
+                                    let _w: u8 = cursor.read_le().ok()?;
+                                }
+                                108 => {
+                                    let flying = get_integer(&mut cursor)?;
+                                    println!("Flying {}", flying);
+                                    let _w: u8 = cursor.read_le().ok()?;
+                                }
+                                109 => {
+                                    let chaina = get_integer(&mut cursor)?;
+                                    let chainb = get_integer(&mut cursor)?;
+                                    println!("Chain {} {}", chaina, chainb);
+                                    let _w: u8 = cursor.read_le().ok()?;
+                                }
+                                110 => {
+                                    frame_rate = get_integer(&mut cursor)?;
+                                    println!("New frame rate is {}", frame_rate);
+                                    let _w: u8 = cursor.read_le().ok()?;
+                                }
+                                111 => {
+                                    let stride = get_integer(&mut cursor)?;
+                                    println!("Stride is {}", stride);
+                                    let _w: u8 = cursor.read_le().ok()?;
+                                }
+                                112 => {
+                                    let furniture = get_integer(&mut cursor)?;
+                                    println!("Furniture is {}", furniture);
+                                    let _w: u8 = cursor.read_le().ok()?;
+                                }
+                                113 => {
+                                    let morph = get_integer(&mut cursor)?;
+                                    println!("Morph is {}", morph);
+                                    let _w: u8 = cursor.read_le().ok()?;
+                                }
+                                114 => {
+                                    let furniture_size = get_integer(&mut cursor)?;
+                                    println!("Furniture size is {}", furniture_size);
+                                    let _w: u8 = cursor.read_le().ok()?;
+                                }
+                                _ => {
+                                    println!("Unknown sprite data {}", v);
+                                    let _w: u8 = cursor.read_le().ok()?;
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                break;
             }
         }
-        Self {}
+        Some(Self {})
     }
 }
 

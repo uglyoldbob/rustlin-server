@@ -24,10 +24,7 @@ pub fn load_map<'a>(map: u16, x: u16, y: u16, rp: PathBuf) -> Option<Box<MapSegm
     GameResources::load_map_segment(map, x, y, rp)
 }
 
-pub fn load_tileset<'a>(
-    r: &mut GameResources<'a, '_, '_>,
-    set: u32,
-) -> Option<TileSetGui<'a>> {
+pub fn load_tileset<'a>(r: &mut GameResources<'a, '_, '_>, set: u32) -> Option<TileSetGui<'a>> {
     r.load_tileset(set)
 }
 
