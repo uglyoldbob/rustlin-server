@@ -67,3 +67,6 @@ pub use character_select::*;
 
 mod sprite_widget;
 pub use sprite_widget::SpriteWidget;
+
+mod text_input;
+pub use text_input::*;

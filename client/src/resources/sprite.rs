@@ -55,7 +55,7 @@ fn get_integer(c: &mut Cursor<Vec<u8>>) -> Option<i32> {
     if found_minus {
         collected_value = collected_value * -1;
     }
-    if let Some(b) = last_byte {
+    if let Some(_b) = last_byte {
         c.seek(SeekFrom::Current(-1)).ok()?;
     }
     Some(collected_value)
