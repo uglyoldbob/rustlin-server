@@ -28,6 +28,17 @@ impl<'a> Login<'a> {
         b.push(Box::new(ImgButton::new(65, 0x213, 0x195, r)));
         b.push(Box::new(ImgButton::new(55, 0x213, 0x1a8, r)));
         b.push(Box::new(ImgButton::new(57, 0x213, 0x1c2, r)));
+
+        let mut ti = TextInput::new(
+            &r.tc,
+            0x1fb,
+            0x160,
+            "".to_string(),
+            &r.font,
+            Color::WHITE,
+            10,
+        );
+        ti.make_password();
         Self {
             b: b,
             background: r.get_or_load_png(814),
@@ -41,15 +52,7 @@ impl<'a> Login<'a> {
                 Color::WHITE,
                 10,
             ),
-            password: TextInput::new(
-                &r.tc,
-                0x1fb,
-                0x160,
-                "".to_string(),
-                &r.font,
-                Color::WHITE,
-                10,
-            ),
+            password: ti,
             focus: 0,
         }
     }
@@ -97,7 +100,7 @@ impl<'a> GameMode<'a> for Login<'a> {
     fn process_button(
         &mut self,
         button: sdl2::keyboard::Keycode,
-        _m: sdl2::keyboard::Mod,
+        m: sdl2::keyboard::Mod,
         down: bool,
         r: &mut GameResources<'a, '_, '_>,
     ) {
@@ -110,10 +113,25 @@ impl<'a> GameMode<'a> for Login<'a> {
                         self.focus = 0;
                     }
                 }
+                sdl2::keyboard::Keycode::Backspace => {
+                    match self.focus {
+                        0 => self.username.process_button(button, m, down, r),
+                        1 => self.password.process_button(button, m, down, r),
+                        _ => {}
+                    }
+                }
                 _ => match self.focus {
                     _ => {}
                 },
             }
+        }
+    }
+
+    fn process_text(&mut self, s: &String) {
+        match self.focus {
+            0 => self.username.process_text(s),
+            1 => self.password.process_text(s),
+            _ => {}
         }
     }
 

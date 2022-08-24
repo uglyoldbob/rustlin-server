@@ -18,6 +18,7 @@ pub struct TextInput<'a, T> {
     cur_cycle: u8,
     cycles: u8,
     keyfocus: bool,
+    password: bool,
 }
 
 impl<'a, T> TextInput<'a, T> {
@@ -58,11 +59,39 @@ impl<'a, T> TextInput<'a, T> {
             cur_cycle: 0,
             cycles: cycles,
             keyfocus: false,
+            password: false,
         }
+    }
+
+    pub fn make_password(&mut self) {
+        self.password = true;
     }
 
     pub fn set_focus(&mut self, f: bool) {
         self.keyfocus = f;
+    }
+
+    pub fn process_button(
+        &mut self,
+        button: sdl2::keyboard::Keycode,
+        _m: sdl2::keyboard::Mod,
+        down: bool,
+        r: &mut GameResources<'a, '_, '_>,
+    ) {
+        if down {
+            match button {
+                sdl2::keyboard::Keycode::Backspace => {
+                    self.s.pop();
+                }
+                _ => {}
+            }
+        }
+        println!("Processing a button input for text input");
+    }
+
+    pub fn process_text(&mut self, t: &String) {
+        println!("Processing {} for text input", t);
+        self.s.push_str(&t[..]);
     }
 
     pub fn update_text(&mut self, font: &sdl2::ttf::Font) {
@@ -70,14 +99,23 @@ impl<'a, T> TextInput<'a, T> {
             let t1 = if self.s.len() == 0 {
                 format!(" ")
             } else {
-                format!("{}", self.s)
+                if self.password {
+                    self.s.chars().map(|x| "*").collect()
+                } else {
+                    format!("{}", self.s)
+                }
             };
             let pr = font.render(&t1[..]);
             let ft = pr.solid(self.color).unwrap();
             let t2 = if self.s.len() == 0 {
                 format!("|")
             } else {
-                format!("{}|", self.s)
+                if self.password {
+                    let p: String = self.s.chars().map(|x| "*").collect(); 
+                    format!("{}|", p)
+                } else {
+                    format!("{}|", self.s)
+                }
             };
             let pr2 = font.render(&t2[..]);
             let ft2 = pr2.solid(self.color).unwrap();

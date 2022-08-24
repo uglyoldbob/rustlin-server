@@ -45,6 +45,7 @@ pub trait GameMode<'a> {
         down: bool,
         r: &mut GameResources<'a, '_, '_>,
     );
+    fn process_text(&mut self, s: &String) {}
     /// Perform any additional processing, before drawing, and after receiving all input events
     fn process_frame(
         &mut self,
