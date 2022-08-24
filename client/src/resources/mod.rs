@@ -301,7 +301,7 @@ impl<T, U> LoadableMap<T, U> {
 
 pub struct GameResources<'a, 'b, 'c> {
     resource_path: PathBuf,
-    tc: &'a TextureCreator<WindowContext>,
+    pub tc: &'a TextureCreator<WindowContext>,
     pngs: LoadableMap<u16, Texture<'a>>,
     imgs: LoadableMap<u16, Texture<'a>>,
     pub font: sdl2::ttf::Font<'b, 'c>,

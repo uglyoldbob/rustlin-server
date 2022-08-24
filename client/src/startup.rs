@@ -51,6 +51,8 @@ pub fn startup(mode: DrawMode) {
     let mut event_pump = sdl_context.event_pump().unwrap();
     let video_subsystem = sdl_context.video().unwrap();
 
+    video_subsystem.text_input().start();
+
     let mut vid_win = video_subsystem.window("l1j-client", 640, 480);
     let mut windowb = vid_win.position_centered();
 
@@ -198,11 +200,11 @@ pub fn startup(mode: DrawMode) {
                     window_id: _,
                     keycode,
                     scancode: _,
-                    keymod: _,
+                    keymod: m,
                     repeat: _,
                 } => {
                     if let Some(key) = keycode {
-                        mode.process_button(key, true, &mut game_resources);
+                        mode.process_button(key, m, true, &mut game_resources);
                     }
                 }
                 Event::KeyUp {
@@ -210,12 +212,15 @@ pub fn startup(mode: DrawMode) {
                     window_id: _,
                     keycode,
                     scancode: _,
-                    keymod: _,
+                    keymod: m,
                     repeat: _,
                 } => {
                     if let Some(key) = keycode {
-                        mode.process_button(key, false, &mut game_resources);
+                        mode.process_button(key, m, false, &mut game_resources);
                     }
+                }
+                Event::TextInput { timestamp, window_id, text } => {
+                    println!("Accepted text {}", text);
                 }
                 _ => {}
             }

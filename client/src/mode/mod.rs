@@ -41,6 +41,7 @@ pub trait GameMode<'a> {
     fn process_button(
         &mut self,
         button: sdl2::keyboard::Keycode,
+        m: sdl2::keyboard::Mod,
         down: bool,
         r: &mut GameResources<'a, '_, '_>,
     );

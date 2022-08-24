@@ -1,5 +1,3 @@
-use std::f32::consts::E;
-
 use crate::widgets::Widget;
 use crate::GameResources;
 use crate::ImageBox;
@@ -19,6 +17,7 @@ pub struct TextInput<'a, T> {
     last_draw: Option<ImageBox>,
     cur_cycle: u8,
     cycles: u8,
+    keyfocus: bool,
 }
 
 impl<'a, T> TextInput<'a, T> {
@@ -31,11 +30,19 @@ impl<'a, T> TextInput<'a, T> {
         color: sdl2::pixels::Color,
         cycles: u8,
     ) -> Self {
-        let pr = font.render(&text[..]);
+        let t1 = if text.len() == 0 {
+            format!(" ")
+        } else {
+            format!("{}", text)
+        };
+        let pr = font.render(&t1[..]);
         let ft = pr.solid(color).unwrap();
-        let mut text2 = text.clone();
-        text2.push_str("|");
-        let pr2 = font.render(&text2[..]);
+        let t2 = if text.len() == 0 {
+            format!("|")
+        } else {
+            format!("{}|", text)
+        };
+        let pr2 = font.render(&t2[..]);
         let ft2 = pr2.solid(color).unwrap();
 
         Self {
@@ -50,17 +57,29 @@ impl<'a, T> TextInput<'a, T> {
             last_draw: None,
             cur_cycle: 0,
             cycles: cycles,
+            keyfocus: false,
         }
+    }
+
+    pub fn set_focus(&mut self, f: bool) {
+        self.keyfocus = f;
     }
 
     pub fn update_text(&mut self, font: &sdl2::ttf::Font) {
         if self.last_s != self.s {
-            let pr = font.render(&self.s[..]);
+            let t1 = if self.s.len() == 0 {
+                format!(" ")
+            } else {
+                format!("{}", self.s)
+            };
+            let pr = font.render(&t1[..]);
             let ft = pr.solid(self.color).unwrap();
-
-            let mut text2 = self.s.clone();
-            text2.push_str("|");
-            let pr2 = font.render(&text2[..]);
+            let t2 = if self.s.len() == 0 {
+                format!("|")
+            } else {
+                format!("{}|", self.s)
+            };
+            let pr2 = font.render(&t2[..]);
             let ft2 = pr2.solid(self.color).unwrap();
 
             self.t = Texture::from_surface(&ft, self.tc).unwrap();
@@ -87,6 +106,9 @@ impl<'a, T> Widget<'a> for TextInput<'a, T> {
         _cursor: bool,
         _r: &mut GameResources,
     ) {
+        if !self.keyfocus {
+            self.cur_cycle = 0;
+        }
         let t = if self.cur_cycle < self.cycles {
             &self.t
         } else {

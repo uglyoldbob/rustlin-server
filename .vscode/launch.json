@@ -13,11 +13,7 @@
                     "build",
                     "--bin=rustlin-client",
                     "--package=rustlin-client"
-                ],
-                "filter": {
-                    "name": "rustlin-client",
-                    "kind": "bin"
-                }
+                ]
             },
             "args": [],
             "cwd": "${workspaceFolder}"

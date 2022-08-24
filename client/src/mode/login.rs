@@ -7,6 +7,7 @@ use crate::GameResources;
 use sdl2::pixels::Color;
 use sdl2::rect::Rect;
 use sdl2::render::Texture;
+use sdl2::video::WindowContext;
 use std::collections::VecDeque;
 use std::rc::Rc;
 
@@ -15,6 +16,9 @@ pub struct Login<'a> {
     b: Vec<Box<dyn Widget<'a> + 'a>>,
     background: Option<Rc<Texture<'a>>>,
     detail: Option<Rc<Texture<'a>>>,
+    username: TextInput<'a, WindowContext>,
+    password: TextInput<'a, WindowContext>,
+    focus: u8,
 }
 
 impl<'a> Login<'a> {
@@ -28,6 +32,25 @@ impl<'a> Login<'a> {
             b: b,
             background: r.get_or_load_png(814),
             detail: r.get_or_load_img(59),
+            username: TextInput::new(
+                &r.tc,
+                0x1fb,
+                0x14a,
+                "asdf".to_string(),
+                &r.font,
+                Color::WHITE,
+                10,
+            ),
+            password: TextInput::new(
+                &r.tc,
+                0x1fb,
+                0x160,
+                "".to_string(),
+                &r.font,
+                Color::WHITE,
+                10,
+            ),
+            focus: 0,
         }
     }
 }
@@ -73,13 +96,33 @@ impl<'a> GameMode<'a> for Login<'a> {
 
     fn process_button(
         &mut self,
-        _button: sdl2::keyboard::Keycode,
-        _down: bool,
-        _r: &mut GameResources,
+        button: sdl2::keyboard::Keycode,
+        _m: sdl2::keyboard::Mod,
+        down: bool,
+        r: &mut GameResources<'a, '_, '_>,
     ) {
+        if down {
+            match button {
+                sdl2::keyboard::Keycode::Tab => {
+                    if self.focus < 1 {
+                        self.focus += 1;
+                    } else {
+                        self.focus = 0;
+                    }
+                }
+                _ => match self.focus {
+                    _ => {}
+                },
+            }
+        }
     }
 
-    fn process_frame(&mut self, _r: &mut GameResources, _requests: &mut VecDeque<DrawModeRequest>) {
+    fn process_frame(&mut self, r: &mut GameResources, _requests: &mut VecDeque<DrawModeRequest>) {
+        self.username.set_focus(self.focus == 0);
+        self.password.set_focus(self.focus == 1);
+
+        self.username.update_text(&r.font);
+        self.password.update_text(&r.font);
     }
 
     fn draw(
@@ -106,6 +149,8 @@ impl<'a> GameMode<'a> for Login<'a> {
         for w in &mut self.b {
             w.draw(canvas, cursor, r);
         }
+        self.username.draw(canvas, cursor, r);
+        self.password.draw(canvas, cursor, r);
     }
 
     fn framerate(&self) -> u8 {

@@ -126,6 +126,7 @@ impl<'a> GameMode<'a> for ExplorerMenu<'a> {
     fn process_button(
         &mut self,
         _button: sdl2::keyboard::Keycode,
+        _m: sdl2::keyboard::Mod,
         _down: bool,
         _r: &mut GameResources<'a, '_, '_>,
     ) {

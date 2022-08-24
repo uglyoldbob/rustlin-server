@@ -88,6 +88,7 @@ impl<'a, T> GameMode<'a> for TileExplorer<'a, T> {
     fn process_button(
         &mut self,
         button: sdl2::keyboard::Keycode,
+        _m: sdl2::keyboard::Mod,
         down: bool,
         r: &mut GameResources<'a, '_, '_>,
     ) {
