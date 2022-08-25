@@ -1,3 +1,5 @@
+use std::collections::VecDeque;
+
 use crate::widgets::Widget;
 use crate::GameResources;
 use crate::ImageBox;
@@ -11,8 +13,9 @@ pub struct TextInput<'a, T> {
     t2: Texture<'a>,
     x: u16,
     y: u16,
-    s: String,
-    last_s: String,
+    pre: VecDeque<char>,
+    post: VecDeque<char>,
+    s_changed: bool,
     color: sdl2::pixels::Color,
     last_draw: Option<ImageBox>,
     cur_cycle: u8,
@@ -52,8 +55,9 @@ impl<'a, T> TextInput<'a, T> {
             t2: Texture::from_surface(&ft2, tc).unwrap(),
             x: x,
             y: y,
-            s: text.to_string(),
-            last_s: text.to_string(),
+            pre: text.to_string().chars().collect(),
+            post: "".to_string().chars().collect(),
+            s_changed: false,
             color: color,
             last_draw: None,
             cur_cycle: 0,
@@ -81,7 +85,8 @@ impl<'a, T> TextInput<'a, T> {
         if down {
             match button {
                 sdl2::keyboard::Keycode::Backspace => {
-                    self.s.pop();
+                    self.pre.pop_back();
+                    self.s_changed = true;
                 }
                 _ => {}
             }
@@ -91,30 +96,41 @@ impl<'a, T> TextInput<'a, T> {
 
     pub fn process_text(&mut self, t: &String) {
         println!("Processing {} for text input", t);
-        self.s.push_str(&t[..]);
+        for i in t.chars() {
+            self.pre.push_back(i);
+        }
+        self.s_changed = true;
     }
 
     pub fn update_text(&mut self, font: &sdl2::ttf::Font) {
-        if self.last_s != self.s {
-            let t1 = if self.s.len() == 0 {
+        if self.s_changed {
+            self.s_changed = false;
+            let t1 = if (self.pre.len() + self.post.len()) == 0 {
                 format!(" ")
             } else {
                 if self.password {
-                    self.s.chars().map(|x| "*").collect()
+                    let p1: String = self.pre.iter().map(|_x| "*").collect();
+                    let p2: String = self.post.iter().map(|_x| "*").collect();
+                    format!("{}{}", p1, p2)
                 } else {
-                    format!("{}", self.s)
+                    let p1: String = self.pre.iter().collect();
+                    let p2: String = self.post.iter().collect();
+                    format!("{}{}", p1, p2)
                 }
             };
             let pr = font.render(&t1[..]);
             let ft = pr.solid(self.color).unwrap();
-            let t2 = if self.s.len() == 0 {
+            let t2 = if (self.pre.len() + self.post.len()) == 0 {
                 format!("|")
             } else {
                 if self.password {
-                    let p: String = self.s.chars().map(|x| "*").collect(); 
-                    format!("{}|", p)
+                    let p1: String = self.pre.iter().map(|_x| "*").collect();
+                    let p2: String = self.post.iter().map(|_x| "*").collect();
+                    format!("{}|{}", p1, p2)
                 } else {
-                    format!("{}|", self.s)
+                    let p1: String = self.pre.iter().collect();
+                    let p2: String = self.post.iter().collect();
+                    format!("{}|{}", p1, p2)
                 }
             };
             let pr2 = font.render(&t2[..]);
@@ -122,7 +138,6 @@ impl<'a, T> TextInput<'a, T> {
 
             self.t = Texture::from_surface(&ft, self.tc).unwrap();
             self.t2 = Texture::from_surface(&ft2, self.tc).unwrap();
-            self.last_s = self.s.clone();
         }
     }
 }

@@ -219,8 +219,12 @@ pub fn startup(mode: DrawMode) {
                         mode.process_button(key, m, false, &mut game_resources);
                     }
                 }
-                Event::TextInput { timestamp, window_id, text } => {
-                    println!("Accepted text {}", text);
+                Event::TextInput {
+                    timestamp: _,
+                    window_id: _,
+                    text,
+                } => {
+                    mode.process_text(&text);
                 }
                 _ => {}
             }
