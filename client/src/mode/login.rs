@@ -113,7 +113,10 @@ impl<'a> GameMode<'a> for Login<'a> {
                         self.focus = 0;
                     }
                 }
-                sdl2::keyboard::Keycode::Backspace => match self.focus {
+                sdl2::keyboard::Keycode::Backspace |
+                sdl2::keyboard::Keycode::Delete |
+                sdl2::keyboard::Keycode::Left |
+                sdl2::keyboard::Keycode::Right  => match self.focus {
                     0 => self.username.process_button(button, m, down, r),
                     1 => self.password.process_button(button, m, down, r),
                     _ => {}

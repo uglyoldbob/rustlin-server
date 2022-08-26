@@ -88,6 +88,22 @@ impl<'a, T> TextInput<'a, T> {
                     self.pre.pop_back();
                     self.s_changed = true;
                 }
+                sdl2::keyboard::Keycode::Delete => {
+                    self.post.pop_front();
+                    self.s_changed = true;
+                }
+                sdl2::keyboard::Keycode::Left => {
+                    if let Some(s) = self.pre.pop_back() {
+                        self.post.push_front(s);
+                        self.s_changed = true;
+                    }
+                }
+                sdl2::keyboard::Keycode::Right => {
+                    if let Some(s) = self.post.pop_front() {
+                        self.pre.push_back(s);
+                        self.s_changed = true;
+                    }
+                }
                 _ => {}
             }
         }
