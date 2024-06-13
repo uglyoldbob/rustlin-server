@@ -192,6 +192,8 @@ pub fn startup(mode: DrawMode) {
                     x: _,
                     y,
                     direction: _,
+                    precise_x: _,
+                    precise_y: _,
                 } => {
                     mouse.event(MouseEventInput::Scrolling(y));
                 }

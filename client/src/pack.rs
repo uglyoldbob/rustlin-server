@@ -65,11 +65,11 @@ struct FileEntry {
 }
 
 fn des_decrypt(key: String, data: &mut Vec<u8>) {
-    let key = generic_array::GenericArray::from_slice(key[..].as_bytes());
-    let mut key = des::Des::new(&key);
+    let key = crypto_common::generic_array::GenericArray::from_slice(key[..].as_bytes());
+    let mut key = des::Des::new(key);
     for chunk in data.chunks_exact_mut(8) {
-        let mut data = generic_array::GenericArray::from_mut_slice(&mut chunk[..]);
-        key.decrypt_block_mut(&mut data);
+        let data = crypto_common::generic_array::GenericArray::from_mut_slice(&mut chunk[..]);
+        key.decrypt_block_mut(data);
     }
 }
 
