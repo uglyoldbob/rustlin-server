@@ -1,6 +1,5 @@
 use crate::mode::*;
 use crate::mouse::*;
-use crate::resources::sprite::SpriteTable;
 use crate::resources::*;
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
@@ -13,7 +12,7 @@ use std::collections::VecDeque;
 use std::fs;
 use std::time::Duration;
 
-mod settings;
+pub mod settings;
 
 pub const EMBEDDED_FONT: &[u8] = include_bytes!("cmsltt10.ttf");
 
@@ -37,11 +36,11 @@ pub fn startup(mode: DrawMode) {
         Ok(con) => con,
         Err(_) => "".to_string(),
     };
-    let mut settings = configparser::ini::Ini::new();
-    let settings_result = settings.read(settings_con);
-    if let Err(e) = settings_result {
+    let settings_result = toml::from_str(&settings_con);
+    if let Err(e) = &settings_result {
         println!("Failed to read settings {}", e);
     }
+    let settings: settings::Settings = settings_result.unwrap();
 
     let ttf_context = sdl2::ttf::init().unwrap();
     let efont = sdl2::rwops::RWops::from_bytes(EMBEDDED_FONT).unwrap();
@@ -56,12 +55,7 @@ pub fn startup(mode: DrawMode) {
     let mut vid_win = video_subsystem.window("l1j-client", 640, 480);
     let mut windowb = vid_win.position_centered();
 
-    let windowed = match settings.get("general", "window").unwrap().as_str() {
-        "yes" => true,
-        _ => false,
-    };
-
-    if !windowed {
+    if !settings.window {
         windowb = windowb.fullscreen();
     }
     let window = windowb.opengl().build().unwrap();
@@ -74,9 +68,7 @@ pub fn startup(mode: DrawMode) {
     let audio = sdl2::mixer::open_audio(44100, 16, 2, 1024);
     println!("Audio is {:?}", audio);
 
-    let resources = settings.get("general", "resources").unwrap();
-
-    let mut game_resources = GameResources::new(font, resources, &texture_creator);
+    let mut game_resources = GameResources::new(font, settings.game_resources, &texture_creator);
 
     //let sprtable = SpriteTable::load_embedded_table();
 
@@ -281,6 +273,6 @@ pub fn startup(mode: DrawMode) {
         let _e = canvas.copy(&dummy_texture, None, None);
         canvas.present();
         let framerate = mode.framerate() as u64;
-        ::std::thread::sleep(Duration::from_nanos(1_000_000_000u64 / framerate));
+        std::thread::sleep(Duration::from_nanos(1_000_000_000u64 / framerate));
     }
 }

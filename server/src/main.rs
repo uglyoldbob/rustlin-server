@@ -15,13 +15,26 @@ use client_data::*;
 
 use futures::FutureExt;
 use std::collections::HashMap;
-use std::fs;
 
 mod clients;
 mod player;
 mod user;
 use crate::clients::ClientList;
 use crate::player::Player;
+
+#[derive(Debug, serde::Deserialize, serde::Serialize)]
+pub struct MysqlConfig {
+    password: String,
+    username: String,
+    dbname: String,
+    url: String,
+}
+
+/// The main configuration of the application
+#[derive(Debug, serde::Deserialize, serde::Serialize)]
+pub struct MainConfiguration {
+    db: MysqlConfig,
+}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -31,29 +44,20 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let (clients, mut clients_rx) = tokio::sync::mpsc::channel::<ClientMessage>(100);
     let (broadcast, _) = tokio::sync::broadcast::channel::<ServerMessage>(100);
 
-    let settings_file = fs::read_to_string("./server-settings.ini")?;
-    let mut settings = configparser::ini::Ini::new();
-    settings.read(settings_file)?;
+    let settings_file = std::fs::read_to_string("./server-settings.ini")?;
+    let settings_result = toml::from_str(&settings_file);
+    if let Err(e) = &settings_result {
+        println!("Failed to read settings {}", e);
+    }
+    let settings: MainConfiguration = settings_result.unwrap();
 
-    let mysql_pw = settings
-        .get("database", "password")
-        .unwrap_or("invalid".to_string());
-    let mysql_user = settings
-        .get("database", "username")
-        .unwrap_or("invalid".to_string());
-    let mysql_dbname = settings
-        .get("database", "name")
-        .unwrap_or("none".to_string());
-    let mysql_url = settings
-        .get("database", "url")
-        .unwrap_or("invalid".to_string());
     let mysql_conn_s = format!(
         "mysql://{}:{}@{}/{}",
-        mysql_user, mysql_pw, mysql_url, mysql_dbname
+        settings.db.username, settings.db.password, settings.db.url, settings.db.dbname
     );
     let mysql_opt = mysql_async::Opts::from_url(mysql_conn_s.as_str()).unwrap();
     let mysql_pool = mysql_async::Pool::new(mysql_opt);
-    println!("Trying to connecto to database");
+    println!("Trying to connect to database");
     let mysql_conn = mysql_pool.get_conn().await?;
 
     let cd: ClientData = ClientData::new(broadcast.clone(), clients, mysql_pool);

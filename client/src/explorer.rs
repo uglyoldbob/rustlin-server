@@ -39,15 +39,13 @@ async fn test_map_load() {
         Ok(con) => con,
         Err(_) => "".to_string(),
     };
-    let mut settings = configparser::ini::Ini::new();
-    let settings_result = settings.read(settings_con);
-    if let Err(e) = settings_result {
+    let settings_result = toml::from_str(&settings_con);
+    if let Err(e) = &settings_result {
         println!("Failed to read settings {}", e);
     }
+    let settings: crate::startup::settings::Settings = settings_result.unwrap();
 
-    let resources = settings.get("general", "resources").unwrap();
-
-    let mut d = PathBuf::from(resources);
+    let mut d = PathBuf::from(settings.game_resources);
     d.push("map");
 
     let mut num_success = 0;

@@ -38,15 +38,13 @@ pub fn bench1(c: &mut Criterion) {
         Ok(con) => con,
         Err(_) => "".to_string(),
     };
-    let mut settings = configparser::ini::Ini::new();
-    let settings_result = settings.read(settings_con);
-    if let Err(e) = settings_result {
+    let settings_result = toml::from_str(&settings_con);
+    if let Err(e) = &settings_result {
         println!("Failed to read settings {}", e);
     }
+    let settings: crate::startup::settings::Settings = settings_result.unwrap();
 
-    let resources = settings.get("general", "resources").unwrap();
-
-    let d = PathBuf::from(resources.clone());
+    let d = PathBuf::from(settings.game_resources.clone());
 
     let mut group = c.benchmark_group("map loading");
     group.bench_function("map 1", |b| {
@@ -65,7 +63,7 @@ pub fn bench1(c: &mut Criterion) {
     let efont = sdl2::rwops::RWops::from_bytes(EMBEDDED_FONT).unwrap();
     let font = ttf_context.load_font_from_rwops(efont, 14).unwrap();
 
-    let mut game_resources = GameResources::new(font, resources.clone(), &tc);
+    let mut game_resources = GameResources::new(font, settings.game_resources.clone(), &tc);
 
     group.bench_function("tileset 0", |b| {
         b.iter(|| load_tileset(&mut game_resources, 0));
