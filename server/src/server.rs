@@ -1,18 +1,11 @@
 use futures::FutureExt;
 use std::error::Error;
+use std::panic::AssertUnwindSafe;
 use tokio::net::TcpListener;
 
 use std::fmt;
-use tokio::io::AsyncReadExt;
-use tokio::io::AsyncWriteExt;
-
-use std::convert::TryInto;
-use std::vec::Vec;
-
-use rand::Rng;
 
 use crate::client_data::*;
-use crate::user::*;
 use crate::ClientMessage;
 use crate::ServerMessage;
 
@@ -99,31 +92,39 @@ async fn process_client(socket: tokio::net::TcpStream, cd: ClientData) -> Result
 
 pub async fn setup_game_server(
     cd: ClientData,
+    tasks: &mut tokio::task::JoinSet<Result<(), u32>>,
 ) -> Result<tokio::sync::oneshot::Sender<u32>, Box<dyn Error>> {
     println!("server: Starting the game server");
     let (update_tx, mut update_rx) = tokio::sync::oneshot::channel::<u32>();
     let update_listener = TcpListener::bind("0.0.0.0:2000").await?;
 
-    tokio::spawn(async move {
+    tasks.spawn(async move {
+        let mut f = futures::stream::FuturesUnordered::new();
         loop {
+            use futures::stream::StreamExt;
             tokio::select! {
-                res = update_listener.accept() => {
-                    let (socket, addr) = res.unwrap();
+                Ok(res) = update_listener.accept() => {
+                    let (socket, addr) = res;
                     println!("server: Received a client from {}", addr);
                     let cd2 = cd.clone();
-                    tokio::spawn(async move {
+                    f.push(async move {
                         if let Err(e) = process_client(socket, cd2).await {
                             println!("server: Client {} errored {}", addr, e);
                         }
                     });
                 }
+                Ok(Some(_)) = AssertUnwindSafe(f.next()).catch_unwind() => {}
                 _ = (&mut update_rx) => {
                     println!("server: Received a message to shut down");
+                    break;
+                }
+                _ = tokio::signal::ctrl_c() => {
                     break;
                 }
             }
         }
         println!("update: Ending the server thread!");
+        Ok(())
     });
 
     Ok(update_tx)

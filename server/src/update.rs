@@ -1,4 +1,6 @@
+use futures::FutureExt;
 use std::error::Error;
+use std::panic::AssertUnwindSafe;
 use tokio::net::TcpListener;
 
 use std::fmt;
@@ -48,30 +50,37 @@ async fn process_update_client(mut socket: tokio::net::TcpStream) -> Result<u8, 
     Ok(0)
 }
 
-pub async fn setup_update_server() -> Result<tokio::sync::oneshot::Sender<u32>, Box<dyn Error>> {
+pub async fn setup_update_server(tasks: &mut tokio::task::JoinSet<Result<(), u32>>) -> Result<tokio::sync::oneshot::Sender<u32>, Box<dyn Error>> {
     println!("update: Starting the update server");
     let (update_tx, mut update_rx) = tokio::sync::oneshot::channel::<u32>();
     let update_listener = TcpListener::bind("0.0.0.0:2003").await?;
 
-    tokio::spawn(async move {
+    tasks.spawn(async move {
+        let mut f = futures::stream::FuturesUnordered::new();
         loop {
+            use futures::stream::StreamExt;
             tokio::select! {
-                res = update_listener.accept() => {
-                    let (socket, addr) = res.unwrap();
+                Ok(res) = update_listener.accept() => {
+                    let (socket, addr) = res;
                     println!("update: Received an update client from {}", addr);
-                    tokio::spawn(async move {
+                    f.push(async move {
                         if let Err(e) = process_update_client(socket).await {
                             println!("update: Client {} errored during the update process {}", addr, e);
                         }
                     });
                 }
+                Ok(Some(_)) = AssertUnwindSafe(f.next()).catch_unwind() => {}
                 _ = (&mut update_rx) => {
                     println!("update: Received a message to shut down");
+                    break;
+                }
+                _ = tokio::signal::ctrl_c() => {
                     break;
                 }
             }
         }
         println!("update: Ending the update server thread!");
+        Ok(())
     });
 
     Ok(update_tx)
