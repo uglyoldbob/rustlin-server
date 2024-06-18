@@ -34,12 +34,9 @@ async fn test_map_load() {
     d.pop();
     d.push("client-settings.ini");
     println!("Reading settings from {}", d.display());
-    let settings_file = fs::read_to_string(d.into_os_string().into_string().unwrap());
-    let settings_con = match settings_file {
-        Ok(con) => con,
-        Err(_) => "".to_string(),
-    };
-    let settings_result = toml::from_str(&settings_con);
+    let settings_file = fs::read_to_string(d.into_os_string().into_string().unwrap())
+        .expect("Failed to read client-settings.ini");
+    let settings_result = toml::from_str(&settings_file);
     if let Err(e) = &settings_result {
         println!("Failed to read settings {}", e);
     }

@@ -2,7 +2,7 @@ use crate::mouse::MouseEventOutput;
 use crate::widgets::*;
 use crate::DrawMode;
 use crate::DrawModeRequest;
-use crate::GameMode;
+use crate::GameModeTrait;
 use crate::GameResources;
 use sdl2::pixels::Color;
 use sdl2::render::Texture;
@@ -219,7 +219,7 @@ impl<'a, T> NewCharacterMode<'a, T> {
     }
 }
 
-impl<'a, T> GameMode<'a> for NewCharacterMode<'a, T> {
+impl<'a, T> GameModeTrait<'a, T> for NewCharacterMode<'a, T> {
     fn process_mouse(
         &mut self,
         events: &Vec<MouseEventOutput>,

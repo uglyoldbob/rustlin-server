@@ -3,7 +3,7 @@ use crate::widgets::WidgetTrait;
 use crate::widgets::*;
 use crate::DrawMode;
 use crate::DrawModeRequest;
-use crate::GameMode;
+use crate::GameModeTrait;
 use crate::GameResources;
 use sdl2::pixels::Color;
 use sdl2::render::TextureCreator;
@@ -48,7 +48,7 @@ impl<'a, T> MapExplorer<'a, T> {
     }
 }
 
-impl<'a, T> GameMode<'a> for MapExplorer<'a, T> {
+impl<'a, T> GameModeTrait<'a, T> for MapExplorer<'a, T> {
     fn process_mouse(
         &mut self,
         events: &Vec<MouseEventOutput>,

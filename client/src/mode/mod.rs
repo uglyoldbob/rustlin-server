@@ -1,5 +1,5 @@
 use crate::mouse::MouseEventOutput;
-use crate::GameResources;
+use crate::{map, GameResources};
 use std::collections::VecDeque;
 
 pub enum DrawMode {
@@ -30,8 +30,25 @@ pub enum DrawModeRequest {
     ChangeDrawMode(DrawMode),
 }
 
+#[enum_dispatch::enum_dispatch]
+pub enum GameMode<'a, T> {
+    CharacterSelect(character_select::CharacterSelect<'a>),
+    Explorer(explorer::ExplorerMenu<'a>),
+    Game(game::Game<'a>),
+    ImgExplorer(img_explorer::ImgExplorer<'a, T>),
+    Loader(loader::GameLoader<'a>),
+    Login(login::Login<'a>),
+    MapExplorer(map_explorer::MapExplorer<'a, T>),
+    NewCharacter(newchar::NewCharacterMode<'a, T>),
+    PngExplorer(png_explorer::PngExplorer<'a, T>),
+    SprExplorer(spr_explorer::SprExplorer<'a, T>),
+    TileExplorer(tile_explorer::TileExplorer<'a, T>),
+    WavPlayer(wav_player::WavPlayer<'a, T>),
+}
+
 /// This trait is used to determine what mode of operation the program is in
-pub trait GameMode<'a> {
+#[enum_dispatch::enum_dispatch(GameMode<T>)]
+pub trait GameModeTrait<'a, T> {
     fn process_mouse(
         &mut self,
         events: &Vec<MouseEventOutput>,

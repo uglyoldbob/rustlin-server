@@ -35,32 +35,43 @@ fn mode_maker<'a, T: 'a>(
     mode: DrawMode,
     texture_creator: &'a TextureCreator<T>,
     game_resources: &mut GameResources<'a, '_, '_>,
-) -> Box<dyn GameMode<'a> + 'a> {
+) -> GameMode<'a, T> {
     match mode {
-        DrawMode::Explorer => Box::new(ExplorerMenu::new(texture_creator, game_resources)),
-        DrawMode::PngExplorer => Box::new(PngExplorer::new(texture_creator, game_resources)),
-        DrawMode::ImgExplorer => Box::new(ImgExplorer::new(texture_creator, game_resources)),
-        DrawMode::SprExplorer => Box::new(SprExplorer::new(texture_creator, game_resources)),
-        DrawMode::TileExplorer => Box::new(TileExplorer::new(texture_creator, game_resources)),
-        DrawMode::MapExplorer => Box::new(MapExplorer::new(texture_creator, game_resources)),
-        DrawMode::GameLoader => Box::new(GameLoader::new(texture_creator, game_resources)),
-        DrawMode::Login => Box::new(Login::new::<WindowContext>(game_resources)),
-        DrawMode::CharacterSelect => {
-            Box::new(CharacterSelect::new(texture_creator, game_resources))
+        DrawMode::Explorer => {
+            GameMode::Explorer(ExplorerMenu::new(texture_creator, game_resources))
         }
-        DrawMode::NewCharacter => Box::new(NewCharacterMode::new(texture_creator, game_resources)),
-        DrawMode::Game => Box::new(Game::new(texture_creator, game_resources)),
-        DrawMode::WavPlayer => Box::new(WavPlayer::new(texture_creator, game_resources)),
+        DrawMode::PngExplorer => {
+            GameMode::PngExplorer(PngExplorer::new(texture_creator, game_resources))
+        }
+        DrawMode::ImgExplorer => {
+            GameMode::ImgExplorer(ImgExplorer::new(texture_creator, game_resources))
+        }
+        DrawMode::SprExplorer => {
+            GameMode::SprExplorer(SprExplorer::new(texture_creator, game_resources))
+        }
+        DrawMode::TileExplorer => {
+            GameMode::TileExplorer(TileExplorer::new(texture_creator, game_resources))
+        }
+        DrawMode::MapExplorer => {
+            GameMode::MapExplorer(MapExplorer::new(texture_creator, game_resources))
+        }
+        DrawMode::GameLoader => GameMode::Loader(GameLoader::new(texture_creator, game_resources)),
+        DrawMode::Login => GameMode::Login(Login::new::<WindowContext>(game_resources)),
+        DrawMode::CharacterSelect => {
+            GameMode::CharacterSelect(CharacterSelect::new(texture_creator, game_resources))
+        }
+        DrawMode::NewCharacter => {
+            GameMode::NewCharacter(NewCharacterMode::new(texture_creator, game_resources))
+        }
+        DrawMode::Game => GameMode::Game(Game::new(texture_creator, game_resources)),
+        DrawMode::WavPlayer => GameMode::WavPlayer(WavPlayer::new(texture_creator, game_resources)),
     }
 }
 
 pub fn startup(mode: DrawMode) {
-    let settings_file = fs::read_to_string("./client-settings.ini");
-    let settings_con = match settings_file {
-        Ok(con) => con,
-        Err(_) => "".to_string(),
-    };
-    let settings_result = toml::from_str(&settings_con);
+    let settings_file =
+        fs::read_to_string("./client-settings.ini").expect("Failed to read client-settings.ini");
+    let settings_result = toml::from_str(&settings_file);
     if let Err(e) = &settings_result {
         println!("Failed to read settings {}", e);
     }
@@ -96,7 +107,7 @@ pub fn startup(mode: DrawMode) {
 
     //let sprtable = SpriteTable::load_embedded_table();
 
-    let mut mode: Box<dyn GameMode> = mode_maker(mode, &texture_creator, &mut game_resources);
+    let mut mode: GameMode<WindowContext> = mode_maker(mode, &texture_creator, &mut game_resources);
 
     println!(
         "Struct GameResources has size {}",
