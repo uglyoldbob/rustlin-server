@@ -1,7 +1,3 @@
-use std::error::Error;
-
-use std::{thread, time};
-
 mod client_message;
 mod server;
 mod update;
@@ -125,12 +121,12 @@ async fn handle_user_message(
                 println!("{} wants to delete {}", account, name);
             }
         }
-        ClientMessage::RegularChat { id, msg } => {
+        ClientMessage::RegularChat { id: _, msg } => {
             //TODO limit based on distance and map
             let amsg = format!("[{}] {}", "unknown", msg);
             let _ = broadcast.send(ServerMessage::RegularChat { id: 0, msg: amsg });
         }
-        ClientMessage::YellChat { id, msg, x, y } => {
+        ClientMessage::YellChat { id: _, msg, x, y } => {
             //TODO limit based on distance and map
             let amsg = format!("[{}] {}", "unknown", msg);
             let _ = broadcast.send(ServerMessage::YellChat {
@@ -140,19 +136,19 @@ async fn handle_user_message(
                 y: y,
             });
         }
-        ClientMessage::GlobalChat(id, msg) => {
+        ClientMessage::GlobalChat(_id, msg) => {
             let amsg = format!("[{}] {}", "unknown", msg);
             let _ = broadcast.send(ServerMessage::GlobalChat(amsg));
         }
-        ClientMessage::PledgeChat(id, msg) => {
+        ClientMessage::PledgeChat(_id, msg) => {
             let amsg = format!("[{}] {}", "unknown", msg);
             let _ = broadcast.send(ServerMessage::PledgeChat(amsg));
         }
-        ClientMessage::PartyChat(id, msg) => {
+        ClientMessage::PartyChat(_id, msg) => {
             let amsg = format!("[{}] {}", "unknown", msg);
             let _ = broadcast.send(ServerMessage::PartyChat(amsg));
         }
-        ClientMessage::WhisperChat(id, person, msg) => {
+        ClientMessage::WhisperChat(_id, _person, msg) => {
             let _ = broadcast.send(ServerMessage::WhisperChat("unknown".to_string(), msg));
         }
     }

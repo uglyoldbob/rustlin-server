@@ -1,5 +1,4 @@
 pub mod packet;
-use crate::packet::*;
 
 pub fn do_stuff() {
     println!("I am doing stuff");

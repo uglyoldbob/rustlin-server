@@ -87,7 +87,7 @@ impl ScreenCoordinate {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::MapCoordinate;
 
     #[test]
     fn coordinate_transform1() {

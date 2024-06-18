@@ -1,5 +1,5 @@
 use crate::mouse::MouseEventOutput;
-use crate::{map, GameResources};
+use crate::GameResources;
 use std::collections::VecDeque;
 
 pub enum DrawMode {
@@ -62,7 +62,7 @@ pub trait GameModeTrait<'a, T> {
         down: bool,
         r: &mut GameResources<'a, '_, '_>,
     );
-    fn process_text(&mut self, s: &String) {}
+    fn process_text(&mut self, _s: &String) {}
     /// Perform any additional processing, before drawing, and after receiving all input events
     fn process_frame(
         &mut self,

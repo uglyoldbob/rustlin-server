@@ -26,12 +26,13 @@ pub fn hash_password(name: String, salt: String, pw: String) -> String {
 }
 
 fn convert_date(d: mysql_async::Value) -> chrono::DateTime<chrono::Utc> {
-    match d {
-        mysql_async::Value::Date(y, m, d, h, min, s, micro) => Utc
-            .ymd(y as i32, m as u32, d as u32)
-            .and_hms_milli(h as u32, min as u32, s as u32, micro as u32),
-        _ => Utc.ymd(1970, 1, 1).and_hms_milli(0, 0, 1, 444),
-    }
+    let dt = match d {
+        mysql_async::Value::Date(y, m, d, h, min, s, _micro) => {
+            Utc.with_ymd_and_hms(y as i32, m as u32, d as u32, h as u32, min as u32, s as u32)
+        }
+        _ => Utc.with_ymd_and_hms(1970, 1, 1, 0, 0, 1),
+    };
+    dt.single().or(dt.latest()).unwrap()
 }
 
 pub async fn get_user_details(user: String, mysql: &mut mysql_async::Conn) -> Option<UserAccount> {
@@ -75,7 +76,7 @@ impl UserAccount {
         Self {
             name: name.clone(),
             password: hashpass,
-            active: Utc.ymd(1970, 1, 1).and_hms_milli(0, 0, 1, 444),
+            active: Utc.with_ymd_and_hms(1970, 1, 1, 0, 0, 1).single().unwrap(),
             access: 0,
             ip: ip.clone(),
             host: ip.clone(),

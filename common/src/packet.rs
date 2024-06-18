@@ -1,15 +1,8 @@
-use futures::FutureExt;
-use std::error::Error;
-use tokio::net::TcpListener;
-
-use std::fmt;
 use tokio::io::AsyncReadExt;
 use tokio::io::AsyncWriteExt;
 
 use std::convert::TryInto;
 use std::vec::Vec;
-
-use rand::Rng;
 
 pub enum PacketError {
     IoError,

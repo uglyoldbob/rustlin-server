@@ -81,7 +81,7 @@ impl<'a> TextInput<'a> {
         button: sdl2::keyboard::Keycode,
         _m: sdl2::keyboard::Mod,
         down: bool,
-        r: &mut GameResources<'a, '_, '_>,
+        _r: &mut GameResources<'a, '_, '_>,
     ) {
         if down {
             match button {
