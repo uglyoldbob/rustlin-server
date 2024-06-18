@@ -1,4 +1,4 @@
-use crate::widgets::Widget;
+use crate::widgets::WidgetTrait;
 use crate::GameResources;
 use crate::ImageBox;
 use sdl2::pixels::PixelFormatEnum;
@@ -37,7 +37,7 @@ impl<'a> PlainColorButton<'a> {
     }
 }
 
-impl<'a> Widget<'a> for PlainColorButton<'a> {
+impl<'a> WidgetTrait<'a> for PlainColorButton<'a> {
     fn was_clicked(&mut self) -> bool {
         let ret = self.clicked;
         self.clicked = false;

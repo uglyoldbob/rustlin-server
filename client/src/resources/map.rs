@@ -303,7 +303,7 @@ impl TileSet {
         Some(TileSet { tiles: tiles })
     }
 
-    pub fn to_gui<'a, T>(self, tc: &'a TextureCreator<T>) -> TileSetGui {
+    pub fn to_gui<'a, T>(self, tc: &'a TextureCreator<T>) -> TileSetGui<'a> {
         let mut t = Vec::with_capacity(self.tiles.len());
         for tmp in &self.tiles {
             let w = 48;

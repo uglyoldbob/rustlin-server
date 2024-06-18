@@ -9,7 +9,7 @@ use sdl2::render::TextureCreator;
 use std::collections::VecDeque;
 
 pub struct SprExplorer<'a, T> {
-    b: Vec<Box<dyn Widget<'a> + 'a>>,
+    b: Vec<Widget<'a>>,
     disp: Vec<DynamicTextWidget<'a>>,
     current_spr_a: u16,
     current_spr_b: u16,
@@ -20,8 +20,10 @@ pub struct SprExplorer<'a, T> {
 
 impl<'a, T> SprExplorer<'a, T> {
     pub fn new(tc: &'a TextureCreator<T>, r: &mut GameResources) -> Self {
-        let mut b: Vec<Box<dyn Widget + 'a>> = Vec::new();
-        b.push(Box::new(TextButton::new(tc, 320, 400, "Go Back", &r.font)));
+        let mut b: Vec<Widget<'a>> = Vec::new();
+        b.push(Widget::TextButton(TextButton::new(
+            tc, 320, 400, "Go Back", &r.font,
+        )));
         let mut disp = Vec::new();
         disp.push(DynamicTextWidget::new(
             tc,

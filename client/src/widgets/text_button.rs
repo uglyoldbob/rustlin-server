@@ -1,4 +1,4 @@
-use crate::widgets::Widget;
+use crate::widgets::WidgetTrait;
 use crate::GameResources;
 use crate::ImageBox;
 use sdl2::rect::Rect;
@@ -38,7 +38,7 @@ impl<'a> TextButton<'a> {
     }
 }
 
-impl<'a> Widget<'a> for TextButton<'a> {
+impl<'a> WidgetTrait<'a> for TextButton<'a> {
     fn last_draw(&self) -> Option<ImageBox> {
         self.last_draw
     }

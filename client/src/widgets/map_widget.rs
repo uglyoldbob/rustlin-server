@@ -3,7 +3,7 @@ use std::rc::Rc;
 use crate::resources::map::MapCoordinate;
 use crate::resources::map::MapSegmentGui;
 use crate::resources::map::TileSetGui;
-use crate::widgets::Widget;
+use crate::widgets::WidgetTrait;
 use crate::GameResources;
 use crate::ImageBox;
 use sdl2::pixels::Color;
@@ -112,7 +112,7 @@ impl<'a> MapWidget<'a> {
     }
 }
 
-impl<'a> Widget<'a> for MapWidget<'a> {
+impl<'a> WidgetTrait<'a> for MapWidget<'a> {
     fn last_draw(&self) -> Option<ImageBox> {
         None
     }

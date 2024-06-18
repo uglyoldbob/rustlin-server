@@ -8,6 +8,7 @@ use sdl2::pixels::Color;
 use sdl2::pixels::PixelFormatEnum;
 use sdl2::render::Texture;
 use sdl2::render::TextureCreator;
+use sdl2::video::WindowContext;
 use std::collections::VecDeque;
 use std::fs;
 use std::time::Duration;
@@ -82,7 +83,7 @@ pub fn startup(mode: DrawMode) {
         }
         DrawMode::MapExplorer => Box::new(MapExplorer::new(&texture_creator, &mut game_resources)),
         DrawMode::GameLoader => Box::new(GameLoader::new(&texture_creator, &mut game_resources)),
-        DrawMode::Login => Box::new(Login::new(&mut game_resources)),
+        DrawMode::Login => Box::new(Login::new::<WindowContext>(&mut game_resources)),
         DrawMode::CharacterSelect => {
             Box::new(CharacterSelect::new(&texture_creator, &mut game_resources))
         }
@@ -252,7 +253,9 @@ pub fn startup(mode: DrawMode) {
                         DrawMode::GameLoader => {
                             Box::new(GameLoader::new(&texture_creator, &mut game_resources))
                         }
-                        DrawMode::Login => Box::new(Login::new(&mut game_resources)),
+                        DrawMode::Login => {
+                            Box::new(Login::new::<WindowContext>(&mut game_resources))
+                        }
                         DrawMode::CharacterSelect => {
                             Box::new(CharacterSelect::new(&texture_creator, &mut game_resources))
                         }

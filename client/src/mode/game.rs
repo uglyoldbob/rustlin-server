@@ -13,7 +13,7 @@ use std::rc::Rc;
 
 /// The screen that allows for selection of which character to play
 pub struct Game<'a> {
-    b: Vec<Box<dyn Widget<'a> + 'a>>,
+    b: Vec<Widget<'a>>,
     disp: Vec<DynamicTextWidget<'a>>,
     sprites: Vec<SpriteWidget>,
     framing: [Option<Rc<Texture<'a>>>; 5],
@@ -21,8 +21,10 @@ pub struct Game<'a> {
 
 impl<'a> Game<'a> {
     pub fn new<T>(tc: &'a TextureCreator<T>, r: &mut GameResources<'a, '_, '_>) -> Self {
-        let mut b: Vec<Box<dyn Widget + 'a>> = Vec::new();
-        b.push(Box::new(PlainColorButton::new(tc, 50, 50, 50, 50)));
+        let mut b: Vec<Widget<'a>> = Vec::new();
+        b.push(Widget::PlainColorButton(PlainColorButton::new(
+            tc, 50, 50, 50, 50,
+        )));
         let mut d = Vec::new();
         d.push(DynamicTextWidget::new(
             tc,

@@ -1,5 +1,5 @@
 use crate::mouse::MouseEventOutput;
-use crate::widgets::Widget;
+use crate::widgets::WidgetTrait;
 use crate::widgets::*;
 use crate::DrawMode;
 use crate::DrawModeRequest;
@@ -9,7 +9,7 @@ use sdl2::pixels::Color;
 use sdl2::render::TextureCreator;
 use std::collections::VecDeque;
 pub struct MapExplorer<'a, T> {
-    b: Vec<Box<dyn Widget<'a> + 'a>>,
+    b: Vec<Widget<'a>>,
     disp: Vec<DynamicTextWidget<'a>>,
     map: MapWidget<'a>,
     current_map: u16,
@@ -21,8 +21,10 @@ pub struct MapExplorer<'a, T> {
 
 impl<'a, T> MapExplorer<'a, T> {
     pub fn new(tc: &'a TextureCreator<T>, r: &mut GameResources<'a, '_, '_>) -> Self {
-        let mut b: Vec<Box<dyn Widget<'a> + 'a>> = Vec::new();
-        b.push(Box::new(TextButton::new(tc, 320, 420, "Go Back", &r.font)));
+        let mut b: Vec<Widget<'a>> = Vec::new();
+        b.push(Widget::TextButton(TextButton::new(
+            tc, 320, 420, "Go Back", &r.font,
+        )));
         let mut disp = Vec::new();
         disp.push(DynamicTextWidget::new(
             tc,

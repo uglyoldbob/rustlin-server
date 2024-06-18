@@ -13,15 +13,17 @@ use std::rc::Rc;
 
 /// This is for exploring the resources of the game client
 pub struct GameLoader<'a> {
-    b: Vec<Box<dyn Widget<'a> + 'a>>,
+    b: Vec<Widget<'a>>,
     background: Option<Rc<Texture<'a>>>,
     progressbar: Option<Rc<Texture<'a>>>,
 }
 
 impl<'a> GameLoader<'a> {
     pub fn new<T>(tc: &'a TextureCreator<T>, r: &mut GameResources<'a, '_, '_>) -> Self {
-        let mut b: Vec<Box<dyn Widget + 'a>> = Vec::new();
-        b.push(Box::new(PlainColorButton::new(tc, 50, 50, 50, 50)));
+        let mut b: Vec<Widget<'a>> = Vec::new();
+        b.push(Widget::PlainColorButton(PlainColorButton::new(
+            tc, 50, 50, 50, 50,
+        )));
         Self {
             b: b,
             background: r.get_or_load_png(811),

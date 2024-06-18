@@ -13,49 +13,49 @@ use std::rc::Rc;
 
 /// This is for exploring the resources of the game client
 pub struct ExplorerMenu<'a> {
-    b: Vec<Box<dyn Widget<'a> + 'a>>,
+    b: Vec<Widget<'a>>,
     background: Option<Rc<Texture<'a>>>,
 }
 
 impl<'a> ExplorerMenu<'a> {
     pub fn new<T>(tc: &'a TextureCreator<T>, r: &mut GameResources<'a, '_, '_>) -> Self {
-        let mut b: Vec<Box<dyn Widget>> = Vec::new();
-        b.push(Box::new(TextButton::new(
+        let mut b: Vec<Widget<'a>> = Vec::new();
+        b.push(Widget::TextButton(TextButton::new(
             tc,
             50,
             100,
             "Png browser",
             &r.font,
         )));
-        b.push(Box::new(TextButton::new(
+        b.push(Widget::TextButton(TextButton::new(
             tc,
             50,
             114,
             "Img browser",
             &r.font,
         )));
-        b.push(Box::new(TextButton::new(
+        b.push(Widget::TextButton(TextButton::new(
             tc,
             50,
             128,
             "Sprite browser",
             &r.font,
         )));
-        b.push(Box::new(TextButton::new(
+        b.push(Widget::TextButton(TextButton::new(
             tc,
             50,
             142,
             "Wav player",
             &r.font,
         )));
-        b.push(Box::new(TextButton::new(
+        b.push(Widget::TextButton(TextButton::new(
             tc,
             50,
             156,
             "Tile browser",
             &r.font,
         )));
-        b.push(Box::new(TextButton::new(
+        b.push(Widget::TextButton(TextButton::new(
             tc,
             50,
             170,

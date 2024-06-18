@@ -50,7 +50,9 @@ async fn process_update_client(mut socket: tokio::net::TcpStream) -> Result<u8, 
     Ok(0)
 }
 
-pub async fn setup_update_server(tasks: &mut tokio::task::JoinSet<Result<(), u32>>) -> Result<tokio::sync::oneshot::Sender<u32>, Box<dyn Error>> {
+pub async fn setup_update_server(
+    tasks: &mut tokio::task::JoinSet<Result<(), u32>>,
+) -> Result<tokio::sync::oneshot::Sender<u32>, Box<dyn Error>> {
     println!("update: Starting the update server");
     let (update_tx, mut update_rx) = tokio::sync::oneshot::channel::<u32>();
     let update_listener = TcpListener::bind("0.0.0.0:2003").await?;

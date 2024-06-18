@@ -187,8 +187,12 @@ async fn main() -> Result<(), String> {
 
     let mut tasks: tokio::task::JoinSet<Result<(), u32>> = tokio::task::JoinSet::new();
 
-    let update_tx = update::setup_update_server(&mut tasks).await.expect("Failed to setup update server");
-    let server_tx = server::setup_game_server(cd, &mut tasks).await.expect("Failed to setup legacy server");
+    let update_tx = update::setup_update_server(&mut tasks)
+        .await
+        .expect("Failed to setup update server");
+    let server_tx = server::setup_game_server(cd, &mut tasks)
+        .await
+        .expect("Failed to setup legacy server");
 
     let mut client_ids: ClientList = ClientList::new();
     let mut clients: HashMap<u32, tokio::sync::mpsc::UnboundedSender<ServerMessage>> =

@@ -14,7 +14,7 @@ use std::rc::Rc;
 pub struct NewCharacterMode<'a, T> {
     tc: &'a TextureCreator<T>,
     background: Option<Rc<Texture<'a>>>,
-    b: Vec<Box<dyn Widget<'a> + 'a>>,
+    b: Vec<Widget<'a>>,
     c: CharacterSelectWidget<'a>,
     options: Vec<SelectableWidget<'a>>,
     selected_class: u8,
@@ -28,21 +28,21 @@ pub struct NewCharacterMode<'a, T> {
 
 impl<'a, T> NewCharacterMode<'a, T> {
     pub fn new(tc: &'a TextureCreator<T>, r: &mut GameResources<'a, '_, '_>) -> Self {
-        let mut b: Vec<Box<dyn Widget>> = Vec::new();
-        b.push(Box::new(ImgButton::new(825, 476, 403, r)));
-        b.push(Box::new(ImgButton::new(827, 476, 430, r)));
-        b.push(Box::new(ImgButton::new(556, 424, 317, r)));
-        b.push(Box::new(ImgButton::new(554, 435, 317, r)));
-        b.push(Box::new(ImgButton::new(556, 424, 332, r)));
-        b.push(Box::new(ImgButton::new(554, 435, 332, r)));
-        b.push(Box::new(ImgButton::new(556, 424, 347, r)));
-        b.push(Box::new(ImgButton::new(554, 435, 347, r)));
-        b.push(Box::new(ImgButton::new(556, 498, 317, r)));
-        b.push(Box::new(ImgButton::new(554, 509, 317, r)));
-        b.push(Box::new(ImgButton::new(556, 498, 332, r)));
-        b.push(Box::new(ImgButton::new(554, 509, 332, r)));
-        b.push(Box::new(ImgButton::new(556, 498, 347, r)));
-        b.push(Box::new(ImgButton::new(554, 509, 347, r)));
+        let mut b: Vec<Widget<'a>> = Vec::new();
+        b.push(Widget::ImgButton(ImgButton::new(825, 476, 403, r)));
+        b.push(Widget::ImgButton(ImgButton::new(827, 476, 430, r)));
+        b.push(Widget::ImgButton(ImgButton::new(556, 424, 317, r)));
+        b.push(Widget::ImgButton(ImgButton::new(554, 435, 317, r)));
+        b.push(Widget::ImgButton(ImgButton::new(556, 424, 332, r)));
+        b.push(Widget::ImgButton(ImgButton::new(554, 435, 332, r)));
+        b.push(Widget::ImgButton(ImgButton::new(556, 424, 347, r)));
+        b.push(Widget::ImgButton(ImgButton::new(554, 435, 347, r)));
+        b.push(Widget::ImgButton(ImgButton::new(556, 498, 317, r)));
+        b.push(Widget::ImgButton(ImgButton::new(554, 509, 317, r)));
+        b.push(Widget::ImgButton(ImgButton::new(556, 498, 332, r)));
+        b.push(Widget::ImgButton(ImgButton::new(554, 509, 332, r)));
+        b.push(Widget::ImgButton(ImgButton::new(556, 498, 347, r)));
+        b.push(Widget::ImgButton(ImgButton::new(554, 509, 347, r)));
         let mut c = CharacterSelectWidget::new(410, 0, r);
         c.set_animating(true);
         let mut o = Vec::new();

@@ -7,27 +7,26 @@ use crate::GameResources;
 use sdl2::pixels::Color;
 use sdl2::rect::Rect;
 use sdl2::render::Texture;
-use sdl2::video::WindowContext;
 use std::collections::VecDeque;
 use std::rc::Rc;
 
 /// The screen that allows for user login
 pub struct Login<'a> {
-    b: Vec<Box<dyn Widget<'a> + 'a>>,
+    b: Vec<Widget<'a>>,
     background: Option<Rc<Texture<'a>>>,
     detail: Option<Rc<Texture<'a>>>,
-    username: TextInput<'a, WindowContext>,
-    password: TextInput<'a, WindowContext>,
+    username: TextInput<'a>,
+    password: TextInput<'a>,
     focus: u8,
 }
 
 impl<'a> Login<'a> {
-    pub fn new(r: &mut GameResources<'a, '_, '_>) -> Self {
-        let mut b: Vec<Box<dyn Widget + 'a>> = Vec::new();
-        b.push(Box::new(ImgButton::new(53, 0x213, 0x183, r)));
-        b.push(Box::new(ImgButton::new(65, 0x213, 0x195, r)));
-        b.push(Box::new(ImgButton::new(55, 0x213, 0x1a8, r)));
-        b.push(Box::new(ImgButton::new(57, 0x213, 0x1c2, r)));
+    pub fn new<T>(r: &mut GameResources<'a, '_, '_>) -> Self {
+        let mut b: Vec<Widget<'a>> = Vec::new();
+        b.push(Widget::ImgButton(ImgButton::new(53, 0x213, 0x183, r)));
+        b.push(Widget::ImgButton(ImgButton::new(65, 0x213, 0x195, r)));
+        b.push(Widget::ImgButton(ImgButton::new(55, 0x213, 0x1a8, r)));
+        b.push(Widget::ImgButton(ImgButton::new(57, 0x213, 0x1c2, r)));
 
         let mut ti = TextInput::new(
             &r.tc,

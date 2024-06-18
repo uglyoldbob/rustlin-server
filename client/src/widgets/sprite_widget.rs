@@ -1,4 +1,4 @@
-use crate::widgets::Widget;
+use crate::widgets::WidgetTrait;
 use crate::GameResources;
 use crate::ImageBox;
 use sdl2::render::TextureCreator;
@@ -44,7 +44,7 @@ impl SpriteWidget {
     }
 }
 
-impl<'a> Widget<'a> for SpriteWidget {
+impl<'a> WidgetTrait<'a> for SpriteWidget {
     fn last_draw(&self) -> Option<ImageBox> {
         self.last_draw
     }

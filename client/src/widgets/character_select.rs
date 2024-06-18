@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use crate::widgets::Widget;
+use crate::widgets::WidgetTrait;
 use crate::GameResources;
 use crate::ImageBox;
 use sdl2::rect::Rect;
@@ -407,7 +407,7 @@ impl<'a> CharacterSelectWidget<'a> {
     }
 }
 
-impl<'a> Widget<'a> for CharacterSelectWidget<'a> {
+impl<'a> WidgetTrait<'a> for CharacterSelectWidget<'a> {
     fn last_draw(&self) -> Option<ImageBox> {
         self.last_draw
     }

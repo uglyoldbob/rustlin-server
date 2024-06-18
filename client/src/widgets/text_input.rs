@@ -1,14 +1,15 @@
 use std::collections::VecDeque;
 
-use crate::widgets::Widget;
+use crate::widgets::WidgetTrait;
 use crate::GameResources;
 use crate::ImageBox;
 use sdl2::rect::Rect;
 use sdl2::render::Texture;
 use sdl2::render::TextureCreator;
+use sdl2::video::WindowContext;
 
-pub struct TextInput<'a, T> {
-    tc: &'a TextureCreator<T>,
+pub struct TextInput<'a> {
+    tc: &'a TextureCreator<WindowContext>,
     t: Texture<'a>,
     t2: Texture<'a>,
     x: u16,
@@ -24,9 +25,9 @@ pub struct TextInput<'a, T> {
     password: bool,
 }
 
-impl<'a, T> TextInput<'a, T> {
+impl<'a> TextInput<'a> {
     pub fn new(
-        tc: &'a TextureCreator<T>,
+        tc: &'a TextureCreator<WindowContext>,
         x: u16,
         y: u16,
         text: String,
@@ -158,7 +159,7 @@ impl<'a, T> TextInput<'a, T> {
     }
 }
 
-impl<'a, T> Widget<'a> for TextInput<'a, T> {
+impl<'a> WidgetTrait<'a> for TextInput<'a> {
     fn last_draw(&self) -> Option<ImageBox> {
         self.last_draw
     }

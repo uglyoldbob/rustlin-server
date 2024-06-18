@@ -13,7 +13,7 @@ use std::rc::Rc;
 
 /// The screen that allows for user login
 pub struct ImgExplorer<'a, T> {
-    b: Vec<Box<dyn Widget<'a> + 'a>>,
+    b: Vec<Widget<'a>>,
     disp: Vec<DynamicTextWidget<'a>>,
     current_img: u16,
     current_img_obj: Option<Rc<Texture<'a>>>,
@@ -23,8 +23,10 @@ pub struct ImgExplorer<'a, T> {
 
 impl<'a, T> ImgExplorer<'a, T> {
     pub fn new(tc: &'a TextureCreator<T>, r: &mut GameResources<'a, '_, '_>) -> Self {
-        let mut b: Vec<Box<dyn Widget + 'a>> = Vec::new();
-        b.push(Box::new(TextButton::new(tc, 320, 400, "Go Back", &r.font)));
+        let mut b: Vec<Widget<'a>> = Vec::new();
+        b.push(Widget::TextButton(TextButton::new(
+            tc, 320, 400, "Go Back", &r.font,
+        )));
         let mut disp = Vec::new();
         disp.push(DynamicTextWidget::new(
             tc,

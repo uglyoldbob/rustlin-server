@@ -1,7 +1,21 @@
 use crate::GameResources;
 use crate::ImageBox;
 
-pub trait Widget<'a> {
+#[enum_dispatch::enum_dispatch]
+pub enum Widget<'a> {
+    CharacterSelect(character_select::CharacterSelectWidget<'a>),
+    DynamicText(dynamic_text::DynamicTextWidget<'a>),
+    ImgButton(img_button::ImgButton<'a>),
+    Map(map_widget::MapWidget<'a>),
+    PlainColorButton(plain_color_button::PlainColorButton<'a>),
+    Selectable(selectable::SelectableWidget<'a>),
+    Sprite(sprite_widget::SpriteWidget),
+    TextButton(text_button::TextButton<'a>),
+    TextInput(text_input::TextInput<'a>),
+}
+
+#[enum_dispatch::enum_dispatch(Widget)]
+pub trait WidgetTrait<'a> {
     fn draw(
         &mut self,
         canvas: &mut sdl2::render::WindowCanvas,
@@ -24,7 +38,7 @@ pub trait Widget<'a> {
     );
     fn was_clicked(&mut self) -> bool;
     fn clicked(&mut self);
-    fn contains(&self, x: i16, y: i16) -> bool {
+    fn contains(&mut self, x: i16, y: i16) -> bool {
         if let Some(t) = &self.last_draw() {
             let x = if x < 0 { 0 as u16 } else { x as u16 };
             let y = if y < 0 { 0 as u16 } else { y as u16 };

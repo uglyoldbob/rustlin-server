@@ -13,7 +13,7 @@ use std::rc::Rc;
 
 /// The screen that allows for selection of which character to play
 pub struct CharacterSelect<'a> {
-    b: Vec<Box<dyn Widget<'a> + 'a>>,
+    b: Vec<Widget<'a>>,
     char_sel: Vec<CharacterSelectWidget<'a>>,
     page: u8,
     selection: Option<u8>,
@@ -25,12 +25,12 @@ pub struct CharacterSelect<'a> {
 
 impl<'a> CharacterSelect<'a> {
     pub fn new<T>(_tc: &'a TextureCreator<T>, r: &mut GameResources<'a, '_, '_>) -> Self {
-        let mut b: Vec<Box<dyn Widget<'a> + 'a>> = Vec::new();
-        b.push(Box::new(ImgButton::new(0x6e5, 0x0f7, 0x10b, r)));
-        b.push(Box::new(ImgButton::new(0x6e7, 0x16c, 0x10b, r)));
-        b.push(Box::new(ImgButton::new(0x334, 0x20d, 0x185, r)));
-        b.push(Box::new(ImgButton::new(0x336, 0x20d, 0x19a, r)));
-        b.push(Box::new(ImgButton::new(0x134, 0x20d, 0x1b5, r)));
+        let mut b: Vec<Widget<'a>> = Vec::new();
+        b.push(Widget::ImgButton(ImgButton::new(0x6e5, 0x0f7, 0x10b, r)));
+        b.push(Widget::ImgButton(ImgButton::new(0x6e7, 0x16c, 0x10b, r)));
+        b.push(Widget::ImgButton(ImgButton::new(0x334, 0x20d, 0x185, r)));
+        b.push(Widget::ImgButton(ImgButton::new(0x336, 0x20d, 0x19a, r)));
+        b.push(Widget::ImgButton(ImgButton::new(0x134, 0x20d, 0x1b5, r)));
         let mut ch = Vec::new();
 
         ch.push(CharacterSelectWidget::new(0x13, 0, r));
