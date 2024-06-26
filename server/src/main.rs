@@ -177,7 +177,7 @@ async fn main() -> Result<(), String> {
     let mysql_opt = mysql_async::Opts::from_url(mysql_conn_s.as_str()).unwrap();
     let mysql_pool = mysql_async::Pool::new(mysql_opt);
     println!("Trying to connect to database");
-    //let mysql_conn = mysql_pool.get_conn().await.expect("Failed to connect to mysql server");
+    let _mysql_conn = mysql_pool.get_conn().await.expect("Failed to connect to mysql server");
 
     let cd: ClientData = ClientData::new(broadcast.clone(), clients, mysql_pool);
 

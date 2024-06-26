@@ -14,41 +14,42 @@ use crate::server::client::*;
 
 use common::packet::*;
 
-#[derive(Debug, Clone)]
-pub struct ClientError;
-impl fmt::Display for ClientError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Client error")
-    }
+#[derive(Debug)]
+pub enum ClientError {
+    PacketError,
+    IoError(std::io::Error),
+    ErroReceivingBroadcast(tokio::sync::broadcast::error::RecvError),
+    ErrorSendingClientMessage(tokio::sync::mpsc::error::SendError<ClientMessage>),
+    MysqlError(mysql_async::Error),
 }
 
 impl From<PacketError> for ClientError {
     fn from(_: PacketError) -> ClientError {
-        ClientError {}
+        ClientError::PacketError
     }
 }
 
 impl From<std::io::Error> for ClientError {
-    fn from(_: std::io::Error) -> ClientError {
-        ClientError {}
+    fn from(a: std::io::Error) -> ClientError {
+        ClientError::IoError(a)
     }
 }
 
 impl From<tokio::sync::broadcast::error::RecvError> for ClientError {
-    fn from(_: tokio::sync::broadcast::error::RecvError) -> ClientError {
-        ClientError {}
+    fn from(a: tokio::sync::broadcast::error::RecvError) -> ClientError {
+        ClientError::ErroReceivingBroadcast(a)
     }
 }
 
 impl From<tokio::sync::mpsc::error::SendError<ClientMessage>> for ClientError {
-    fn from(_: tokio::sync::mpsc::error::SendError<ClientMessage>) -> ClientError {
-        ClientError {}
+    fn from(a: tokio::sync::mpsc::error::SendError<ClientMessage>) -> ClientError {
+        ClientError::ErrorSendingClientMessage(a)
     }
 }
 
 impl From<mysql_async::Error> for ClientError {
-    fn from(_: mysql_async::Error) -> ClientError {
-        ClientError {}
+    fn from(a: mysql_async::Error) -> ClientError {
+        ClientError::MysqlError(a)
     }
 }
 
@@ -109,7 +110,7 @@ pub async fn setup_game_server(
                     let cd2 = cd.clone();
                     f.push(async move {
                         if let Err(e) = process_client(socket, cd2).await {
-                            println!("server: Client {} errored {}", addr, e);
+                            println!("server: Client {} errored {:?}", addr, e);
                         }
                     });
                 }
