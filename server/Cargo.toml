@@ -24,3 +24,11 @@ features = ["rt-multi-thread", "net", "time", "macros", "signal", "sync", "io-ut
 [dependencies.common]
 version = "^0"
 path="../common"
+
+[[bin]]
+name = "rustlin-server"
+path = "src/main.rs"
+
+[[bin]]
+name = "rustlin-server-setup"
+path = "src/setup.rs"

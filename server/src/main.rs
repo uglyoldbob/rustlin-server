@@ -12,24 +12,12 @@ use client_data::*;
 use std::collections::HashMap;
 
 mod clients;
+mod config;
+use config::*;
 mod player;
 mod user;
 use crate::clients::ClientList;
 use crate::player::Player;
-
-#[derive(Debug, serde::Deserialize, serde::Serialize)]
-pub struct MysqlConfig {
-    password: String,
-    username: String,
-    dbname: String,
-    url: String,
-}
-
-/// The main configuration of the application
-#[derive(Debug, serde::Deserialize, serde::Serialize)]
-pub struct MainConfiguration {
-    db: MysqlConfig,
-}
 
 /// Handle a message from a user
 async fn handle_user_message(
@@ -162,20 +150,8 @@ async fn main() -> Result<(), String> {
     let (clients, mut clients_rx) = tokio::sync::mpsc::channel::<ClientMessage>(100);
     let (broadcast, _) = tokio::sync::broadcast::channel::<ServerMessage>(100);
 
-    let settings_file = std::fs::read_to_string("./server-settings.ini")
-        .expect("Failed to open server-settings.ini");
-    let settings_result = toml::from_str(&settings_file);
-    if let Err(e) = &settings_result {
-        println!("Failed to read settings {}", e);
-    }
-    let settings: MainConfiguration = settings_result.unwrap();
-
-    let mysql_conn_s = format!(
-        "mysql://{}:{}@{}/{}",
-        settings.db.username, settings.db.password, settings.db.url, settings.db.dbname
-    );
-    let mysql_opt = mysql_async::Opts::from_url(mysql_conn_s.as_str()).unwrap();
-    let mysql_pool = mysql_async::Pool::new(mysql_opt);
+    let settings = load_config().unwrap();
+    let mysql_pool = open_mysql(&settings).unwrap();
     println!("Trying to connect to database");
     let _mysql_conn = mysql_pool.get_conn().await.expect("Failed to connect to mysql server");
 
