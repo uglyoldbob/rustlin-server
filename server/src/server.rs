@@ -3,8 +3,6 @@ use std::error::Error;
 use std::panic::AssertUnwindSafe;
 use tokio::net::TcpListener;
 
-use std::fmt;
-
 use crate::client_data::*;
 use crate::ClientMessage;
 use crate::ServerMessage;
