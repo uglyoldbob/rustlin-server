@@ -16,7 +16,7 @@ rand = "0.8.5"
 toml = "0.8.14"
 
 [dependencies.sdl2]
-version="0.36.0"
+version="0.37.0"
 features=["use_mac_framework", "image", "ttf", "mixer"]
 
 [dependencies.serde]
