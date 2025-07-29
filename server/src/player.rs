@@ -12,7 +12,6 @@ impl Player {
     }
 
     pub fn valid_name(n: String) -> bool {
-        let c1 = !n.is_empty();
-        c1
+        !n.is_empty()
     }
 }

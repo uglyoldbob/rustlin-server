@@ -1,3 +1,7 @@
+#![deny(missing_docs)]
+#![deny(clippy::missing_docs_in_private_items)]
+
+//! The server for the game.
 use futures::FutureExt;
 use std::error::Error;
 use std::panic::AssertUnwindSafe;
@@ -12,12 +16,18 @@ use crate::server::client::*;
 
 use common::packet::*;
 
+/// The errors that can occur when dealing with a game client
 #[derive(Debug)]
 pub enum ClientError {
+    /// Some sort of packet error occurred
     PacketError,
+    /// An io error occurred
     IoError(std::io::Error),
-    ErroReceivingBroadcast(tokio::sync::broadcast::error::RecvError),
+    /// Error receiving a broadcast
+    ErrorReceivingBroadcast(tokio::sync::broadcast::error::RecvError),
+    /// Error sending a ClientMessage
     ErrorSendingClientMessage(tokio::sync::mpsc::error::SendError<ClientMessage>),
+    /// A mysql error occurred
     MysqlError(mysql_async::Error),
 }
 
@@ -35,7 +45,7 @@ impl From<std::io::Error> for ClientError {
 
 impl From<tokio::sync::broadcast::error::RecvError> for ClientError {
     fn from(a: tokio::sync::broadcast::error::RecvError) -> ClientError {
-        ClientError::ErroReceivingBroadcast(a)
+        ClientError::ErrorReceivingBroadcast(a)
     }
 }
 
@@ -51,7 +61,12 @@ impl From<mysql_async::Error> for ClientError {
     }
 }
 
-async fn process_client(socket: tokio::net::TcpStream, cd: ClientData) -> Result<u8, ClientError> {
+/// Process a single client for the world in the server
+async fn process_client(
+    socket: tokio::net::TcpStream,
+    cd: ClientData,
+    world: std::sync::Arc<crate::world::World>,
+) -> Result<u8, ClientError> {
     let (reader, writer) = socket.into_split();
     let packet_writer = ServerPacketSender::new(writer);
 
@@ -68,20 +83,17 @@ async fn process_client(socket: tokio::net::TcpStream, cd: ClientData) -> Result
     println!("client: Waiting to receive the id");
     loop {
         let msg = rx.recv().await;
-        match msg.unwrap() {
-            ServerMessage::AssignId(i) => {
-                println!("client: assigned id of {} to self", i);
-                client_id = i;
-                break;
-            }
-            _ => {}
+        if let ServerMessage::AssignId(i) = msg.unwrap() {
+            println!("client: assigned id of {} to self", i);
+            client_id = i;
+            break;
         }
     }
 
-    let c = Client::new(packet_writer, brd_rx, rx, &server_tx, client_id, mysql);
+    let c = Client::new(packet_writer, brd_rx, rx, server_tx, client_id, mysql);
 
-    if let Err(_) = c.event_loop(reader).await {
-        println!("test: Client errored");
+    if let Err(e) = c.event_loop(reader, world).await {
+        println!("test: Client errored: {:?}", e);
     }
 
     server_tx.send(ClientMessage::Unregister(client_id)).await?;
@@ -89,9 +101,11 @@ async fn process_client(socket: tokio::net::TcpStream, cd: ClientData) -> Result
     Ok(0)
 }
 
+/// Start the game
 pub async fn setup_game_server(
     cd: ClientData,
     tasks: &mut tokio::task::JoinSet<Result<(), u32>>,
+    world: std::sync::Arc<crate::world::World>,
 ) -> Result<tokio::sync::oneshot::Sender<u32>, Box<dyn Error>> {
     println!("server: Starting the game server");
     let (update_tx, mut update_rx) = tokio::sync::oneshot::channel::<u32>();
@@ -106,8 +120,9 @@ pub async fn setup_game_server(
                     let (socket, addr) = res;
                     println!("server: Received a client from {}", addr);
                     let cd2 = cd.clone();
+                    let world2 = world.clone();
                     f.push(async move {
-                        if let Err(e) = process_client(socket, cd2).await {
+                        if let Err(e) = process_client(socket, cd2, world2).await {
                             println!("server: Client {} errored {:?}", addr, e);
                         }
                     });

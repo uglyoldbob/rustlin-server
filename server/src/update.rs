@@ -21,7 +21,10 @@ impl From<std::io::Error> for UpdateError {
     }
 }
 
-async fn process_update_client(mut socket: tokio::net::TcpStream) -> Result<u8, UpdateError> {
+async fn process_update_client(
+    mut socket: tokio::net::TcpStream,
+    world: std::sync::Arc<crate::world::World>,
+) -> Result<u8, UpdateError> {
     //the AsyncReadExt trait is used
     let timestamp = socket.read_u32().await?;
     //timestamp is the contents of time.dat
@@ -37,7 +40,7 @@ async fn process_update_client(mut socket: tokio::net::TcpStream) -> Result<u8, 
         //TODO: send all files
         socket.write_u32_le(0).await?;
         socket.write_u32_le(1).await?;
-        let number_players = 0;
+        let number_players = world.get_number_players();
         socket.write_u16_le(number_players).await?;
     } else {
         println!("update: client is using an invalid timestamp");
@@ -52,6 +55,7 @@ async fn process_update_client(mut socket: tokio::net::TcpStream) -> Result<u8, 
 
 pub async fn setup_update_server(
     tasks: &mut tokio::task::JoinSet<Result<(), u32>>,
+    world: std::sync::Arc<crate::world::World>,
 ) -> Result<tokio::sync::oneshot::Sender<u32>, Box<dyn Error>> {
     println!("update: Starting the update server");
     let (update_tx, mut update_rx) = tokio::sync::oneshot::channel::<u32>();
@@ -65,8 +69,9 @@ pub async fn setup_update_server(
                 Ok(res) = update_listener.accept() => {
                     let (socket, addr) = res;
                     println!("update: Received an update client from {}", addr);
+                    let world2 = world.clone();
                     f.push(async move {
-                        if let Err(e) = process_update_client(socket).await {
+                        if let Err(e) = process_update_client(socket, world2).await {
                             println!("update: Client {} errored during the update process {}", addr, e);
                         }
                     });

@@ -823,7 +823,7 @@ impl ServerPacketSender {
             self.encryption_key = Some(change_key(key, kcv));
         }
         self.writer.write_u16_le(data.len() + 2).await?;
-        self.writer.write(&data.buf()).await?;
+        self.writer.write_all(&data.buf()).await?;
         Ok(())
     }
 }

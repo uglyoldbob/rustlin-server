@@ -1,3 +1,5 @@
+//! Holds code for game clients
+
 use crate::client_message::ClientMessage;
 use crate::server::ClientError;
 use crate::server_message::ServerMessage;
@@ -7,23 +9,31 @@ use common::packet::*;
 use futures::FutureExt;
 use rand::Rng;
 
+/// A game client for a game server
 pub struct Client<'a> {
+    /// Used to send packets to the server
     packet_writer: ServerPacketSender,
+    /// How the client receives broadcast messages from the server
     brd_rx: tokio::sync::broadcast::Receiver<ServerMessage>,
+    /// How the client receives messages from the server
     rx: tokio::sync::mpsc::UnboundedReceiver<ServerMessage>,
+    /// How the client sends messages to the server
     server_tx: &'a tokio::sync::mpsc::Sender<ClientMessage>,
+    /// The id for the game client
     id: u32,
+    /// Connection to the mysql server
     mysql: mysql_async::Conn,
 }
 
 impl<'a> Client<'a> {
+    /// Construct a new client
     pub fn new(
-        mut packet_writer: ServerPacketSender,
-        mut brd_rx: tokio::sync::broadcast::Receiver<ServerMessage>,
-        mut rx: tokio::sync::mpsc::UnboundedReceiver<ServerMessage>,
+        packet_writer: ServerPacketSender,
+        brd_rx: tokio::sync::broadcast::Receiver<ServerMessage>,
+        rx: tokio::sync::mpsc::UnboundedReceiver<ServerMessage>,
         server_tx: &'a tokio::sync::mpsc::Sender<ClientMessage>,
         id: u32,
-        mut mysql: mysql_async::Conn,
+        mysql: mysql_async::Conn,
     ) -> Self {
         Self {
             packet_writer: packet_writer,
@@ -35,6 +45,8 @@ impl<'a> Client<'a> {
         }
     }
 
+    /// Process a single message for the server.
+    /// TODO move this functionality to world?
     pub async fn handle_server_message(&mut self, p: ServerMessage) -> Result<u8, ClientError> {
         match p {
             ServerMessage::AssignId(i) => {}
@@ -166,9 +178,15 @@ impl<'a> Client<'a> {
         Ok(0)
     }
 
-    pub async fn process_packet(&mut self, p: Packet) -> Result<(), ClientError> {
+    /// Process a single packet from the game client
+    pub async fn process_packet(
+        &mut self,
+        p: Packet,
+        peer: std::net::SocketAddr,
+        world: &std::sync::Arc<crate::world::World>,
+    ) -> Result<(), ClientError> {
         let c = p.convert();
-        Ok(match c {
+        match c {
             ClientPacket::Version(a, b, c, d) => {
                 println!("client: version {} {} {} {}", a, b, c, d);
                 let response: Packet = ServerPacket::ServerVersion {
@@ -226,12 +244,11 @@ impl<'a> Client<'a> {
                         println!("User {} does not exist!", u.clone());
                         //TODO actually determine if auto account creation is enabled
                         if true {
-                            //TODO: put in accurate ip information
                             //TODO un-hardcode the salt for the password hashing
                             let newaccount = UserAccount::new(
                                 u.clone(),
                                 p,
-                                "127.0.0.1".to_string(),
+                                peer.to_string(),
                                 "lineage".to_string(),
                             );
                             newaccount.insert_into_db(&mut self.mysql).await;
@@ -297,15 +314,15 @@ impl<'a> Client<'a> {
                     .server_tx
                     .send(ClientMessage::NewCharacter {
                         id: self.id,
-                        name: name,
-                        class: class,
-                        gender: gender,
-                        strength: strength,
-                        dexterity: dexterity,
-                        constitution: constitution,
-                        wisdom: wisdom,
-                        charisma: charisma,
-                        intelligence: intelligence,
+                        name,
+                        class,
+                        gender,
+                        strength,
+                        dexterity,
+                        constitution,
+                        wisdom,
+                        charisma,
+                        intelligence,
                     })
                     .await?;
             }
@@ -572,14 +589,18 @@ impl<'a> Client<'a> {
             ClientPacket::Unknown(d) => {
                 println!("client: received unknown packet {:x?}", d);
             }
-        })
+        }
+        Ok(())
     }
 
+    /// The main event loop for a client in a server.
     pub async fn event_loop(
         mut self,
         reader: tokio::net::tcp::OwnedReadHalf,
+        world: std::sync::Arc<crate::world::World>,
     ) -> Result<u8, ClientError> {
         let encryption_key: u32 = rand::thread_rng().gen();
+        let peer = reader.peer_addr()?;
         let mut packet_reader = ServerPacketReceiver::new(reader, encryption_key);
 
         let mut key_packet = Packet::new();
@@ -591,7 +612,7 @@ impl<'a> Client<'a> {
             futures::select! {
                 packet = packet_reader.read_packet().fuse() => {
                     let p = packet?;
-                    self.process_packet(p).await?;
+                    self.process_packet(p, peer, &world).await?;
                 }
                 msg = self.brd_rx.recv().fuse() => {
                     let p = msg.unwrap();

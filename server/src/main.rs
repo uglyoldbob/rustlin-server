@@ -16,6 +16,7 @@ mod config;
 use config::*;
 mod player;
 mod user;
+mod world;
 use crate::clients::ClientList;
 use crate::player::Player;
 
@@ -120,8 +121,8 @@ async fn handle_user_message(
             let _ = broadcast.send(ServerMessage::YellChat {
                 id: 0,
                 msg: amsg,
-                x: x,
-                y: y,
+                x,
+                y,
             });
         }
         ClientMessage::GlobalChat(_id, msg) => {
@@ -153,16 +154,21 @@ async fn main() -> Result<(), String> {
     let settings = load_config().unwrap();
     let mysql_pool = open_mysql(&settings).unwrap();
     println!("Trying to connect to database");
-    let _mysql_conn = mysql_pool.get_conn().await.expect("Failed to connect to mysql server");
+    let _mysql_conn = mysql_pool
+        .get_conn()
+        .await
+        .expect("Failed to connect to mysql server");
 
     let cd: ClientData = ClientData::new(broadcast.clone(), clients, mysql_pool);
 
     let mut tasks: tokio::task::JoinSet<Result<(), u32>> = tokio::task::JoinSet::new();
 
-    let update_tx = update::setup_update_server(&mut tasks)
+    let world = std::sync::Arc::new(world::World::new());
+
+    let update_tx = update::setup_update_server(&mut tasks, world.clone())
         .await
         .expect("Failed to setup update server");
-    let server_tx = server::setup_game_server(cd, &mut tasks)
+    let server_tx = server::setup_game_server(cd, &mut tasks, world.clone())
         .await
         .expect("Failed to setup legacy server");
 
