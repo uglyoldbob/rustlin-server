@@ -7,11 +7,7 @@ impl Font {
     pub async fn load(path: String) -> Result<Self, Exception> {
         println!("Loading font {}", path);
 
-        let file = tokio::fs::File::open(path).await;
-        if let Err(_e) = file {
-            return Err(Exception::IoError);
-        }
-        let mut file = file.unwrap();
+        let mut file = tokio::fs::File::open(path).await?;
         if file.metadata().await?.len() as u64 != 1140 {
             return Err(Exception::ContentError);
         }

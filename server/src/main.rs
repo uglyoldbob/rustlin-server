@@ -31,25 +31,6 @@ async fn handle_user_message(
 ) {
     *testvar = 1;
     match res {
-        ClientMessage::Register(tx) => {
-            let new_id = client_ids.new_entry();
-            clients.insert(new_id, tx.clone());
-            let resp = clients
-                .get(&new_id)
-                .unwrap()
-                .send(ServerMessage::AssignId(new_id));
-            match resp {
-                Err(_) => {
-                    clients.remove(&new_id);
-                }
-                Ok(()) => println!("server: New client {} just registered {}", new_id, testvar),
-            }
-        }
-        ClientMessage::Unregister(i) => {
-            println!("server: client {} is unregistering", i);
-            clients.remove(&i);
-            client_ids.remove_entry(i);
-        }
         ClientMessage::LoggedIn(id, account) => {
             client_accounts.insert(id, account);
         }
@@ -67,7 +48,7 @@ async fn handle_user_message(
         } => {
             let a = client_accounts.get(&id);
             let cid = clients.get(&id).unwrap();
-            if let Some(account) = &a {
+            if let Some(account) = a {
                 println!("{} wants to make a new character {}", account, name);
                 //TODO ensure player name does not already exist
                 //TODO validate that all stats are legitimately possible

@@ -6,10 +6,12 @@ use std::collections::HashMap;
 use std::io::Read;
 use std::io::Seek;
 
+/// A helper trait for reading raw file data from a Read object
 trait VecReader
 where
     Self: Read,
 {
+    /// Reads a vector of data from a buffer, the vector must already have the length desired to read
     fn read_vec(&mut self, buf: &mut Vec<u8>) -> Result<(), ()>;
 }
 
@@ -182,7 +184,7 @@ impl Pack {
                 }
             }
         } else {
-            return Err(Exception::IoError); //probably
+            return Err(Exception::IoError(std::io::Error::other("No contents in pack?".to_string()))); //probably
         }
         Ok(())
     }

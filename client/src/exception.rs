@@ -1,10 +1,13 @@
+/// The exceptions that can occur loading resources
+#[derive(Debug)]
 pub enum Exception {
-    IoError,
+    /// An io error occurred
+    IoError(std::io::Error),
     ContentError,
 }
 
 impl From<std::io::Error> for Exception {
-    fn from(_a: std::io::Error) -> Self {
-        Exception::IoError
+    fn from(a: std::io::Error) -> Self {
+        Exception::IoError(a)
     }
 }

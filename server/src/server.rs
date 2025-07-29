@@ -74,29 +74,13 @@ async fn process_client(
     let server_tx = &cd.server_tx;
 
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<ServerMessage>();
-    let _ = &server_tx.send(ClientMessage::Register(tx)).await?;
-
-    let client_id: u32;
-
     let mysql = cd.get_mysql().await?;
 
-    println!("client: Waiting to receive the id");
-    loop {
-        let msg = rx.recv().await;
-        if let ServerMessage::AssignId(i) = msg.unwrap() {
-            println!("client: assigned id of {} to self", i);
-            client_id = i;
-            break;
-        }
-    }
+    let c = Client::new(packet_writer, brd_rx, rx, server_tx, mysql, world.clone());
 
-    let c = Client::new(packet_writer, brd_rx, rx, server_tx, client_id, mysql);
-
-    if let Err(e) = c.event_loop(reader, world).await {
+    if let Err(e) = c.event_loop(reader).await {
         println!("test: Client errored: {:?}", e);
     }
-
-    server_tx.send(ClientMessage::Unregister(client_id)).await?;
 
     Ok(0)
 }

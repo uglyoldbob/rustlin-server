@@ -23,6 +23,15 @@ pub struct Client<'a> {
     id: u32,
     /// Connection to the mysql server
     mysql: mysql_async::Conn,
+    /// The world object
+    world: std::sync::Arc<crate::world::World>,
+}
+
+impl<'a> Drop for Client<'a>
+{
+    fn drop(&mut self) {
+        self.world.unregister_user(self.id);
+    }
 }
 
 impl<'a> Client<'a> {
@@ -32,16 +41,17 @@ impl<'a> Client<'a> {
         brd_rx: tokio::sync::broadcast::Receiver<ServerMessage>,
         rx: tokio::sync::mpsc::UnboundedReceiver<ServerMessage>,
         server_tx: &'a tokio::sync::mpsc::Sender<ClientMessage>,
-        id: u32,
         mysql: mysql_async::Conn,
+        world: std::sync::Arc<crate::world::World>,
     ) -> Self {
         Self {
-            packet_writer: packet_writer,
-            brd_rx: brd_rx,
-            rx: rx,
-            server_tx: server_tx,
-            id: id,
-            mysql: mysql,
+            packet_writer,
+            brd_rx,
+            rx,
+            server_tx,
+            id: world.register_user(),
+            mysql,
+            world,
         }
     }
 
@@ -49,7 +59,6 @@ impl<'a> Client<'a> {
     /// TODO move this functionality to world?
     pub async fn handle_server_message(&mut self, p: ServerMessage) -> Result<u8, ClientError> {
         match p {
-            ServerMessage::AssignId(i) => {}
             ServerMessage::Disconnect => {
                 self.packet_writer
                     .send_packet(ServerPacket::Disconnect.build())
@@ -183,7 +192,6 @@ impl<'a> Client<'a> {
         &mut self,
         p: Packet,
         peer: std::net::SocketAddr,
-        world: &std::sync::Arc<crate::world::World>,
     ) -> Result<(), ClientError> {
         let c = p.convert();
         match c {
@@ -597,7 +605,6 @@ impl<'a> Client<'a> {
     pub async fn event_loop(
         mut self,
         reader: tokio::net::tcp::OwnedReadHalf,
-        world: std::sync::Arc<crate::world::World>,
     ) -> Result<u8, ClientError> {
         let encryption_key: u32 = rand::thread_rng().gen();
         let peer = reader.peer_addr()?;
@@ -612,7 +619,7 @@ impl<'a> Client<'a> {
             futures::select! {
                 packet = packet_reader.read_packet().fuse() => {
                     let p = packet?;
-                    self.process_packet(p, peer, &world).await?;
+                    self.process_packet(p, peer).await?;
                 }
                 msg = self.brd_rx.recv().fuse() => {
                     let p = msg.unwrap();

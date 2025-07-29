@@ -1,3 +1,4 @@
+use crate::exception;
 use crate::Pack;
 use omnom::ReadExt;
 use sdl2::image::LoadTexture;
@@ -134,37 +135,34 @@ impl PackFiles {
         None
     }
 
-    pub fn load(path: String) -> Result<Self, ()> {
+    pub fn load(path: String) -> Result<Self, exception::Exception> {
         let start = std::time::Instant::now();
         let mut packs: Vec<Pack> = Vec::new();
         for i in 0..16 {
             let mut pack = Pack::new(format!("{}/Sprite{:02}", path, i), false);
-            let e = pack.load();
+            pack.load()?;
             for (key, v) in pack.file_extensions().iter() {
                 println!("Contains {} {}", key, v);
             }
             println!("Time elapsed is {:?}", start.elapsed());
-            if let Err(_a) = e {
-                return Err(());
-            }
             packs.push(pack);
         }
         let mut tile = Pack::new(format!("{}/Tile", path), false);
-        let _e = tile.load();
+        tile.load()?;
         println!("TILE");
         for (key, v) in tile.file_extensions().iter() {
             println!("Contains {} {}", key, v);
         }
         println!("Time elapsed is {:?}", start.elapsed());
         let mut text = Pack::new(format!("{}/Text", path), true);
-        let _e = text.load();
+        text.load()?;
         println!("TEXT");
         for (key, v) in text.file_extensions().iter() {
             println!("Contains {} {}", key, v);
         }
         println!("Time elapsed is {:?}", start.elapsed());
         let mut sprite = Pack::new(format!("{}/Sprite", path), false);
-        let _e = sprite.load();
+        sprite.load()?;
         println!("SPRITE");
         for (key, v) in sprite.file_extensions().iter() {
             println!("Contains {} {}", key, v);
@@ -333,7 +331,7 @@ impl<'a, 'b, 'c> GameResources<'a, 'b, 'c> {
         chars[2].t = CharacterDisplayType::Locked;
 
         let p = PathBuf::from(path.clone());
-        let pack = PackFiles::load(path).ok();
+        let pack = PackFiles::load(path).inspect_err(|e| println!("Failed to load packs: {:?}", e)).ok();
         Self {
             resource_path: p,
             tc: tc,

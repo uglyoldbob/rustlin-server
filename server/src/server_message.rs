@@ -1,7 +1,6 @@
 /// Represents messages sent by the server to player clients
 #[derive(Clone)]
 pub enum ServerMessage {
-    AssignId(u32),
     SystemMessage(String),
     CharacterCreateStatus(u8),
     Disconnect,
