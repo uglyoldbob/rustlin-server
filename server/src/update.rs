@@ -34,6 +34,13 @@ impl From<std::io::Error> for UpdateError {
     }
 }
 
+/// this function shows behavior of the client in theory
+async fn get_update(mut socket: tokio::net::TcpStream) {
+    socket.write_u32(42).await.unwrap();
+    let a: u32 = socket.read_u32().await.unwrap();
+
+}
+
 async fn process_update_client(
     mut socket: tokio::net::TcpStream,
     world: std::sync::Arc<crate::world::World>,
@@ -64,14 +71,16 @@ async fn process_update_client(
         }
         println!("Done sending files");
         socket.write_u32_le(0).await?; //unsure if necessary
+        println!("Sending number of servers");
         socket.write_u32_le(1).await?; //number of servers
         let number_players = world.get_number_players();
+        println!("Sending number of players");
         socket.write_u16_le(number_players).await?;
     } else {
         println!("update: client is using an invalid timestamp");
         return Err(UpdateError);
     }
-
+    println!("Reading restime from client");
     let restime = socket.read_u32().await?; //loaded from restime.dat
     println!(" Client restime is {}", restime);
 
