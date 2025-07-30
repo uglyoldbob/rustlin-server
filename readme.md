@@ -69,9 +69,14 @@ Host lineage
 	KexAlgorithms diffie-hellman-group-exchange-sha1,diffie-hellman-group1-sha1
 	HostKeyAlgorithms ssh-rsa,ssh-dss
 ```
-8. `sudo qemu-system-ppc -L pc-bios -boot c -M mac99,via=pmu -m 512 -drive file=./mac.qcow2,format=qcow2,media=disk -device sungem,netdev=network01 -netdev tap,ifname=tap0,id=network01`
-9. On the osx host, download and install xcode from `http://home.uglyoldbob.com/downloads/xcode313_2736_developerdvd.dmg`
-10. On the osx host, download and install lineage client from `http://home.uglyoldbob.com/downloads/Lineage_Tikal_Antharas_Update.dmg`
-11. On the osx host, configure networking for static ip address at 11.11.11.12 with subnet of 255.255.255.0
-12. On the osx host, enable remote login in sharing (found in system preferences, sharing).
-13. On the osx host, change sleep options to never on both putting computer and display to sleep in system preferences, energy saver
+8. Add yourself to the netdev group. 
+```
+sudo usermod -a -G netdev <your username>
+newgrp netdev
+```
+9. `qemu-system-ppc -L pc-bios -boot c -M mac99,via=pmu -m 512 -drive file=./mac.qcow2,format=qcow2,media=disk -device sungem,netdev=network01 -netdev tap,ifname=tap0,id=network01`
+10. On the osx host, download and install xcode from `http://home.uglyoldbob.com/downloads/xcode313_2736_developerdvd.dmg`
+11. On the osx host, download and install lineage client from `http://home.uglyoldbob.com/downloads/Lineage_Tikal_Antharas_Update.dmg`
+12. On the osx host, configure networking for static ip address at 11.11.11.12 with subnet of 255.255.255.0
+13. On the osx host, enable remote login in sharing (found in system preferences, sharing).
+14. On the osx host, change sleep options to never on both putting computer and display to sleep in system preferences, energy saver

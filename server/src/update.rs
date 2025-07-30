@@ -34,13 +34,6 @@ impl From<std::io::Error> for UpdateError {
     }
 }
 
-/// this function shows behavior of the client in theory
-async fn get_update(mut socket: tokio::net::TcpStream) {
-    socket.write_u32(42).await.unwrap();
-    let a: u32 = socket.read_u32().await.unwrap();
-
-}
-
 async fn process_update_client(
     mut socket: tokio::net::TcpStream,
     world: std::sync::Arc<crate::world::World>,
@@ -52,33 +45,49 @@ async fn process_update_client(
     println!(" Client checksum is {}", timestamp);
 
     if let Some(uf) = ufiles.versions.get(&timestamp) {
-        socket.write_i32_le(-2).await?;
+        //socket.write_i32_le(-2).await?;
         let number_files = uf.files.len() as u32;
         println!("Sending {} files to client", number_files);
-        socket.write_u32_le(number_files).await?;
+        socket.write_u32(number_files).await?;
         for fname in &uf.files {
+            let fname2 = format!("sprite/{}", fname);
             let pb = std::path::PathBuf::from(format!("./update-files/{}/{}.gz", timestamp, fname));
             println!("Sending {}", pb.display());
             let mut f = tokio::fs::File::open(pb).await.unwrap();
             let mut b = Vec::new();
             f.read_to_end(&mut b).await.unwrap();
-            socket.write_u8(fname.len() as u8).await.unwrap();
-            socket.write_all(fname.as_bytes()).await.unwrap();
+            socket.write_u8(fname2.len() as u8).await.unwrap();
+            socket.write_all(fname2.as_bytes()).await.unwrap();
             println!("Sending a file of length {}", b.len());
             socket.write_u32(b.len() as u32).await.unwrap();
             socket.write_all(b.as_slice()).await.unwrap();
             socket.write_u32(uf.new_cs).await.unwrap();
         }
+
         println!("Done sending files");
-        socket.write_u32_le(0).await?; //unsure if necessary
+        socket.write_u32(0).await?; //unsure if necessary
         println!("Sending number of servers");
-        socket.write_u32_le(1).await?; //number of servers
+        socket.write_u32(1).await?; //number of servers
         let number_players = world.get_number_players();
         println!("Sending number of players");
-        socket.write_u16_le(number_players).await?;
+        socket.write_u16(number_players).await?;
     } else {
         println!("update: client is using an invalid timestamp");
-        return Err(UpdateError);
+        if true {
+            //socket.write_i32_le(-2).await?;
+            let number_files = 0u32;
+            println!("Sending {} files to client", number_files);
+            socket.write_u32(number_files).await?;
+            socket.write_u32(0).await?; //unsure if necessary
+            println!("Sending number of servers");
+            socket.write_u32(1).await?; //number of servers
+            let number_players = world.get_number_players();
+            println!("Sending number of players");
+            socket.write_u16(number_players).await?;
+        }
+        else {
+            return Err(UpdateError);
+        }
     }
     println!("Reading restime from client");
     let restime = socket.read_u32().await?; //loaded from restime.dat

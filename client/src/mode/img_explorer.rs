@@ -116,6 +116,10 @@ impl<'a, T> GameModeTrait<'a, T> for ImgExplorer<'a, T> {
                         self.disp[0].update_text(self.tc, &words, &r.font);
                     }
                 }
+                sdl2::keyboard::Keycode::X => {
+                    println!("Extracting {}.img", self.current_img);
+                    r.export_img(self.current_img);
+                }
                 _ => {}
             }
         }

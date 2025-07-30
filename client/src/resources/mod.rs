@@ -312,6 +312,20 @@ pub struct GameResources<'a, 'b, 'c> {
 }
 
 impl<'a, 'b, 'c> GameResources<'a, 'b, 'c> {
+    /// Export a img file
+    pub fn export_img(&mut self, i: u16) {
+        if let Some(packs) = &mut self.packs {
+            if let Some(img) = packs.load_img(i) {
+                let d = img.data;
+                let fname = std::path::PathBuf::from(format!("./{}.img", i));
+                if let Ok(mut f) = std::fs::File::create_new(fname) {
+                    use std::io::Write;
+                    f.write_all(&d).unwrap();
+                }
+            }
+        }
+    }
+
     pub fn new(
         font: sdl2::ttf::Font<'b, 'c>,
         path: String,

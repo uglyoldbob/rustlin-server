@@ -1,3 +1,5 @@
 target/*
 server/target/*
 *.ini
+lclientosx/*
+lclientwin32/*
