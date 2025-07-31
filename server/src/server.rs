@@ -1,7 +1,3 @@
-#![deny(missing_docs)]
-#![deny(clippy::missing_docs_in_private_items)]
-
-//! The server for the game.
 use futures::FutureExt;
 use std::error::Error;
 use std::panic::AssertUnwindSafe;

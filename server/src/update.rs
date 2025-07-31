@@ -84,8 +84,7 @@ async fn process_update_client(
             let number_players = world.get_number_players();
             println!("Sending number of players");
             socket.write_u16(number_players).await?;
-        }
-        else {
+        } else {
             return Err(UpdateError);
         }
     }
@@ -112,7 +111,7 @@ pub async fn setup_update_server(
         if let Ok(f) = f {
             if f.path().is_dir() {
                 let name = f.file_name().into_string().unwrap();
-                let oldcs : u32 = name.parse().unwrap();
+                let oldcs: u32 = name.parse().unwrap();
                 println!("Found a entry for checksum {}", oldcs);
                 let mut flist = Vec::new();
                 let mut cs = None;
@@ -129,7 +128,7 @@ pub async fn setup_update_server(
                                 let mut fcon = String::new();
                                 let mut f3 = tokio::fs::File::open(f2.path()).await.unwrap();
                                 f3.read_to_string(&mut fcon).await.unwrap();
-                                let newcs2 : u32 = fcon.parse().unwrap();
+                                let newcs2: u32 = fcon.parse().unwrap();
                                 println!("Found a newcs file");
                                 cs = Some(newcs2);
                             }
@@ -138,10 +137,13 @@ pub async fn setup_update_server(
                 }
                 if let Some(newcs) = cs {
                     println!("Inserting entry for cs {} -> {}", oldcs, newcs);
-                    updates.versions.insert(oldcs, UpdateFileSet {
-                        files: flist,
-                        new_cs: newcs,
-                    });
+                    updates.versions.insert(
+                        oldcs,
+                        UpdateFileSet {
+                            files: flist,
+                            new_cs: newcs,
+                        },
+                    );
                 }
             }
         }

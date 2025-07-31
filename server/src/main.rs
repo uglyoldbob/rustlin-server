@@ -1,3 +1,8 @@
+#![deny(missing_docs)]
+#![deny(clippy::missing_docs_in_private_items)]
+
+//! The server for the game
+
 mod client_message;
 mod server;
 mod update;

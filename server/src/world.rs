@@ -1,4 +1,7 @@
-use std::{collections::HashMap, sync::{Arc, Mutex}};
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+};
 
 /// Represents the world for a server
 pub struct World {
@@ -12,8 +15,8 @@ impl World {
     /// Construct a new server world
     pub fn new() -> Self {
         Self {
-           users: Arc::new(Mutex::new(HashMap::new())),
-           client_ids: Arc::new(Mutex::new(crate::ClientList::new())),
+            users: Arc::new(Mutex::new(HashMap::new())),
+            client_ids: Arc::new(Mutex::new(crate::ClientList::new())),
         }
     }
 

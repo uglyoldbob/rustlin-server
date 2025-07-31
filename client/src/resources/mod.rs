@@ -345,7 +345,9 @@ impl<'a, 'b, 'c> GameResources<'a, 'b, 'c> {
         chars[2].t = CharacterDisplayType::Locked;
 
         let p = PathBuf::from(path.clone());
-        let pack = PackFiles::load(path).inspect_err(|e| println!("Failed to load packs: {:?}", e)).ok();
+        let pack = PackFiles::load(path)
+            .inspect_err(|e| println!("Failed to load packs: {:?}", e))
+            .ok();
         Self {
             resource_path: p,
             tc: tc,

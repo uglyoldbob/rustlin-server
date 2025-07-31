@@ -190,6 +190,41 @@ pub enum ServerPacket {
     ///msg = "[player name] message"
     PledgeChat(String),
     PartyChat(String),
+    /// Inventory manipulation
+    Inventory {
+        /// Item id
+        id: u32,
+        /// Item type
+        i_type: i8,
+        /// usage?
+        n_use: u8,
+        /// icon
+        icon: i16,
+        /// bless status
+        blessing: ItemBlessing,
+        /// item count
+        count: u32,
+        /// identified
+        identified: u8,
+        /// description, $numeric references use a string from the stringtable of the game client, as long as the $ is not the first character
+        description: String,
+        /// Is extended description used? Extended description is complicated and tacked on after the fact
+        ed_used: u8,
+    },
+}
+
+/// Potential bless status for an item
+#[repr(u8)]
+#[derive(Clone)]
+pub enum ItemBlessing {
+    /// The item is blessed
+    Blessed,
+    /// The item is normal
+    Normal,
+    /// The item is cursed
+    Cursed,
+    /// The item is unknown
+    Unidentified,
 }
 
 impl ServerPacket {
@@ -451,6 +486,27 @@ impl ServerPacket {
             }
             ServerPacket::WhisperChat { name, msg } => {
                 p.add_u8(91).add_string(name).add_string(msg);
+            }
+            ServerPacket::Inventory {
+                id,
+                i_type,
+                n_use,
+                icon,
+                blessing,
+                count,
+                identified,
+                description,
+                ed_used,
+            } => {
+                p.add_u8(6)
+                    .add_u32(id)
+                    .add_i8(i_type)
+                    .add_i16(icon)
+                    .add_u8(blessing as u8)
+                    .add_u32(count)
+                    .add_u8(identified)
+                    .add_string(description)
+                    .add_u8(ed_used);
             }
         }
         p

@@ -184,7 +184,9 @@ impl Pack {
                 }
             }
         } else {
-            return Err(Exception::IoError(std::io::Error::other("No contents in pack?".to_string()))); //probably
+            return Err(Exception::IoError(std::io::Error::other(
+                "No contents in pack?".to_string(),
+            ))); //probably
         }
         Ok(())
     }

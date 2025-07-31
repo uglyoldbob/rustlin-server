@@ -27,9 +27,9 @@ pub struct Client<'a> {
     world: std::sync::Arc<crate::world::World>,
 }
 
-impl<'a> Drop for Client<'a>
-{
+impl<'a> Drop for Client<'a> {
     fn drop(&mut self) {
+        //TODO send disconnect packet if applicable
         self.world.unregister_user(self.id);
     }
 }
@@ -187,6 +187,25 @@ impl<'a> Client<'a> {
         Ok(0)
     }
 
+    /// Performs packet testing
+    pub async fn test1(&mut self) -> Result<(), ClientError> {
+        let mut p = ServerPacket::Inventory {
+            id: 1,
+            i_type: 1,
+            n_use: 1,
+            icon: 1,
+            blessing: common::packet::ItemBlessing::Normal,
+            count: 1,
+            identified: 0,
+            description: " $1".to_string(),
+            ed_used: 1,
+        }
+        .build();
+        p.add_vec(&vec![1]);
+        self.packet_writer.send_packet(p).await?;
+        Ok(())
+    }
+
     /// Process a single packet from the game client
     pub async fn process_packet(
         &mut self,
@@ -199,7 +218,7 @@ impl<'a> Client<'a> {
                 println!("client: version {} {} {} {}", a, b, c, d);
                 let response: Packet = ServerPacket::ServerVersion {
                     id: 2,
-                    version: 2,
+                    version: 0x27e9,
                     time: 3,
                     new_accounts: 1,
                     english: 1,
@@ -421,6 +440,7 @@ impl<'a> Client<'a> {
                     .await?;
 
                 //TODO send owncharstatus packet
+                self.test1().await?;
             }
             ClientPacket::KeepAlive => {}
             ClientPacket::GameInitDone => {}
@@ -633,7 +653,6 @@ impl<'a> Client<'a> {
                 }
             }
         }
-        //TODO send disconnect packet if applicable
         Ok(0)
     }
 }
