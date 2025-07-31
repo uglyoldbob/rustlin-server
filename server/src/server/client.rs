@@ -202,6 +202,34 @@ impl<'a> Client<'a> {
         }
         .build();
         self.packet_writer.send_packet(p).await?;
+        for j in 0..12 {
+            for i in 0..12 {
+                self.packet_writer
+                .send_packet(ServerPacket::PutObject {
+                    x: 33435 + i,
+                    y: 32816 - 2 * j,
+                    id: 3 + 12 * j as u32 + i as u32 * 2,
+                    icon: 29,
+                    status: 0,
+                    direction: 1,
+                    light: 7,
+                    speed: 50,
+                    xp: 1235,
+                    alignment: 2767,
+                    name: "steve".to_string(),
+                    title: "john".to_string(),
+                    status2: 0,
+                    pledgeid: 0,
+                    pledgename: "mavericks".to_string(),
+                    unknown: "".to_string(),
+                    v1: 0,
+                    hp_bar: 12,
+                    v2: 0,
+                    v3: 0,
+                }.build())
+                .await?;
+            }
+        }
         Ok(())
     }
 

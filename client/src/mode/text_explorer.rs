@@ -52,15 +52,12 @@ impl<'a, T> Explorer<'a, T> {
     }
 
     /// Update dynamic text for the game mode
-    fn update_text(&mut self, r: &mut GameResources<'a, '_, '_>,) {
-        let words = format!(
-            "Displaying {} text string",
-            self.current_string
-        );
+    fn update_text(&mut self, r: &mut GameResources<'a, '_, '_>) {
+        let words = format!("Displaying {} text string", self.current_string);
         self.disp[0].update_text(self.tc, &words, &r.font);
         if let Some(t) = self.descs.get(self.current_string as usize) {
             if t.is_empty() {
-                self.disp[1].update_text(self.tc, "<empty string>", &r.font);    
+                self.disp[1].update_text(self.tc, "<empty string>", &r.font);
             } else {
                 self.disp[1].update_text(self.tc, t, &r.font);
             }

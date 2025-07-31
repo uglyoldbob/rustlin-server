@@ -269,6 +269,13 @@ pub enum ServerPacket {
         /// * 16 - ?
         ed: Vec<u8>,
     },
+    /// change direction packet
+    ChangeDirection {
+        /// The id of the userobject
+        id: u32,
+        /// The direction for the userobject
+        direction: u8,
+    },
 }
 
 /// Potential bless status for an item
@@ -276,13 +283,13 @@ pub enum ServerPacket {
 #[derive(Clone)]
 pub enum ItemBlessing {
     /// The item is blessed
-    Blessed,
+    Blessed = 0,
     /// The item is normal
-    Normal,
+    Normal = 1,
     /// The item is cursed
-    Cursed,
+    Cursed = 2,
     /// The item is unknown
-    Unidentified,
+    Unidentified = 3,
 }
 
 impl ServerPacket {
@@ -568,6 +575,9 @@ impl ServerPacket {
                 if ed.len() > 0 {
                     p.add_vec(&ed);
                 }
+            }
+            ServerPacket::ChangeDirection { id, direction } => {
+                p.add_u32(id).add_u8(direction);
             }
         }
         p
