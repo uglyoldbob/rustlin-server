@@ -8,6 +8,7 @@ pub enum DrawMode {
     ImgExplorer,
     SprExplorer,
     WavPlayer,
+    TextEplorer,
     TileExplorer,
     MapExplorer,
     GameLoader,
@@ -42,6 +43,7 @@ pub enum GameMode<'a, T> {
     NewCharacter(newchar::NewCharacterMode<'a, T>),
     PngExplorer(png_explorer::PngExplorer<'a, T>),
     SprExplorer(spr_explorer::SprExplorer<'a, T>),
+    TextExplorer(text_explorer::Explorer<'a, T>),
     TileExplorer(tile_explorer::TileExplorer<'a, T>),
     WavPlayer(wav_player::WavPlayer<'a, T>),
 }
@@ -114,3 +116,6 @@ pub use tile_explorer::TileExplorer;
 
 pub mod map_explorer;
 pub use map_explorer::MapExplorer;
+
+pub mod text_explorer;
+pub use text_explorer::Explorer as TextExplorer;

@@ -37,6 +37,9 @@ fn mode_maker<'a, T: 'a>(
     game_resources: &mut GameResources<'a, '_, '_>,
 ) -> GameMode<'a, T> {
     match mode {
+        DrawMode::TextEplorer => {
+            GameMode::TextExplorer(TextExplorer::new(texture_creator, game_resources))
+        }
         DrawMode::Explorer => {
             GameMode::Explorer(ExplorerMenu::new(texture_creator, game_resources))
         }

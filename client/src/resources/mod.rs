@@ -326,6 +326,12 @@ impl<'a, 'b, 'c> GameResources<'a, 'b, 'c> {
         }
     }
 
+    /// Gets the descriptions string table from the text pack
+    pub fn get_descs(&mut self) -> Option<stringtable::StringTable> {
+        let raw = self.packs.as_mut().map(|p| p.text.decrypted_file_contents("desc-e.tbl".to_string())).flatten();
+        raw.map(|r| stringtable::StringTable::from(r))
+    }
+
     pub fn new(
         font: sdl2::ttf::Font<'b, 'c>,
         path: String,

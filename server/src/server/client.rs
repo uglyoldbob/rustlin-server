@@ -198,10 +198,9 @@ impl<'a> Client<'a> {
             count: 1,
             identified: 0,
             description: " $1".to_string(),
-            ed_used: 1,
+            ed: vec![40, 3],
         }
         .build();
-        p.add_vec(&vec![1]);
         self.packet_writer.send_packet(p).await?;
         Ok(())
     }
@@ -218,7 +217,7 @@ impl<'a> Client<'a> {
                 println!("client: version {} {} {} {}", a, b, c, d);
                 let response: Packet = ServerPacket::ServerVersion {
                     id: 2,
-                    version: 0x27e9,
+                    version: 0x16009,
                     time: 3,
                     new_accounts: 1,
                     english: 1,

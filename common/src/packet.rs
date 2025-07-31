@@ -190,7 +190,7 @@ pub enum ServerPacket {
     ///msg = "[player name] message"
     PledgeChat(String),
     PartyChat(String),
-    /// Inventory manipulation
+    /// Add an inventory item
     Inventory {
         /// Item id
         id: u32,
@@ -208,8 +208,66 @@ pub enum ServerPacket {
         identified: u8,
         /// description, $numeric references use a string from the stringtable of the game client, as long as the $ is not the first character
         description: String,
-        /// Is extended description used? Extended description is complicated and tacked on after the fact
-        ed_used: u8,
+        /// extended description.
+        /// # opcodes
+        /// * 1 - Hit value small+?/large+?, small: u8, large: u8, material: u8, weight: u32, if followed by 2, the next u8 is the + value for large and small
+        /// * 3 - Damage d, d: u8
+        /// * 4 - Two handed Weapon
+        /// * 5 - Hit bonus +d, d: u8
+        /// * 6 - Damage bonus +d, d: u8
+        /// * 7 - Usable: bitmask: bitmask: u8 - 1 = Prince/Princess, 2 = Knight, 4 = Elf, 8 = Wizard, 16 = Dark Elf, 32 = Dragon Knight, 64 = Illusionist, 128 = High Pet, 127 = All Classes
+        /// * 8 - STR +d: d: u8
+        /// * 9 - DEX +d: d: u8
+        /// * 10 - CON +d: d: u8
+        /// * 11 - WIS +d: d: u8
+        /// * 12 - INT +d: d: u8
+        /// * 13 - CHA +d: d: u8
+        /// * 14 - Maximum HP +d: d: u16
+        /// * 15 - Magic Defense +d: d: u16
+        /// * 16 - Mana Absorption
+        /// * 17 - Spell Power +d: d: u8
+        /// * 18 - Maintains haste state when held
+        /// * 19 - AC ac+?: ac: u8, grade: u8, material: u8, weight: u32, if followed by 2, the next u8 is the + value (grade: high = 0, medium = 1, low = 2)
+        /// * 20 - Luck +d: d: u8
+        /// * 21 - Nutrition - nutrition: nitrition: u16, material: u8, weight: u32
+        /// * 22 - Lightness d: d: u16, material: u8, weight: u32
+        /// * 23 - Nothing : material: u8, weight: u32
+        /// * 24 - Bow hit bonus +d: d: u8
+        /// * 25 - Class $d: d: u16, unsure of valid values
+        /// * 26 - Level d: d: u16
+        /// * 27 - Fire Elemental d: d: u8
+        /// * 28 - Water Elemental d: d: u8
+        /// * 29 - Wind Elementa d: d: u8
+        /// * 30 - Earth Elemental d: d: u8
+        /// * 31 - Maximum HP d: d: i16
+        /// * 32 - Maximum MP +d: d: i8
+        /// * 33 - Modifies magic defense with v, must come after a opcode 15: v: u8 (1 = Freeze Resistance, 2 = Petrify Resistance, 3 = Sleep Resistance, 4 = Darkness Resistance, 5 = Stun Resistance, 6 = Hold Resistance, 7 = None)
+        /// * 34 - Life Suction
+        /// * 35 - Bow Damage +d: d: u8
+        /// * 36 - dummy for branch d: d: u8
+        /// * 37 - Healing Rate d: d: u8
+        /// * 38 - Mana Healing Rate d: d: u8
+        /// * 39 - plain string: null terminated string
+        /// * 40 - nothing?: unknown: u8
+        /// * others: immediately finish processing
+        /// # Materials 1-16
+        /// * 1 - ?
+        /// * 2 - ?
+        /// * 3 - ?
+        /// * 4 - ?
+        /// * 5 - ?
+        /// * 6 - ?
+        /// * 7 - ?
+        /// * 8 - ?
+        /// * 9 - ?
+        /// * 10 - ?
+        /// * 11 - ?
+        /// * 12 - ?
+        /// * 13 - ?
+        /// * 14 - ?
+        /// * 15 - ?
+        /// * 16 - ?
+        ed: Vec<u8>,
     },
 }
 
@@ -496,7 +554,7 @@ impl ServerPacket {
                 count,
                 identified,
                 description,
-                ed_used,
+                ed,
             } => {
                 p.add_u8(6)
                     .add_u32(id)
@@ -506,7 +564,10 @@ impl ServerPacket {
                     .add_u32(count)
                     .add_u8(identified)
                     .add_string(description)
-                    .add_u8(ed_used);
+                    .add_u8(ed.len() as u8);
+                if ed.len() > 0 {
+                    p.add_vec(&ed);
+                }
             }
         }
         p
@@ -869,6 +930,7 @@ impl ServerPacketSender {
     }
 
     pub async fn send_packet(&mut self, mut data: Packet) -> Result<(), PacketError> {
+        println!("Sending packet {:x?}", data.buf());
         while data.buf().len() < 4 {
             data.add_u8(0);
         }

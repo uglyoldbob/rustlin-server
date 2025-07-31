@@ -62,6 +62,13 @@ impl<'a> ExplorerMenu<'a> {
             "Map browser",
             &r.font,
         )));
+        b.push(Widget::TextButton(TextButton::new(
+            tc,
+            50,
+            184,
+            "Descs browser",
+            &r.font,
+        )));
         Self {
             b: b,
             background: r.get_or_load_png(811),
@@ -120,6 +127,9 @@ impl<'a, T> GameModeTrait<'a, T> for ExplorerMenu<'a> {
         }
         if self.b[5].was_clicked() {
             requests.push_back(DrawModeRequest::ChangeDrawMode(DrawMode::MapExplorer));
+        }
+        if self.b[6].was_clicked() {
+            requests.push_back(DrawModeRequest::ChangeDrawMode(DrawMode::TextEplorer));
         }
     }
 
