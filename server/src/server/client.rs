@@ -189,7 +189,8 @@ impl<'a> Client<'a> {
 
     /// Performs packet testing
     pub async fn test1(&mut self) -> Result<(), ClientError> {
-        let mut p = ServerPacket::Inventory {
+        for i in 1..=16 {
+        self.packet_writer.send_packet(ServerPacket::Inventory {
             id: 1,
             i_type: 1,
             n_use: 1,
@@ -198,17 +199,17 @@ impl<'a> Client<'a> {
             count: 1,
             identified: 0,
             description: " $1".to_string(),
-            ed: vec![40, 3],
+            ed: vec![23, i, i, 0, 0, 0],
         }
-        .build();
-        self.packet_writer.send_packet(p).await?;
+        .build()).await?;
+        }
         for j in 0..12 {
             for i in 0..12 {
                 self.packet_writer
                 .send_packet(ServerPacket::PutObject {
                     x: 33435 + i,
                     y: 32816 - 2 * j,
-                    id: 3 + 12 * j as u32 + i as u32 * 2,
+                    id: 2 + 12 * j as u32 + i as u32,
                     icon: 29,
                     status: 0,
                     direction: 1,
@@ -217,15 +218,15 @@ impl<'a> Client<'a> {
                     xp: 1235,
                     alignment: 2767,
                     name: "steve".to_string(),
-                    title: "john".to_string(),
+                    title: "".to_string(),
                     status2: 0,
                     pledgeid: 0,
-                    pledgename: "mavericks".to_string(),
-                    unknown: "".to_string(),
+                    pledgename: "".to_string(),
+                    owner_name: "".to_string(),
                     v1: 0,
                     hp_bar: 12,
                     v2: 0,
-                    v3: 0,
+                    level: 0,
                 }.build())
                 .await?;
             }
@@ -448,11 +449,11 @@ impl<'a> Client<'a> {
                             status2: 0,
                             pledgeid: 0,
                             pledgename: "avengers".to_string(),
-                            unknown: "".to_string(),
+                            owner_name: "".to_string(),
                             v1: 0,
                             hp_bar: 100,
                             v2: 0,
-                            v3: 0,
+                            level: 0,
                         }
                         .build(),
                     )

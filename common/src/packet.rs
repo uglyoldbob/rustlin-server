@@ -157,11 +157,13 @@ pub enum ServerPacket {
         status2: u8,
         pledgeid: u32,
         pledgename: String,
-        unknown: String,
+        owner_name: String,
+        /// Upper 4 bits is pledge rank, lower 4 bits is altitude
         v1: u8,
         hp_bar: u8,
+        /// 8 = drunken, not 8 = speed becomes 2
         v2: u8,
-        v3: u8,
+        level: u8,
     },
     CharSpMrBonus {
         sp: u8,
@@ -251,22 +253,22 @@ pub enum ServerPacket {
         /// * 40 - nothing?: unknown: u8
         /// * others: immediately finish processing
         /// # Materials 1-16
-        /// * 1 - ?
-        /// * 2 - ?
-        /// * 3 - ?
-        /// * 4 - ?
-        /// * 5 - ?
-        /// * 6 - ?
-        /// * 7 - ?
-        /// * 8 - ?
-        /// * 9 - ?
-        /// * 10 - ?
-        /// * 11 - ?
-        /// * 12 - ?
-        /// * 13 - ?
-        /// * 14 - ?
-        /// * 15 - ?
-        /// * 16 - ?
+        /// * 1 - Liquid
+        /// * 2 - Web
+        /// * 3 - Vegetation
+        /// * 4 - Animal Matter
+        /// * 5 - Paper
+        /// * 6 - Cloth
+        /// * 7 - Leather
+        /// * 8 - Wood
+        /// * 9 - Bone
+        /// * 10 - Dragon Scale
+        /// * 11 - Iron
+        /// * 12 - Metal
+        /// * 13 - Copper
+        /// * 14 - Silver
+        /// * 15 - Gold
+        /// * 16 - Platinum
         ed: Vec<u8>,
     },
     /// change direction packet
@@ -484,11 +486,11 @@ impl ServerPacket {
                 status2,
                 pledgeid,
                 pledgename,
-                unknown,
+                owner_name: unknown,
                 v1,
                 hp_bar,
                 v2,
-                v3,
+                level: v3,
             } => {
                 p.add_u8(64)
                     .add_u16(x)
