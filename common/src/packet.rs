@@ -160,6 +160,7 @@ pub enum ServerPacket {
         owner_name: String,
         /// Upper 4 bits is pledge rank, lower 4 bits is altitude
         v1: u8,
+        /// Represents the hp percentage 0-100, 255 means no bar
         hp_bar: u8,
         /// 8 = drunken, not 8 = speed becomes 2
         v2: u8,
