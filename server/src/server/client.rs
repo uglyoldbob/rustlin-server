@@ -29,7 +29,7 @@ pub struct Client<'a> {
 
 impl<'a> Drop for Client<'a> {
     fn drop(&mut self) {
-        //TODO send disconnect packet if applicable
+        //TODO send disconnect packet if applicable (needs async drop support first)
         self.world.unregister_user(self.id);
     }
 }
@@ -140,7 +140,7 @@ impl<'a> Client<'a> {
                         .await?;
                 }
                 _ => {
-                    println!("wrong char creation status");
+                    log::info!("wrong char creation status");
                 }
             },
             ServerMessage::NewCharacterDetails {
@@ -190,47 +190,72 @@ impl<'a> Client<'a> {
     /// Performs packet testing
     pub async fn test1(&mut self) -> Result<(), ClientError> {
         for i in 1..=16 {
-        self.packet_writer.send_packet(ServerPacket::Inventory {
-            id: 1,
-            i_type: 1,
-            n_use: 1,
-            icon: 1,
-            blessing: common::packet::ItemBlessing::Normal,
-            count: 1,
-            identified: 0,
-            description: " $1".to_string(),
-            ed: vec![23, i, i, 0, 0, 0],
-        }
-        .build()).await?;
+            self.packet_writer
+                .send_packet(
+                    ServerPacket::Inventory {
+                        id: 1,
+                        i_type: 1,
+                        n_use: 1,
+                        icon: 1,
+                        blessing: common::packet::ItemBlessing::Normal,
+                        count: 1,
+                        identified: 0,
+                        description: " $1".to_string(),
+                        ed: vec![23, i, i, 0, 0, 0],
+                    }
+                    .build(),
+                )
+                .await?;
         }
         for j in 0..12 {
             for i in 0..12 {
                 self.packet_writer
-                .send_packet(ServerPacket::PutObject {
-                    x: 33435 + i,
-                    y: 32816 - 2 * j,
-                    id: 2 + 12 * j as u32 + i as u32,
-                    icon: 29,
-                    status: 0,
-                    direction: 1,
-                    light: 7,
-                    speed: 50,
-                    xp: 1235,
-                    alignment: 2767,
-                    name: "steve".to_string(),
-                    title: "".to_string(),
-                    status2: 0,
-                    pledgeid: 0,
-                    pledgename: "".to_string(),
-                    owner_name: "".to_string(),
-                    v1: 0,
-                    hp_bar: 12,
-                    v2: 0,
-                    level: 0,
-                }.build())
-                .await?;
+                    .send_packet(
+                        ServerPacket::PutObject {
+                            x: 33435 + i,
+                            y: 32816 - 2 * j,
+                            id: 2 + 12 * j as u32 + i as u32,
+                            icon: 29,
+                            status: 0,
+                            direction: 1,
+                            light: 7,
+                            speed: 50,
+                            xp: 1235,
+                            alignment: 2767,
+                            name: "steve".to_string(),
+                            title: "".to_string(),
+                            status2: 0,
+                            pledgeid: 0,
+                            pledgename: "".to_string(),
+                            owner_name: "".to_string(),
+                            v1: 0,
+                            hp_bar: 12,
+                            v2: 0,
+                            level: 0,
+                        }
+                        .build(),
+                    )
+                    .await?;
             }
         }
+        Ok(())
+    }
+
+    /// Performs packet testing
+    pub async fn test2(&mut self) -> Result<(), ClientError> {
+        self.packet_writer
+            .send_packet(
+                ServerPacket::CloneObject {
+                    id: 2,
+                    speed: 255,
+                    poly_id: 2001,
+                    alignment: -32767,
+                    poly_action: 0,
+                    title: "Evil dragon 3".to_string(),
+                }
+                .build(),
+            )
+            .await?;
         Ok(())
     }
 
@@ -239,11 +264,27 @@ impl<'a> Client<'a> {
         &mut self,
         p: Packet,
         peer: std::net::SocketAddr,
+        config: &std::sync::Arc<crate::ServerConfiguration>,
     ) -> Result<(), ClientError> {
         let c = p.convert();
         match c {
+            ClientPacket::Ping(v) => {
+                log::info!("The user pinged us {v}");
+            }
+            ClientPacket::RemoveFriend(name) => {
+                log::info!("User used the remove friend command with {name}");
+            }
+            ClientPacket::AddFriend(name) => {
+                log::info!("User used the add friend command with {name}");
+            }
+            ClientPacket::WhoCommand(name) => {
+                log::info!("User used the who command on {name}");
+            }
+            ClientPacket::CreateBookmark(n) => {
+                log::info!("User wants to create a bookmark named {n}");
+            }
             ClientPacket::Version(a, b, c, d) => {
-                println!("client: version {} {} {} {}", a, b, c, d);
+                log::info!("version {} {} {} {}", a, b, c, d);
                 let response: Packet = ServerPacket::ServerVersion {
                     id: 2,
                     version: 0x16009,
@@ -256,34 +297,31 @@ impl<'a> Client<'a> {
                 self.packet_writer.send_packet(response).await?;
             }
             ClientPacket::Login(u, p, v1, v2, v3, v4, v5, v6, v7) => {
-                println!(
-                    "client: login attempt for {} {} {} {} {} {} {} {}",
-                    &u, v1, v2, v3, v4, v5, v6, v7
+                log::info!(
+                    "login attempt for {} {} {} {} {} {} {} {}",
+                    &u,
+                    v1,
+                    v2,
+                    v3,
+                    v4,
+                    v5,
+                    v6,
+                    v7
                 );
                 let user = get_user_details(u.clone(), &mut self.mysql).await;
                 match user {
                     Some(us) => {
-                        println!("User {} exists", u.clone());
+                        log::info!("User {} exists", u.clone());
                         us.print();
                         //TODO un-hardcode the salt for the password hashing
-                        let password_success = us.check_login("lineage".to_string(), p);
-                        println!(
-                            "User pw test {}",
-                            hash_password(
-                                "testtest".to_string(),
-                                "lineage".to_string(),
-                                "password".to_string()
-                            )
-                        );
-                        println!("User login check is {}", password_success);
+                        let password_success = us.check_login(&config.account_creation_salt, &p);
+                        log::info!("User login check is {}", password_success);
                         if password_success {
                             self.packet_writer
                                 .send_packet(ServerPacket::LoginResult { code: 0 }.build())
                                 .await?;
                             self.packet_writer
-                                .send_packet(
-                                    ServerPacket::News("This is the news".to_string()).build(),
-                                )
+                                .send_packet(ServerPacket::News(config.get_news()).build())
                                 .await?;
                             let _ = &self
                                 .server_tx
@@ -296,24 +334,20 @@ impl<'a> Client<'a> {
                         }
                     }
                     None => {
-                        println!("User {} does not exist!", u.clone());
-                        //TODO actually determine if auto account creation is enabled
-                        if true {
-                            //TODO un-hardcode the salt for the password hashing
+                        log::info!("User {} does not exist!", u.clone());
+                        if config.automatic_account_creation {
                             let newaccount = UserAccount::new(
                                 u.clone(),
                                 p,
                                 peer.to_string(),
-                                "lineage".to_string(),
+                                config.account_creation_salt.clone(),
                             );
                             newaccount.insert_into_db(&mut self.mysql).await;
                             self.packet_writer
                                 .send_packet(ServerPacket::LoginResult { code: 0 }.build())
                                 .await?;
                             self.packet_writer
-                                .send_packet(
-                                    ServerPacket::News("This is the news".to_string()).build(),
-                                )
+                                .send_packet(ServerPacket::News(config.get_news()).build())
                                 .await?;
                             let _ = &self
                                 .server_tx
@@ -396,7 +430,7 @@ impl<'a> Client<'a> {
                     .await?;
             }
             ClientPacket::CharacterSelect { name } => {
-                println!("client: login with {}", name);
+                log::info!("login with {}", name);
                 let mut response = ServerPacket::StartGame(0).build();
                 self.packet_writer.send_packet(response).await?;
 
@@ -473,14 +507,14 @@ impl<'a> Client<'a> {
             ClientPacket::KeepAlive => {}
             ClientPacket::GameInitDone => {}
             ClientPacket::WindowActivate(v2) => {
-                println!("Client window activate {}", v2);
+                log::info!("Client window activate {}", v2);
             }
             ClientPacket::Save => {}
             ClientPacket::Move { x, y, heading } => {
-                println!("client: moving to {} {} {}", x, y, heading);
+                log::info!("moving to {} {} {}", x, y, heading);
             }
             ClientPacket::ChangeDirection(d) => {
-                println!("client: change direction to {}", d);
+                log::info!("change direction to {}", d);
             }
             ClientPacket::Chat(m) => {
                 let _ = &self
@@ -528,18 +562,21 @@ impl<'a> Client<'a> {
                     .await?;
             }
             ClientPacket::CommandChat(m) => {
-                println!("client: command chat {}", m);
+                log::info!("command chat {}", m);
                 let mut words = m.split_whitespace();
                 let first_word = words.next();
                 if let Some(m) = first_word {
                     match m {
                         "asdf" => {
-                            println!("A command called asdf");
+                            log::info!("A command called asdf");
                         }
                         "quit" => {
                             self.packet_writer
                                 .send_packet(ServerPacket::Disconnect.build())
                                 .await?;
+                        }
+                        "test" => {
+                            self.test2().await?;
                         }
                         "chat" => {
                             self.packet_writer
@@ -602,13 +639,13 @@ impl<'a> Client<'a> {
                                 .await?;
                         }
                         _ => {
-                            println!("An unknown command {}", m);
+                            log::info!("An unknown command {}", m);
                         }
                     }
                 }
             }
             ClientPacket::SpecialCommandChat(m) => {
-                println!("client: special command chat {}", m);
+                log::info!("special command chat {}", m);
             }
             ClientPacket::ChangePassword {
                 account,
@@ -618,12 +655,13 @@ impl<'a> Client<'a> {
                 let user = get_user_details(account.clone(), &mut self.mysql).await;
                 match user {
                     Some(us) => {
-                        println!("User {} exists", account);
+                        log::info!("User {} exists", account);
                         us.print();
-                        let password_success = us.check_login("lineage".to_string(), oldpass);
-                        println!("User login check is {}", password_success);
+                        let password_success =
+                            us.check_login(&config.account_creation_salt, &oldpass);
+                        log::info!("User login check is {}", password_success);
                         if password_success {
-                            println!("User wants to change password and entered correct details");
+                            log::info!("User wants to change password and entered correct details");
                             self.packet_writer
                                 .send_packet(ServerPacket::LoginResult { code: 0x30 }.build())
                                 .await?;
@@ -643,7 +681,7 @@ impl<'a> Client<'a> {
                 }
             }
             ClientPacket::Unknown(d) => {
-                println!("client: received unknown packet {:x?}", d);
+                log::info!("received unknown packet {:x?}", d);
             }
         }
         Ok(())
@@ -653,6 +691,7 @@ impl<'a> Client<'a> {
     pub async fn event_loop(
         mut self,
         reader: tokio::net::tcp::OwnedReadHalf,
+        config: &std::sync::Arc<crate::ServerConfiguration>,
     ) -> Result<u8, ClientError> {
         let encryption_key: u32 = rand::thread_rng().gen();
         let peer = reader.peer_addr()?;
@@ -667,7 +706,7 @@ impl<'a> Client<'a> {
             futures::select! {
                 packet = packet_reader.read_packet().fuse() => {
                     let p = packet?;
-                    self.process_packet(p, peer).await?;
+                    self.process_packet(p, peer, config).await?;
                 }
                 msg = self.brd_rx.recv().fuse() => {
                     let p = msg.unwrap();

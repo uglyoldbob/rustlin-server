@@ -1,7 +1,7 @@
 pub mod packet;
 
 pub fn do_stuff() {
-    println!("I am doing stuff");
+    log::info!("I am doing stuff");
 }
 
 #[cfg(test)]

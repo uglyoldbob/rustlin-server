@@ -54,18 +54,18 @@ async fn handle_user_message(
             let a = client_accounts.get(&id);
             let cid = clients.get(&id).unwrap();
             if let Some(account) = a {
-                println!("{} wants to make a new character {}", account, name);
+                log::info!("{} wants to make a new character {}", account, name);
                 //TODO ensure player name does not already exist
                 //TODO validate that all stats are legitimately possible
                 //TODO validate count of characters for account
 
                 if !Player::valid_name(name.clone()) {
                     if let Err(e) = cid.send(ServerMessage::CharacterCreateStatus(1)) {
-                        println!("Failed to send char create status {} ", e);
+                        log::info!("Failed to send char create status {} ", e);
                     }
                 } else {
                     if let Err(e) = cid.send(ServerMessage::CharacterCreateStatus(0)) {
-                        println!("Failed to send char create status {} ", e);
+                        log::info!("Failed to send char create status {} ", e);
                     }
                     //TODO: populate the correct details
                     if let Err(e) = cid.send(ServerMessage::NewCharacterDetails {
@@ -85,7 +85,7 @@ async fn handle_user_message(
                         charisma: charisma,
                         intelligence: intelligence,
                     }) {
-                        println!("Failed to send new char details {}", e);
+                        log::info!("Failed to send new char details {}", e);
                     }
                 }
             }
@@ -93,7 +93,7 @@ async fn handle_user_message(
         ClientMessage::DeleteCharacter { id, name } => {
             let a = client_accounts.get(&id);
             if let Some(account) = &a {
-                println!("{} wants to delete {}", account, name);
+                log::info!("{} wants to delete {}", account, name);
             }
         }
         ClientMessage::RegularChat { id: _, msg } => {
@@ -131,15 +131,17 @@ async fn handle_user_message(
 
 #[tokio::main]
 async fn main() -> Result<(), String> {
+    simple_logger::init_with_level(log::Level::Info).unwrap();
+
     common::do_stuff();
-    println!("server: Game server is starting");
+    log::info!("server: Game server is starting");
 
     let (clients, mut clients_rx) = tokio::sync::mpsc::channel::<ClientMessage>(100);
     let (broadcast, _) = tokio::sync::broadcast::channel::<ServerMessage>(100);
 
     let settings = load_config().unwrap();
     let mysql_pool = open_mysql(&settings).unwrap();
-    println!("Trying to connect to database");
+    log::info!("Trying to connect to database");
     let _mysql_conn = mysql_pool
         .get_conn()
         .await
@@ -154,7 +156,7 @@ async fn main() -> Result<(), String> {
     let update_tx = update::setup_update_server(&mut tasks, world.clone())
         .await
         .expect("Failed to setup update server");
-    let server_tx = server::setup_game_server(cd, &mut tasks, world.clone())
+    let server_tx = server::setup_game_server(cd, &mut tasks, world.clone(), &settings.config)
         .await
         .expect("Failed to setup legacy server");
 
@@ -170,7 +172,7 @@ async fn main() -> Result<(), String> {
     loop {
         tokio::select! {
             Some(r) = tasks.join_next() => {
-                println!("A task exited {:?}, closing server in 5 seconds", r);
+                log::info!("A task exited {:?}, closing server in 5 seconds", r);
                 error = Err(format!("A task exited {:?}, closing server in 5 seconds", r));
                 tokio::time::sleep(tokio::time::Duration::from_millis(5000)).await;
                 break;
@@ -194,9 +196,9 @@ async fn main() -> Result<(), String> {
 
     tokio::time::sleep(tokio::time::Duration::from_millis(5000)).await;
 
-    println!("server: Server is shutting down");
+    log::info!("server: Server is shutting down");
     if let Err(e) = update_tx.send(0) {
-        println!(
+        log::info!(
             "server: Failed to signal the update server to shutdown {}",
             e
         );
@@ -205,9 +207,9 @@ async fn main() -> Result<(), String> {
     //mysql_conn.disconnect().await.expect("Failed to disconnect from mmysql server");
 
     if let Err(e) = server_tx.send(0) {
-        println!("server: Failed to signal the server to shutdown {}", e);
+        log::info!("server: Failed to signal the server to shutdown {}", e);
     }
     tokio::time::sleep(tokio::time::Duration::from_millis(1000)).await;
-    println!("server: Server will now close");
+    log::info!("server: Server will now close");
     error
 }

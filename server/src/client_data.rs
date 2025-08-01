@@ -2,7 +2,7 @@ use crate::client_message::*;
 use crate::server_message::*;
 
 pub struct ClientData {
-    global_tx: tokio::sync::broadcast::Sender<ServerMessage>,
+    pub global_tx: tokio::sync::broadcast::Sender<ServerMessage>,
     pub server_tx: tokio::sync::mpsc::Sender<ClientMessage>,
     pub mysql: mysql_async::Pool,
 }

@@ -38,7 +38,9 @@ pub enum ClientPacket {
     PledgeChat(String),
     WhisperChat(String, String),
     GlobalChat(String),
+    /// chat messages starting with - in the client
     CommandChat(String),
+    /// chat message starting with . in the client
     SpecialCommandChat(String),
     ChangePassword {
         account: String,
@@ -57,6 +59,16 @@ pub enum ClientPacket {
         intelligence: u8,
     },
     DeleteCharacter(String),
+    /// The user wants to create a bookmark
+    CreateBookmark(String),
+    /// The user used the /who command
+    WhoCommand(String),
+    /// The user wants to add a friend
+    AddFriend(String),
+    /// The user wants to remove a friend
+    RemoveFriend(String),
+    /// A ping from a user
+    Ping(u8),
     Unknown(Vec<u8>),
 }
 
@@ -279,6 +291,30 @@ pub enum ServerPacket {
         /// The direction for the userobject
         direction: u8,
     },
+    /// Updates title, alignment, speed, and polymorph, resulting object seems to not move
+    CloneObject {
+        /// The id of the userobject
+        id: u32,
+        /// new object speed
+        speed: u32,
+        /// the poly id?
+        poly_id: u16,
+        /// alignment
+        alignment: i16,
+        /// the polymorph action
+        poly_action: u8,
+        /// title
+        title: String,
+    },
+    /// Sets the criminal count for an object
+    SetCriminalCount {
+        /// The id of the userobject
+        id: u32,
+        /// The count
+        count: u8,
+    },
+    /// Remove an object
+    RemoveObject(u32),
 }
 
 /// Potential bless status for an item
@@ -299,6 +335,28 @@ impl ServerPacket {
     pub fn build(self) -> Packet {
         let mut p = Packet::new();
         match self {
+            ServerPacket::RemoveObject(id) => {
+                p.add_u8(9).add_u32(id);
+            }
+            ServerPacket::SetCriminalCount { id, count } => {
+                p.add_u8(121).add_u32(id).add_u8(count);
+            }
+            ServerPacket::CloneObject {
+                id,
+                speed,
+                poly_id,
+                alignment,
+                poly_action: poly_arg,
+                title,
+            } => {
+                p.add_u8(126)
+                    .add_u32(id)
+                    .add_u32(speed)
+                    .add_u16(poly_id)
+                    .add_i16(alignment)
+                    .add_u8(poly_arg)
+                    .add_string(title);
+            }
             ServerPacket::ServerVersion {
                 id,
                 version,
@@ -650,6 +708,8 @@ impl Packet {
                 self.pull_u32(),
             ),
             13 => ClientPacket::WhisperChat(self.pull_string(), self.pull_string()),
+            20 => ClientPacket::CreateBookmark(self.pull_string()),
+            30 => ClientPacket::RemoveFriend(self.pull_string()),
             34 => ClientPacket::DeleteCharacter(self.pull_string()),
             40 => {
                 self.pull_u8();
@@ -662,7 +722,7 @@ impl Packet {
                 let val2: u32 = self.pull_u32();
                 let val3: u8 = self.pull_u8();
                 let val4: u32 = self.pull_u32();
-                println!("client: found a client version packet");
+                log::info!("client: found a client version packet");
                 ClientPacket::Version(val1, val2, val3, val4)
             }
             72 => ClientPacket::NewCharacter {
@@ -677,6 +737,7 @@ impl Packet {
                 intelligence: self.pull_u8(),
             },
             74 => ClientPacket::ChangeDirection(self.pull_u8()),
+            79 => ClientPacket::AddFriend(self.pull_string()),
             83 => ClientPacket::CharacterSelect {
                 name: self.pull_string(),
             },
@@ -714,6 +775,8 @@ impl Packet {
                 }
             }
             111 => ClientPacket::Save,
+            112 => ClientPacket::Ping(self.pull_u8()),
+            119 => ClientPacket::WhoCommand(self.pull_string()),
             _ => ClientPacket::Unknown(self.buf()),
         }
     }
@@ -943,7 +1006,7 @@ impl ServerPacketSender {
     }
 
     pub async fn send_packet(&mut self, mut data: Packet) -> Result<(), PacketError> {
-        println!("Sending packet {:x?}", data.buf());
+        log::debug!("Sending packet {:x?}", data.buf());
         while data.buf().len() < 4 {
             data.add_u8(0);
         }

@@ -15,9 +15,10 @@ pub struct UserAccount {
     slot: u32,
 }
 
-pub fn hash_password(name: String, salt: String, pw: String) -> String {
+/// Hash the password for the database
+pub fn hash_password(name: &str, salt: &str, pw: &str) -> String {
     let mut md5 = crypto::md5::Md5::new();
-    md5.input_str(&name);
+    md5.input_str(name);
     let m = md5.result_str();
     let inp = format!("{}{}{}", salt, pw, m);
     let mut sha = crypto::sha2::Sha256::new();
@@ -66,13 +67,14 @@ pub async fn get_user_details(user: String, mysql: &mut mysql_async::Conn) -> Op
 }
 
 impl UserAccount {
-    pub fn check_login(&self, salt: String, pw: String) -> bool {
-        let hash = hash_password(self.name.clone(), salt, pw);
+    /// Check login to see if the password was correct
+    pub fn check_login(&self, salt: &str, pw: &str) -> bool {
+        let hash = hash_password(&self.name, salt, pw);
         hash == self.password
     }
 
     pub fn new(name: String, pass: String, ip: String, salt: String) -> Self {
-        let hashpass = hash_password(name.clone(), salt, pass);
+        let hashpass = hash_password(&name, &salt, &pass);
         Self {
             name: name.clone(),
             password: hashpass,
@@ -103,16 +105,16 @@ impl UserAccount {
         let err = tq.await;
         match err {
             Err(e) => {
-                println!("error inserting account {}", e);
+                log::info!("error inserting account {}", e);
             }
             _ => {
-                println!("account insertion is fine");
+                log::info!("account insertion is fine");
             }
         }
     }
 
     pub fn print(&self) -> () {
-        println!(
+        log::info!(
             "User details: {} {} {} {} {} {} {} {}",
             self.name,
             self.password,
