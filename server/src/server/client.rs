@@ -259,6 +259,56 @@ impl<'a> Client<'a> {
         Ok(())
     }
 
+    async fn after_news(&mut self) -> Result<(), ClientError> {
+        let mut response = ServerPacket::NumberCharacters(1, 8).build();
+        self.packet_writer.send_packet(response).await?;
+
+        for _ in 0..1 {
+            response = ServerPacket::LoginCharacterDetails {
+                name: "whatever".to_string(),
+                pledge: "whocares".to_string(),
+                ctype: 1,
+                gender: 2,
+                alignment: 32767,
+                hp: 1234,
+                mp: 95,
+                ac: -12,
+                level: 51,
+                strength: 12,
+                dexterity: 12,
+                constitution: 12,
+                wisdom: 12,
+                charisma: 12,
+                intelligence: 12,
+            }
+            .build();
+            self.packet_writer.send_packet(response).await?;
+        }
+        Ok(())
+    }
+
+    async fn login_with_news(&mut self,
+        config: &std::sync::Arc<crate::ServerConfiguration>,
+        username: String,
+    ) -> Result<(), ClientError> {
+        self.packet_writer
+            .send_packet(ServerPacket::LoginResult { code: 0 }.build())
+            .await?;
+        let news = config.get_news();
+        if news.is_empty() {
+            self.after_news().await?;
+        } else {
+            self.packet_writer
+                .send_packet(ServerPacket::News(news).build())
+                .await?;
+        }
+        let _ = self
+            .server_tx
+            .send(ClientMessage::LoggedIn(self.id, username))
+            .await;
+        Ok(())
+    }
+
     /// Process a single packet from the game client
     pub async fn process_packet(
         &mut self,
@@ -317,16 +367,7 @@ impl<'a> Client<'a> {
                         let password_success = us.check_login(&config.account_creation_salt, &p);
                         log::info!("User login check is {}", password_success);
                         if password_success {
-                            self.packet_writer
-                                .send_packet(ServerPacket::LoginResult { code: 0 }.build())
-                                .await?;
-                            self.packet_writer
-                                .send_packet(ServerPacket::News(config.get_news()).build())
-                                .await?;
-                            let _ = &self
-                                .server_tx
-                                .send(ClientMessage::LoggedIn(self.id, u))
-                                .await?;
+                            self.login_with_news(config, u).await?;
                         } else {
                             self.packet_writer
                                 .send_packet(ServerPacket::LoginResult { code: 8 }.build())
@@ -343,16 +384,7 @@ impl<'a> Client<'a> {
                                 config.account_creation_salt.clone(),
                             );
                             newaccount.insert_into_db(&mut self.mysql).await;
-                            self.packet_writer
-                                .send_packet(ServerPacket::LoginResult { code: 0 }.build())
-                                .await?;
-                            self.packet_writer
-                                .send_packet(ServerPacket::News(config.get_news()).build())
-                                .await?;
-                            let _ = &self
-                                .server_tx
-                                .send(ClientMessage::LoggedIn(self.id, u.clone()))
-                                .await?;
+                            self.login_with_news(config, u).await?;
                         } else {
                             self.packet_writer
                                 .send_packet(ServerPacket::LoginResult { code: 8 }.build())
@@ -363,30 +395,7 @@ impl<'a> Client<'a> {
             }
             ClientPacket::NewsDone => {
                 //send number of characters the player has
-                let mut response = ServerPacket::NumberCharacters(1, 8).build();
-                self.packet_writer.send_packet(response).await?;
-
-                for _ in 0..1 {
-                    response = ServerPacket::LoginCharacterDetails {
-                        name: "whatever".to_string(),
-                        pledge: "whocares".to_string(),
-                        ctype: 1,
-                        gender: 2,
-                        alignment: 32767,
-                        hp: 1234,
-                        mp: 95,
-                        ac: -12,
-                        level: 51,
-                        strength: 12,
-                        dexterity: 12,
-                        constitution: 12,
-                        wisdom: 12,
-                        charisma: 12,
-                        intelligence: 12,
-                    }
-                    .build();
-                    self.packet_writer.send_packet(response).await?;
-                }
+                self.after_news().await?;
             }
             ClientPacket::NewCharacter {
                 name,

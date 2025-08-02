@@ -21,6 +21,7 @@ pub enum ClientPacket {
     CharacterSelect {
         name: String,
     },
+    /// The player is done "reading" the news
     NewsDone,
     KeepAlive,
     GameInitDone,
