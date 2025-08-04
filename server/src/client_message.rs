@@ -1,5 +1,3 @@
-use crate::ServerMessage;
-
 /// This enum represents the messages sent from a client
 pub enum ClientMessage {
     RegularChat {
