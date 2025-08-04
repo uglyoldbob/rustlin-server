@@ -3,7 +3,11 @@ use mysql_async::prelude::Queryable;
 use chrono::{TimeZone, Utc};
 use crypto::digest::Digest;
 
+use crate::character::CharacterRowData;
+
+#[derive(Debug)]
 pub struct UserAccount {
+    /// The name for the account in the database
     name: String,
     ///the hashed password, don't be a moron
     password: String,
@@ -73,6 +77,7 @@ impl UserAccount {
         hash == self.password
     }
 
+    /// Construct a new user account
     pub fn new(name: String, pass: String, ip: String, salt: String) -> Self {
         let hashpass = hash_password(&name, &salt, &pass);
         Self {
@@ -87,6 +92,25 @@ impl UserAccount {
         }
     }
 
+    /// Retrieve characters for user account from database
+    pub async fn retrieve_chars(&self, mysql: &mut mysql_async::Conn) -> Result<Vec<crate::character::Character>, crate::server::ClientError> {
+        let query = "SELECT account_name, char_name, objid, Lawful from characters WHERE account_name=?";
+        log::info!("Checking for account {}", self.name);
+        let s = mysql.prep(query).await?;
+        let asdf = mysql.exec_map(
+            s,
+            (
+                self.name.clone(),
+            ),
+            |a: CharacterRowData| {
+                log::info!("Converting {:?} to character", a);
+                crate::character::Character::from(a)
+            },
+        ).await?;
+        Ok(asdf)
+    }
+
+    /// Insert a new account into the database
     pub async fn insert_into_db(&self, mysql: &mut mysql_async::Conn) {
         let query = "INSERT INTO accounts SET login=?,password=?,lastactive=?,access_level=?,ip=?,host=?,banned=?,character_slot=?";
         let tq = mysql.exec_drop(
@@ -98,7 +122,7 @@ impl UserAccount {
                 self.access,
                 self.ip.clone(),
                 self.host.clone(),
-                if self.banned { 0 } else { 1 },
+                if self.banned { 1 } else { 0 },
                 self.slot,
             ),
         );
@@ -111,19 +135,5 @@ impl UserAccount {
                 log::info!("account insertion is fine");
             }
         }
-    }
-
-    pub fn print(&self) -> () {
-        log::info!(
-            "User details: {} {} {} {} {} {} {} {}",
-            self.name,
-            self.password,
-            self.active,
-            self.access,
-            self.ip,
-            self.host,
-            self.banned,
-            self.slot
-        );
     }
 }

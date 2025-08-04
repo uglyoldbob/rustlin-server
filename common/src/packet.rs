@@ -117,9 +117,10 @@ pub enum ServerPacket {
     LoginCharacterDetails {
         name: String,
         pledge: String,
+        /// The character type
         ctype: u8,
         gender: u8,
-        alignment: u16,
+        alignment: i16,
         hp: u16,
         mp: u16,
         ac: i8,
@@ -150,7 +151,7 @@ pub enum ServerPacket {
         time: u32,
         food: f32,
         weight: f32,
-        alignment: u16,
+        alignment: i16,
         fire_resist: u8,
         water_resist: u8,
         wind_resist: u8,
@@ -471,7 +472,7 @@ impl ServerPacket {
                     .add_string(pledge)
                     .add_u8(ctype)
                     .add_u8(gender)
-                    .add_u16(alignment)
+                    .add_i16(alignment)
                     .add_u16(hp)
                     .add_u16(mp)
                     .add_i8(ac)
@@ -527,7 +528,7 @@ impl ServerPacket {
                     .add_u32(time)
                     .add_u8((food * 29.0).round() as u8)
                     .add_u8((weight * 29.0).round() as u8)
-                    .add_u16(alignment)
+                    .add_i16(alignment)
                     .add_u8(fire_resist)
                     .add_u8(water_resist)
                     .add_u8(wind_resist)

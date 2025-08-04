@@ -3,7 +3,7 @@
 use crate::client_message::ClientMessage;
 use crate::server::ClientError;
 use crate::server_message::ServerMessage;
-use crate::user::*;
+use crate::user::{self, *};
 use common::packet::*;
 
 use futures::FutureExt;
@@ -15,6 +15,10 @@ pub struct Client {
     packet_writer: ServerPacketSender,
     /// The id for the game client
     id: u32,
+    /// The account for the client
+    account: Option<UserAccount>,
+    /// The possible characters for the client
+    chars: Vec<crate::character::Character>,
     /// The world object
     world: std::sync::Arc<crate::world::World>,
 }
@@ -34,9 +38,17 @@ impl Client {
     ) -> Self {
         Self {
             packet_writer,
+            account: None,
+            chars: Vec::new(),
             id: world.register_user(),
             world,
         }
+    }
+
+    /// Fetch all characters for the client
+    async fn fetch_chars(&self) -> Result<Vec<crate::Character>, ClientError> {
+        let mut mysql = self.world.get_mysql_conn().await?;
+        Ok(Vec::new())
     }
 
     /// Performs packet testing
@@ -115,25 +127,8 @@ impl Client {
         let mut response = ServerPacket::NumberCharacters(1, 8).build();
         self.packet_writer.send_packet(response).await?;
 
-        for _ in 0..1 {
-            response = ServerPacket::LoginCharacterDetails {
-                name: "whatever".to_string(),
-                pledge: "whocares".to_string(),
-                ctype: 1,
-                gender: 2,
-                alignment: 32767,
-                hp: 1234,
-                mp: 95,
-                ac: -12,
-                level: 51,
-                strength: 12,
-                dexterity: 12,
-                constitution: 12,
-                wisdom: 12,
-                charisma: 12,
-                intelligence: 12,
-            }
-            .build();
+        for c in &self.chars {
+            let response = c.get_details_packet().build();
             self.packet_writer.send_packet(response).await?;
         }
         Ok(())
@@ -156,6 +151,11 @@ impl Client {
         }
         self.world.send_message(ClientMessage::LoggedIn(self.id, username), &mut self.packet_writer)
             .await?;
+        if let Some(account) = &self.account {
+            let mut conn = self.world.get_mysql_conn().await?;
+            self.chars = account.retrieve_chars(&mut conn).await?;
+            log::info!("Characters are {:?}", self.chars);
+        }
         Ok(())
     }
 
@@ -216,12 +216,11 @@ impl Client {
                 let user = get_user_details(u.clone(), &mut mysql_conn).await;
                 match user {
                     Some(us) => {
-                        log::info!("User {} exists", u.clone());
-                        us.print();
-                        //TODO un-hardcode the salt for the password hashing
+                        log::info!("User {} exists: {:?}", u.clone(), us);
                         let password_success = us.check_login(&config.account_creation_salt, &p);
                         log::info!("User login check is {}", password_success);
                         if password_success {
+                            self.account = Some(us);
                             self.login_with_news(config, u).await?;
                         } else {
                             self.packet_writer
@@ -240,6 +239,7 @@ impl Client {
                             );
                             let mut mysql = self.world.get_mysql_conn().await?;
                             newaccount.insert_into_db(&mut mysql).await;
+                            self.account = Some(newaccount);
                             self.login_with_news(config, u).await?;
                         } else {
                             self.packet_writer
@@ -507,8 +507,7 @@ impl Client {
                 let user = get_user_details(account.clone(), &mut mysql).await;
                 match user {
                     Some(us) => {
-                        log::info!("User {} exists", account);
-                        us.print();
+                        log::info!("User {} exists: {:?}", account, us);
                         let password_success =
                             us.check_login(&config.account_creation_salt, &oldpass);
                         log::info!("User login check is {}", password_success);

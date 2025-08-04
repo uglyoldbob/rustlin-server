@@ -5,7 +5,7 @@ use std::{
 
 use common::packet::{ServerPacket, ServerPacketSender};
 
-use crate::{client_message::ClientMessage, player::Player, server::ClientError, server_message::ServerMessage};
+use crate::{client_message::ClientMessage, character::Character, server::ClientError, server_message::ServerMessage};
 
 /// Represents the world for a server
 pub struct World {
@@ -176,6 +176,12 @@ impl World {
         Ok(0)
     }
 
+    /// Save a new character into the database
+    pub async fn save_new_character(&self, c: &Character) -> Result<(), ClientError> {
+        let mut conn = self.get_mysql_conn().await?;
+        c.save_new_to_db(&mut conn).await
+    }
+
     pub async fn send_message(&self, message: crate::client_message::ClientMessage, packet_writer: &mut ServerPacketSender) -> Result<(), crate::server::ClientError> {
         match message {
             ClientMessage::LoggedIn(id, account) => {
@@ -204,17 +210,16 @@ impl World {
                     //TODO validate that all stats are legitimately possible
                     //TODO validate count of characters for account
     
-                    if !Player::valid_name(name.clone()) {
-                        packet_writer.send_packet(ServerPacket::CharacterCreationStatus(1).build()).await?;
-                    } else {
+                    if let Some(c) = Character::new(account, id, name, class, gender, strength, dexterity, constitution, wisdom, charisma, intelligence) {
+                        self.save_new_character(&c).await?;
                         packet_writer.send_packet(ServerPacket::CharacterCreationStatus(0).build()).await?;
                         //TODO: populate the correct details
                         packet_writer.send_packet(ServerPacket::NewCharacterDetails {
-                            name: name.clone(),
+                            name: c.name().to_string(),
                             pledge: "".to_string(),
                             class: class,
                             gender: gender,
-                            alignment: 32764,
+                            alignment: c.alignment(),
                             hp: 234,
                             mp: 456,
                             ac: 12,
@@ -226,6 +231,8 @@ impl World {
                             charisma: charisma,
                             intelligence: intelligence,
                         }.build()).await?;
+                    } else {
+                        packet_writer.send_packet(ServerPacket::CharacterCreationStatus(1).build()).await?;
                     }
                 }
             }

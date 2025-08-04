@@ -13,14 +13,14 @@ use server_message::*;
 
 use std::collections::HashMap;
 
+mod character;
 mod clients;
 mod config;
 use config::*;
-mod player;
 mod user;
 mod world;
 use crate::clients::ClientList;
-use crate::player::Player;
+use crate::character::Character;
 
 #[tokio::main]
 async fn main() -> Result<(), String> {
