@@ -336,6 +336,7 @@ pub enum ItemBlessing {
 }
 
 impl ServerPacket {
+    /// Build a `Packet` from the ServerPacket
     pub fn build(self) -> Packet {
         let mut p = Packet::new();
         match self {
@@ -649,6 +650,7 @@ impl ServerPacket {
     }
 }
 
+/// Change the key to the next key with the given data
 pub fn change_key(k: u64, v: u32) -> u64 {
     let d: u32 = u32::from_be(v);
     let mut little: u32 = u32::from_be((k & 0xFFFFFFFF).try_into().unwrap());
@@ -664,6 +666,7 @@ pub fn change_key(k: u64, v: u32) -> u64 {
     nk
 }
 
+/// Initialize an encryption key based on an initial seed
 pub fn key_init(k: u32) -> u64 {
     let key: u32 = 0x930fd7e2;
     let rotr: u32 = k ^ 0x9c30d539;
@@ -675,28 +678,34 @@ pub fn key_init(k: u32) -> u64 {
     u64::from_ne_bytes(keyvec.try_into().unwrap())
 }
 
+/// A packet of data that can be sent or received over a network connection
 pub struct Packet {
     data: Vec<u8>,
     read: usize,
 }
 
+/// Used for converting u8 to i8 and vice versa
 union U8Converter {
     u: u8,
     i: i8,
 }
 
+/// Used for converting u16 to i16 and vice versa
 union U16Converter {
     u: u16,
     i: i16,
 }
 
 impl Packet {
+    /// Construct an empty packet
     pub fn new() -> Packet {
         Packet {
             data: Vec::new(),
             read: 0,
         }
     }
+
+    /// Convert the packet to a `ClientPacket`
     pub fn convert(mut self) -> ClientPacket {
         let opcode: u8 = self.pull_u8();
         match opcode {
@@ -785,41 +794,59 @@ impl Packet {
             _ => ClientPacket::Unknown(self.buf()),
         }
     }
+
+    /// Get the length of data currently in the packet
     fn len(&self) -> u16 {
         self.data.len().try_into().unwrap()
     }
+
+    /// Get a copy of the raw packet data
     fn buf(&self) -> Vec<u8> {
         self.data.to_vec()
     }
-    pub fn add_vec(&mut self, d: &Vec<u8>) -> &mut Packet {
-        let mut copy = d.clone();
+
+    /// Write a vector of bytes to the packet
+    pub fn add_vec(&mut self, d: &[u8]) -> &mut Packet {
+        let mut copy = d.to_vec();
         self.data.append(&mut copy);
         self
     }
+
+    /// Write a u8 to the packet
     pub fn add_u8(&mut self, d: u8) -> &mut Packet {
         self.data.push(d);
         self
     }
+
+    /// Write an i8 to the packet
     pub fn add_i8(&mut self, d: i8) -> &mut Packet {
         let a: U8Converter = U8Converter { i: d };
         let a: u8 = unsafe { a.u };
         self.data.push(a);
         self
     }
+
+    /// Write a u16 to the packet
     pub fn add_u16(&mut self, d: u16) -> &mut Packet {
         self.data.append(&mut d.to_le_bytes().to_vec());
         self
     }
+
+    /// Write an i16 to the packet
     pub fn add_i16(&mut self, d: i16) -> &mut Packet {
         let a: U16Converter = U16Converter { i: d };
         let a: u16 = unsafe { a.u };
         self.add_u16(a);
         self
     }
+
+    /// Write a u32 to the packet
     pub fn add_u32(&mut self, d: u32) -> &mut Packet {
         self.data.append(&mut d.to_le_bytes().to_vec());
         self
     }
+
+    /// Write a string to the packet
     pub fn add_string(&mut self, d: String) -> &mut Packet {
         for n in d.bytes() {
             self.add_u8(n);
@@ -827,17 +854,23 @@ impl Packet {
         self.add_u8(0);
         self
     }
+
+    /// Fetch a u8 from the packet
     fn pull_u8(&mut self) -> u8 {
         let val: u8 = self.data[self.read];
         self.read += 1;
         val
     }
+
+    /// Fetch a u16 from the packet
     fn pull_u16(&mut self) -> u16 {
         let mut val: u16 = (self.data[self.read + 1] as u16) << 8;
         val |= self.data[self.read] as u16;
         self.read += 2;
         val
     }
+
+    /// Fetch a u32 from the packet
     fn pull_u32(&mut self) -> u32 {
         let mut val: u32 = self.data[self.read + 3] as u32;
         val = (val << 8) | (self.data[self.read + 2] as u32);
@@ -846,6 +879,8 @@ impl Packet {
         self.read += 4;
         val
     }
+
+    /// Fetch a string from the packet
     fn pull_string(&mut self) -> String {
         let mut v: String = "".to_string();
         //a do while loop
@@ -858,10 +893,14 @@ impl Packet {
         } {}
         v
     }
+
+    /// Peek into the packet
     fn peek_u32(&self) -> u32 {
         let v = Vec::from([self.data[0], self.data[1], self.data[2], self.data[3]]);
         u32::from_ne_bytes(v.try_into().unwrap())
     }
+
+    /// Encrypt data into a sendable packet
     fn encrypt(&mut self, key: u64) -> &mut Packet {
         let key_vec = key.to_be_bytes().to_vec();
         self.data[0] ^= key_vec[0];
@@ -874,6 +913,8 @@ impl Packet {
         self.data[0] ^= key_vec[5] ^ self.data[1];
         self
     }
+
+    /// Decrypt data into a packet
     fn decrypt(&mut self, key: u64) -> &mut Packet {
         let key_vec = key.to_be_bytes().to_vec();
         let b3: u8 = self.data[3];
@@ -901,6 +942,7 @@ impl Packet {
 mod tests {
     use super::*;
 
+    /// Tests encrypting and decrypting together
     #[test]
     fn encrypt_decrypt() {
         let mut rng = rand::thread_rng();
@@ -920,6 +962,7 @@ mod tests {
         }
     }
 
+    /// Tests initialization of an encryption key
     #[test]
     fn test_key_init() {
         let key_init_val = key_init(0x12345678);
@@ -927,6 +970,7 @@ mod tests {
         assert_eq!(key_init_val, required);
     }
 
+    /// Tests decrypting data of a known value with a known decryption key
     #[test]
     fn test_known_data_decrypt() {
         let data: Vec<u8> = Vec::from([
@@ -947,6 +991,7 @@ mod tests {
         assert_eq!(new_key, required_new_key);
     }
 
+    /// Tests encrypting data of a known value with a known decryption key
     #[test]
     fn test_known_data_encrypt() {
         let required: Vec<u8> = Vec::from([
@@ -963,12 +1008,16 @@ mod tests {
     }
 }
 
+/// Used for receiving packets from a user
 pub struct ServerPacketReceiver {
+    /// The read half of a tcp connectio to a user
     reader: tokio::net::tcp::OwnedReadHalf,
+    /// The decryption key for receiving packets
     decryption_key: u64,
 }
 
 impl ServerPacketReceiver {
+    /// Construct a new receiver
     pub fn new(r: tokio::net::tcp::OwnedReadHalf, key: u32) -> ServerPacketReceiver {
         ServerPacketReceiver {
             reader: r,
@@ -976,10 +1025,12 @@ impl ServerPacketReceiver {
         }
     }
 
+    /// Get the decryption key
     pub fn get_key(&self) -> u64 {
         self.decryption_key
     }
 
+    /// Read a packet from the user
     pub async fn read_packet(&mut self) -> Result<Packet, PacketError> {
         let mut packet = Packet::new();
         let length: usize = self.reader.read_i16_le().await?.try_into().unwrap();
@@ -993,8 +1044,11 @@ impl ServerPacketReceiver {
     }
 }
 
+/// Used for sending packets to a single user
 pub struct ServerPacketSender {
+    /// The write half of a tcp connection
     writer: tokio::net::tcp::OwnedWriteHalf,
+    /// The encryption key to use for the next data to send out
     encryption_key: Option<u64>,
 }
 
@@ -1006,10 +1060,12 @@ impl ServerPacketSender {
         }
     }
 
+    /// Set the encryption key for outbound traffic
     pub fn set_encryption_key(&mut self, d: u64) {
         self.encryption_key = Some(d);
     }
 
+    /// Send a packet
     pub async fn send_packet(&mut self, mut data: Packet) -> Result<(), PacketError> {
         log::debug!("Sending packet {:x?}", data.buf());
         while data.buf().len() < 4 {
