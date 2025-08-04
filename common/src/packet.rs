@@ -319,6 +319,8 @@ pub enum ServerPacket {
     },
     /// Remove an object
     RemoveObject(u32),
+    /// Send the player back to the character select screen
+    BackToCharacterSelect,
 }
 
 /// Potential bless status for an item
@@ -340,6 +342,9 @@ impl ServerPacket {
     pub fn build(self) -> Packet {
         let mut p = Packet::new();
         match self {
+            ServerPacket::BackToCharacterSelect => {
+                p.add_u8(107).add_u8(42);
+            }
             ServerPacket::RemoveObject(id) => {
                 p.add_u8(9).add_u32(id);
             }

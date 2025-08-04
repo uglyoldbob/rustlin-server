@@ -173,6 +173,7 @@ impl Client {
             }
             ClientPacket::Restart => {
                 log::info!("Player restarts");
+                self.packet_writer.send_packet(ServerPacket::BackToCharacterSelect.build()).await?;
             }
             ClientPacket::RemoveFriend(name) => {
                 log::info!("User used the remove friend command with {name}");
