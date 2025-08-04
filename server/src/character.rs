@@ -7,15 +7,21 @@ pub struct Character {
     account_name: String,
     /// The name of the character
     name: String,
+    /// The pledge name of the character (empty string if no pledge)
+    pledge: String,
     /// The id of the character in the database
     id: u32,
     /// The alignmnet of the character
     alignment: i16,
+    /// The level of the character
+    level: u8,
 }
 
-pub type CharacterRowData = (String, String, u32, i16);
+pub type CharacterRowData = (String, String, u32, i16, u8, String);
 
 impl Character {
+    pub const QUERY: &str = "SELECT account_name, char_name, objid, Lawful, level, Clanname from characters WHERE account_name=?";
+
     /// Is the player name valid?
     pub fn valid_name(n: String) -> bool {
         !n.is_empty()
@@ -35,14 +41,14 @@ impl Character {
     pub fn get_details_packet(&self) -> ServerPacket {
         ServerPacket::LoginCharacterDetails {
             name: self.name.clone(),
-            pledge: "whocares".to_string(),
+            pledge: self.pledge.clone(),
             ctype: 1,
             gender: 2,
             alignment: self.alignment,
             hp: 1234,
             mp: 95,
             ac: -12,
-            level: 51,
+            level: self.level,
             strength: 12,
             dexterity: 12,
             constitution: 12,
@@ -55,7 +61,7 @@ impl Character {
     /// Save a new character into the database
     pub async fn save_new_to_db(&self, mysql: &mut mysql_async::Conn) -> Result<(), crate::server::ClientError> {
         use mysql_async::prelude::Queryable;
-        let query = "INSERT INTO characters SET account_name=?,objid=?,char_name=?";
+        let query = "INSERT INTO characters SET account_name=?,objid=?,char_name=?,level=1";
         let tq = mysql.exec_drop(
             query,
             (
@@ -81,8 +87,10 @@ impl Character {
         Some(Self {
             account_name,
             name,
+            pledge: "".to_string(),
             id,
             alignment: 0,
+            level: 1,
         })
     }
 }
@@ -94,6 +102,8 @@ impl From<CharacterRowData> for Character {
             name: value.1,
             id: value.2,
             alignment: value.3,
+            level: value.4,
+            pledge: value.5,
         }
     }
 }
@@ -107,6 +117,8 @@ impl mysql_async::prelude::FromRow for Character {
             name: row.get(1).unwrap(),
             id: row.get(2).unwrap(),
             alignment: row.get(3).unwrap(),
+            level: row.get(4).unwrap(),
+            pledge: row.get(5).unwrap(),
         }
     }
 
@@ -118,6 +130,8 @@ impl mysql_async::prelude::FromRow for Character {
             name: row.get(1).ok_or(mysql_async::FromRowError(row.clone()))?,
             id: row.get(2).ok_or(mysql_async::FromRowError(row.clone()))?,
             alignment: row.get(3).ok_or(mysql_async::FromRowError(row.clone()))?,
+            level: row.get(4).ok_or(mysql_async::FromRowError(row.clone()))?,
+            pledge: row.get(5).ok_or(mysql_async::FromRowError(row.clone()))?,
         })
     }
 }
