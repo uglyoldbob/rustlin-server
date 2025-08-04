@@ -1,5 +1,5 @@
 /// Represents messages sent by the server to player clients
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum ServerMessage {
     SystemMessage(String),
     CharacterCreateStatus(u8),

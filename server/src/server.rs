@@ -16,7 +16,7 @@ use common::packet::*;
 #[derive(Debug)]
 pub enum ClientError {
     /// Some sort of packet error occurred
-    PacketError,
+    PacketError(common::packet::PacketError),
     /// An io error occurred
     IoError(std::io::Error),
     /// Error receiving a broadcast
@@ -28,8 +28,8 @@ pub enum ClientError {
 }
 
 impl From<PacketError> for ClientError {
-    fn from(_: PacketError) -> ClientError {
-        ClientError::PacketError
+    fn from(p: PacketError) -> ClientError {
+        ClientError::PacketError(p)
     }
 }
 

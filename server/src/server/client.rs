@@ -321,6 +321,9 @@ impl<'a> Client<'a> {
             ClientPacket::Ping(v) => {
                 log::info!("The user pinged us {v}");
             }
+            ClientPacket::Restart => {
+                log::info!("Player restarts");
+            }
             ClientPacket::RemoveFriend(name) => {
                 log::info!("User used the remove friend command with {name}");
             }

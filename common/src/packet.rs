@@ -4,6 +4,7 @@ use tokio::io::AsyncWriteExt;
 use std::convert::TryInto;
 use std::vec::Vec;
 
+#[derive(Debug)]
 pub enum PacketError {
     IoError,
 }
@@ -70,6 +71,8 @@ pub enum ClientPacket {
     RemoveFriend(String),
     /// A ping from a user
     Ping(u8),
+    /// The player wants to restart with another character
+    Restart,
     Unknown(Vec<u8>),
 }
 
@@ -717,6 +720,7 @@ impl Packet {
                 ClientPacket::GlobalChat(self.pull_string())
             }
             43 => ClientPacket::NewsDone,
+            47 => ClientPacket::Restart,
             57 => ClientPacket::KeepAlive,
             71 => {
                 let val1: u16 = self.pull_u16();
