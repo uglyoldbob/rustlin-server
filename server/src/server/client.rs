@@ -124,7 +124,7 @@ impl Client {
     }
 
     async fn after_news(&mut self) -> Result<(), ClientError> {
-        let mut response = ServerPacket::NumberCharacters(1, 8).build();
+        let mut response = ServerPacket::NumberCharacters(self.chars.len() as u8, 8).build();
         self.packet_writer.send_packet(response).await?;
 
         for c in &self.chars {

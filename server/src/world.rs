@@ -213,24 +213,7 @@ impl World {
                     if let Some(c) = Character::new(account, id, name, class, gender, strength, dexterity, constitution, wisdom, charisma, intelligence) {
                         self.save_new_character(&c).await?;
                         packet_writer.send_packet(ServerPacket::CharacterCreationStatus(0).build()).await?;
-                        //TODO: populate the correct details
-                        packet_writer.send_packet(ServerPacket::NewCharacterDetails {
-                            name: c.name().to_string(),
-                            pledge: "".to_string(),
-                            class: class,
-                            gender: gender,
-                            alignment: c.alignment(),
-                            hp: 234,
-                            mp: 456,
-                            ac: 12,
-                            level: 1,
-                            strength: strength,
-                            dexterity: dexterity,
-                            constitution: constitution,
-                            wisdom: wisdom,
-                            charisma: charisma,
-                            intelligence: intelligence,
-                        }.build()).await?;
+                        packet_writer.send_packet(c.get_new_char_details_packet().build()).await?;
                     } else {
                         packet_writer.send_packet(ServerPacket::CharacterCreationStatus(1).build()).await?;
                     }

@@ -3,8 +3,6 @@ use mysql_async::prelude::Queryable;
 use chrono::{TimeZone, Utc};
 use crypto::digest::Digest;
 
-use crate::character::CharacterRowData;
-
 #[derive(Debug)]
 pub struct UserAccount {
     /// The name for the account in the database
@@ -94,20 +92,7 @@ impl UserAccount {
 
     /// Retrieve characters for user account from database
     pub async fn retrieve_chars(&self, mysql: &mut mysql_async::Conn) -> Result<Vec<crate::character::Character>, crate::server::ClientError> {
-        let query = crate::character::Character::QUERY;
-        log::info!("Checking for account {}", self.name);
-        let s = mysql.prep(query).await?;
-        let asdf = mysql.exec_map(
-            s,
-            (
-                self.name.clone(),
-            ),
-            |a: CharacterRowData| {
-                log::info!("Converting {:?} to character", a);
-                crate::character::Character::from(a)
-            },
-        ).await?;
-        Ok(asdf)
+        crate::character::Character::retrieve_chars(&self.name, mysql).await
     }
 
     /// Insert a new account into the database
