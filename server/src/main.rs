@@ -42,6 +42,7 @@ async fn main() -> Result<(), String> {
     let mut tasks: tokio::task::JoinSet<Result<(), u32>> = tokio::task::JoinSet::new();
 
     let world = std::sync::Arc::new(world::World::new(broadcast, mysql_pool));
+    world.load_maps_data().await?;
 
     let update_tx = update::setup_update_server(&mut tasks, world.clone())
         .await

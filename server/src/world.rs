@@ -4,12 +4,83 @@ use std::{
 };
 
 use common::packet::{ServerPacket, ServerPacketSender};
-use mysql_async::prelude::Queryable;
 
 use crate::{
-    character::Character, client_message::ClientMessage, server::ClientError,
+    character::Character, server::ClientError,
     server_message::ServerMessage,
 };
+
+/// Represents a single map of the world
+#[derive(Debug)]
+pub struct Map {
+    /// The mapid
+    id: u16,
+    /// The name of the map
+    name: String,
+    /// The minimum x coordinate for the map
+    min_x: u16,
+    /// The maximum x coordinate for the map
+    max_x: u16,
+    /// The minimum y coordinate for the map
+    min_y: u16,
+    /// The maximum y coordinate for the map
+    max_y: u16,
+    /// The rate multiplier for monsters
+    monster_rate: f32,
+    /// The drop rate multiplier for items from monsters
+    drop_rate: f32,
+    /// Is the map underwater?
+    underwater: bool,
+    /// Can players make bookmarks on this map?
+    bookmarkable: bool,
+    /// Does random teleport work on this map?
+    random_teleport: bool,
+    /// Is this map escapable?
+    escapable: bool,
+    /// Does resurrection work on this map?
+    resurrection: bool,
+    /// Do spawn monster items work here?
+    spawn_monster: bool,
+    /// Does this map impose an experience penalty upon death?
+    death_exp_penalty: bool,
+    /// Can pets come to this map?
+    pets: bool,
+    /// Can monsters be summoned on this map?
+    summon_monster: bool,
+    /// Is item usage allowed on this map?
+    item_usage: bool,
+    /// Are skills allowed on this map?
+    skill_usage: bool,
+}
+
+impl mysql_async::prelude::FromRow for Map {
+    fn from_row_opt(row: mysql_async::Row) -> Result<Self, mysql_async::FromRowError>
+    where
+        Self: Sized,
+    {
+        Ok(Self {
+            id: row.get(0).ok_or(mysql_async::FromRowError(row.clone()))?,
+            name: row.get(1).ok_or(mysql_async::FromRowError(row.clone()))?,
+            min_x: row.get(2).ok_or(mysql_async::FromRowError(row.clone()))?,
+            max_x: row.get(3).ok_or(mysql_async::FromRowError(row.clone()))?,
+            min_y: row.get(4).ok_or(mysql_async::FromRowError(row.clone()))?,
+            max_y: row.get(5).ok_or(mysql_async::FromRowError(row.clone()))?,
+            monster_rate: row.get(6).ok_or(mysql_async::FromRowError(row.clone()))?,
+            drop_rate: row.get(7).ok_or(mysql_async::FromRowError(row.clone()))?,
+            underwater: row.get(8).ok_or(mysql_async::FromRowError(row.clone()))?,
+            bookmarkable: row.get(9).ok_or(mysql_async::FromRowError(row.clone()))?,
+            random_teleport: row.get(10).ok_or(mysql_async::FromRowError(row.clone()))?,
+            escapable: row.get(11).ok_or(mysql_async::FromRowError(row.clone()))?,
+            resurrection: row.get(12).ok_or(mysql_async::FromRowError(row.clone()))?,
+            spawn_monster: row.get(13).ok_or(mysql_async::FromRowError(row.clone()))?,
+            death_exp_penalty: row.get(14).ok_or(mysql_async::FromRowError(row.clone()))?,
+            pets: row.get(15).ok_or(mysql_async::FromRowError(row.clone()))?,
+            summon_monster: row.get(16).ok_or(mysql_async::FromRowError(row.clone()))?,
+            item_usage: row.get(17).ok_or(mysql_async::FromRowError(row.clone()))?,
+            skill_usage: row.get(18).ok_or(mysql_async::FromRowError(row.clone()))?,
+        })
+    }
+}
 
 /// Represents the world for a server
 pub struct World {
@@ -21,6 +92,8 @@ pub struct World {
     pub global_tx: tokio::sync::broadcast::Sender<crate::ServerMessage>,
     /// The connection to the database
     mysql: mysql_async::Pool,
+    /// maps of the world
+    maps: Arc<Mutex<HashMap<u16, Map>>>,
 }
 
 impl World {
@@ -34,7 +107,27 @@ impl World {
             client_ids: Arc::new(Mutex::new(crate::ClientList::new())),
             global_tx,
             mysql,
+            maps: Arc::new(Mutex::new(HashMap::new())),
         }
+    }
+
+    /// (Re)load all maps from the database
+    pub async fn load_maps_data(&self) -> Result<(), String> {
+        let mut hmaps = self.maps.lock().unwrap();
+        use mysql_async::prelude::Queryable;
+        let query = "SELECT mapid, locationname, startX, endX, startY, endY, monster_amount, drop_rate, underwater, markable, teleportable, escapable, resurrection, painwand, penalty, take_pets, recall_pets, usable_item, usable_skill from mapids";
+        let mut mysql = self.get_mysql_conn().await.map_err(|e| e.to_string())?;
+        let s = mysql.prep(query).await.map_err(|e| e.to_string())?;
+        let maps = mysql
+            .exec_map(s, (), |a: Map| a)
+            .await
+            .map_err(|e| e.to_string())?;
+        hmaps.clear();
+        for m in maps {
+            println!("Found map data {:?}", m);
+            hmaps.insert(m.id, m);
+        }
+        Ok(())
     }
 
     /// Insert a character id into the world

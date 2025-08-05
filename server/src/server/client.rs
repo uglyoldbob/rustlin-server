@@ -423,7 +423,9 @@ impl Client {
                     let c = &self.chars[c];
                     if c.needs_delete_waiting() {
                         //TODO implement the actual delete in a scheduled async task
-                        self.packet_writer.send_packet(ServerPacket::DeleteCharacterWait.build()).await?;       
+                        self.packet_writer
+                            .send_packet(ServerPacket::DeleteCharacterWait.build())
+                            .await?;
                     } else {
                         self.send_message(ClientMessage::DeleteCharacter {
                             id: self.id,
@@ -433,7 +435,7 @@ impl Client {
                         self.packet_writer
                             .send_packet(ServerPacket::DeleteCharacterOk.build())
                             .await?;
-                    } 
+                    }
                 }
             }
             ClientPacket::CharacterSelect { name } => {
