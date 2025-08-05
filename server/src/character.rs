@@ -1,3 +1,5 @@
+use std::convert::TryInto;
+
 use common::packet::ServerPacket;
 use mysql_async::Params;
 
@@ -17,7 +19,7 @@ pub struct Character {
     /// The pledge name of the character (empty string if no pledge)
     pledge: String,
     /// The class of character
-    class: u8,
+    class: Class,
     /// The gender
     gender: u8,
     /// The current max hp
@@ -38,6 +40,93 @@ pub struct Character {
     charisma: u8,
     /// Character intelligence
     intelligence: u8,
+}
+
+/// The possible classes for a character
+#[repr(u8)]
+#[derive(Clone, Copy, Debug)]
+enum Class {
+    // Prince/princess
+    Royal=0,
+    /// Knight
+    Knight=1,
+    /// Elf
+    Elf=2,
+    /// Wizard
+    Wizard=3,
+    /// Dark Elf
+    DarkElf=4,
+    /// Dragon Knight
+    DragonKnight=5,
+    /// Illusionist
+    Illusionist=6,
+}
+
+impl Class {
+    /// Get the initial hp for classes, maybe this should depend on initial constitution?
+    fn initial_hp(&self, con: u8) -> u16 {
+        match self {
+            Class::Royal => 14,
+            Class::Knight => 16,
+            Class::Elf => 15,
+            Class::Wizard => 12,
+            Class::DarkElf => 12,
+            Class::DragonKnight => 15,
+            Class::Illusionist => 15,
+        }
+    }
+
+    /// Get the initial mp
+    fn initial_mp(&self, wisdom: u8) -> u16 {
+        match self {
+            Class::Royal => match wisdom {
+                12..=15 => 3,
+                16..=18 => 4,
+                _ => 2,
+            },
+            Class::Knight => match wisdom {
+                12..=13 => 2,
+                _ => 1,
+            }
+            Class::Elf => match wisdom {
+                16..=18 => 6,
+                _ => 4,
+            }
+            Class::Wizard => match wisdom {
+                16..=18 => 8,
+                _ => 6,
+            }
+            Class::DarkElf => match wisdom {
+                12..=15 => 4,
+                16..=18 => 6,
+                _ => 3,
+            }
+            Class::DragonKnight => match wisdom {
+                16..=18 => 6,
+                _ => 4,
+            }
+            Class::Illusionist => match wisdom {
+                16..=18 => 6,
+                _ => 4,
+            }
+        }
+    }
+}
+
+impl std::convert::TryFrom<u8> for Class {
+    type Error = ();
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(Self::Royal),
+            1 => Ok(Self::Knight),
+            2 => Ok(Self::Elf),
+            3 => Ok(Self::Wizard),
+            4 => Ok(Self::DarkElf),
+            5 => Ok(Self::DragonKnight),
+            6 => Ok(Self::Illusionist),
+            _ => Err(()),
+        }
+    }
 }
 
 impl Character {
@@ -63,7 +152,7 @@ impl Character {
         ServerPacket::LoginCharacterDetails {
             name: self.name.clone(),
             pledge: self.pledge.clone(),
-            ctype: self.class,
+            ctype: self.class as u8,
             gender: self.gender,
             alignment: self.alignment,
             hp: self.hp_max,
@@ -79,11 +168,12 @@ impl Character {
         }
     }
 
+    /// Get a new character details packet, used when creating new characters
     pub fn get_new_char_details_packet(&self) -> ServerPacket {
         ServerPacket::NewCharacterDetails {
             name: self.name().to_string(),
             pledge: self.pledge.to_string(),
-            class: self.class,
+            class: self.class as u8,
             gender: self.gender,
             alignment: self.alignment,
             hp: self.hp_max,
@@ -137,44 +227,12 @@ impl Character {
         Ok(asdf)
     }
 
-    /// Calculate initial mp for a character with class and wisdom
-    fn calc_initial_mp(class: u8, wisdom: u8) -> u16 {
-        match class {
-            0 => {
-                match wisdom {
-                    11 => 2,
-                    12..=15 => 3,
-                    16..=18 => 4,
-                    _ => 2,
-                }
-            }
-            1 => {
-                2
-            }
-            2 => {
-                3
-            }
-            3 => {
-                4
-            }
-            4 => {
-                5
-            }
-            5 => {
-                6
-            }
-            6 => {
-                7
-            }
-            _ => panic!("Invalid class"),
-        }
-    }
-
     /// Roll a new character
     pub fn new(account_name: String, id: u32, name: String, class: u8, gender: u8, str: u8, dex: u8, con: u8, wis: u8, cha: u8, int: u8) -> Option<Self> {
         if !Self::valid_name(&name) {
             return None;
         }
+        let class : Class = std::convert::TryInto::try_into(class).ok()?;
         Some(Self {
             account_name,
             name,
@@ -184,17 +242,8 @@ impl Character {
             level: 1,
             class,
             gender,
-            hp_max: match class {
-                0 => 14,
-                1 => 16,
-                2 => 15,
-                3 => 12,
-                4 => 12,
-                5 => 15,
-                6 => 15,
-                _ => panic!(),
-            },
-            mp_max: Self::calc_initial_mp(class, wis),
+            hp_max: class.initial_hp(con),
+            mp_max: class.initial_mp(wis),
             ac: 10,
             strength: str,
             dexterity: dex,
@@ -215,7 +264,7 @@ impl Into<Params> for &Character {
         p.push(self.level.into());
         p.push(self.hp_max.into());
         p.push(self.mp_max.into());
-        p.push(self.class.into());
+        p.push((self.class as u8).into());
         p.push(self.gender.into());
         p.push(self.ac.into());
         p.push(self.strength.into());
@@ -232,6 +281,7 @@ impl mysql_async::prelude::FromRow for Character {
     fn from_row_opt(row: mysql_async::Row) -> Result<Self, mysql_async::FromRowError>
         where
             Self: Sized {
+        let c: u8 = row.get(6).ok_or(mysql_async::FromRowError(row.clone()))?;
         Ok(Self {
             account_name: row.get(0).ok_or(mysql_async::FromRowError(row.clone()))?,
             name: row.get(1).ok_or(mysql_async::FromRowError(row.clone()))?,
@@ -239,7 +289,7 @@ impl mysql_async::prelude::FromRow for Character {
             alignment: row.get(3).ok_or(mysql_async::FromRowError(row.clone()))?,
             level: row.get(4).ok_or(mysql_async::FromRowError(row.clone()))?,
             pledge: row.get(5).ok_or(mysql_async::FromRowError(row.clone()))?,
-            class: row.get(6).ok_or(mysql_async::FromRowError(row.clone()))?,
+            class: c.try_into().map_err(|_| mysql_async::FromRowError(row.clone()))?,
             gender: row.get(7).ok_or(mysql_async::FromRowError(row.clone()))?,
             hp_max: row.get(8).ok_or(mysql_async::FromRowError(row.clone()))?,
             mp_max: row.get(9).ok_or(mysql_async::FromRowError(row.clone()))?,
