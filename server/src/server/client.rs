@@ -448,6 +448,7 @@ impl Client {
                 self.packet_writer.send_packet(response).await?;
                 let mut mysql = self.world.get_mysql_conn().await?;
                 let mut c = self.chars[c].get_full_details(&mut mysql).await?;
+                self.world.add_player(c.clone());
                 c.main_character();
                 response = c.details_packet().build();
                 self.packet_writer.send_packet(response).await?;

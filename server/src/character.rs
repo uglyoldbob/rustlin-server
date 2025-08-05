@@ -4,7 +4,7 @@ use common::packet::ServerPacket;
 use mysql_async::{prelude::Queryable, Params};
 
 /// Represents a complete playable character in the game
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct FullCharacter {
     /// The account name for the character
     account_name: String,
@@ -44,7 +44,23 @@ pub struct FullCharacter {
     details: ExtraCharacterDetails,
 }
 
+
+impl crate::world::object::ObjectTrait for FullCharacter {
+    async fn get_location(&self) -> crate::character::Location {
+        self.details.location
+    }
+
+    async fn id(&self) -> u32 {
+        self.id
+    }
+}
+
 impl FullCharacter {
+    /// Get the location of the character
+    pub fn location_ref(&self) -> &Location {
+        &self.details.location
+    }
+
     /// Get the details packet for sending to the user
     pub fn details_packet(&self) -> ServerPacket {
         ServerPacket::CharacterDetails {
@@ -114,11 +130,11 @@ impl FullCharacter {
 #[derive(Copy, Clone, Debug)]
 pub struct Location {
     /// The x coordinate
-    x: u16,
+    pub x: u16,
     /// The y coordinate
-    y: u16,
+    pub y: u16,
     /// The map id
-    map: u16,
+    pub map: u16,
 }
 
 /// The extra details for a character to go from Character to FullCharacter

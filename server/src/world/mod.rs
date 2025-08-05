@@ -3,11 +3,13 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+pub mod object;
+
 use common::packet::{ServerPacket, ServerPacketSender};
 
 use crate::{
     character::Character, server::ClientError,
-    server_message::ServerMessage,
+    server_message::ServerMessage, world::object::ObjectTrait,
 };
 
 /// Represents a single map of the world
@@ -53,6 +55,20 @@ pub struct Map {
     skill_usage: bool,
 }
 
+/// Represents the dynamic information of a map
+pub struct MapInfo {
+    objects: HashMap<u32, object::Object>,
+}
+
+impl MapInfo {
+    /// Construct a new map info object
+    pub fn new() -> Self {
+        Self {
+            objects: HashMap::new(),
+        }
+    }
+}
+
 impl mysql_async::prelude::FromRow for Map {
     fn from_row_opt(row: mysql_async::Row) -> Result<Self, mysql_async::FromRowError>
     where
@@ -94,6 +110,8 @@ pub struct World {
     mysql: mysql_async::Pool,
     /// maps of the world
     maps: Arc<Mutex<HashMap<u16, Map>>>,
+    /// dynamic information for all maps
+    map_info: Arc<Mutex<HashMap<u16, MapInfo>>>,
 }
 
 impl World {
@@ -108,6 +126,18 @@ impl World {
             global_tx,
             mysql,
             maps: Arc::new(Mutex::new(HashMap::new())),
+            map_info: Arc::new(Mutex::new(HashMap::new())),
+        }
+    }
+
+    /// Add a player to the world
+    pub async fn add_player(&self, p: crate::character::FullCharacter) {
+        let location = p.location_ref();
+        let mut m = self.map_info.lock().unwrap();
+        let m2 = m.get_mut(&location.map);
+        if let Some(map) = m2 {
+            let obj: object::Object = p.into();
+            map.objects.insert(obj.id().await, obj);
         }
     }
 
@@ -122,9 +152,15 @@ impl World {
             .exec_map(s, (), |a: Map| a)
             .await
             .map_err(|e| e.to_string())?;
+        let mut hdata = self.map_info.lock().unwrap();
         hmaps.clear();
         for m in maps {
             println!("Found map data {:?}", m);
+            if !hdata.contains_key(&m.id) {
+                let mut map_info = MapInfo::new();
+                map_info.objects.insert(3, 42.into());
+                hdata.insert(m.id, map_info);
+            }
             hmaps.insert(m.id, m);
         }
         Ok(())
