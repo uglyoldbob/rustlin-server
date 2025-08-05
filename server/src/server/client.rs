@@ -238,7 +238,7 @@ impl Client {
     }
 
     async fn after_news(&mut self) -> Result<(), ClientError> {
-        let mut response = ServerPacket::NumberCharacters(self.chars.len() as u8, 8).build();
+        let response = ServerPacket::NumberCharacters(self.chars.len() as u8, 8).build();
         self.packet_writer.send_packet(response).await?;
 
         for c in &self.chars {
@@ -272,6 +272,16 @@ impl Client {
             log::info!("Characters are {:?}", self.chars);
         }
         Ok(())
+    }
+
+    /// find a character by name, returning the character index
+    pub fn find_char(&self, name: &str) -> Option<usize> {
+        for (i, c) in self.chars.iter().enumerate() {
+            if c.name() == name {
+                return Some(i);
+            }
+        }
+        None
     }
 
     /// Process a single packet from the game client
@@ -409,34 +419,16 @@ impl Client {
             }
             ClientPacket::CharacterSelect { name } => {
                 log::info!("login with {}", name);
+                let c = self
+                    .find_char(&name)
+                    .ok_or(ClientError::InvalidCharSelection)?;
+
                 let mut response = ServerPacket::StartGame(0).build();
                 self.packet_writer.send_packet(response).await?;
-
-                response = ServerPacket::CharacterDetails {
-                    id: 1,
-                    level: 5,
-                    xp: 1234,
-                    strength: 12,
-                    dexterity: 12,
-                    constitution: 13,
-                    wisdom: 14,
-                    charisma: 15,
-                    intelligence: 16,
-                    curr_hp: 123,
-                    max_hp: 985,
-                    curr_mp: 34,
-                    max_mp: 345,
-                    time: 1,
-                    ac: -13,
-                    food: 1.0,
-                    weight: 0.5,
-                    alignment: 32675,
-                    fire_resist: 0,
-                    water_resist: 1,
-                    wind_resist: 2,
-                    earth_resist: 3,
-                }
-                .build();
+                let mut mysql = self.world.get_mysql_conn().await?;
+                let mut c = self.chars[c].get_full_details(&mut mysql).await?;
+                c.main_character();
+                response = c.details_packet().build();
                 self.packet_writer.send_packet(response).await?;
 
                 self.packet_writer

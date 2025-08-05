@@ -24,6 +24,8 @@ pub enum ClientError {
     ErrorSendingClientMessage(tokio::sync::mpsc::error::SendError<ClientMessage>),
     /// A mysql error occurred
     MysqlError(mysql_async::Error),
+    /// The user selected an invalid character
+    InvalidCharSelection,
 }
 
 impl From<PacketError> for ClientError {

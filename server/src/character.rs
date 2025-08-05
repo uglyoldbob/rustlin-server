@@ -3,6 +3,127 @@ use std::convert::TryInto;
 use common::packet::ServerPacket;
 use mysql_async::{prelude::Queryable, Params};
 
+/// Represents a complete playable character in the game
+#[derive(Debug)]
+pub struct FullCharacter {
+    /// The account name for the character
+    account_name: String,
+    /// The name of the character
+    name: String,
+    /// The id of the character in the database
+    id: u32,
+    /// The alignment of the character
+    alignment: i16,
+    /// The level of the character
+    level: u8,
+    /// The pledge name of the character (empty string if no pledge)
+    pledge: String,
+    /// The class of character
+    class: Class,
+    /// The gender
+    gender: u8,
+    /// The current max hp
+    hp_max: u16,
+    /// The current mp max
+    mp_max: u16,
+    /// Current armor class
+    ac: i8,
+    /// Character strength
+    strength: u8,
+    /// Character dexterity
+    dexterity: u8,
+    /// Character constitution
+    constitution: u8,
+    /// Character wisdom
+    wisdom: u8,
+    /// Character charisma
+    charisma: u8,
+    /// Character intelligence
+    intelligence: u8,
+    /// Extra details
+    details: ExtraCharacterDetails,
+}
+
+impl FullCharacter {
+    /// Get the details packet for sending to the user
+    pub fn details_packet(&self) -> ServerPacket {
+        ServerPacket::CharacterDetails {
+            id: self.id,
+            level: self.level,
+            xp: self.details.exp,
+            strength: self.strength,
+            dexterity: self.strength,
+            constitution: self.constitution,
+            wisdom: self.wisdom,
+            charisma: self.charisma,
+            intelligence: self.intelligence,
+            curr_hp: self.details.curr_hp,
+            max_hp: self.hp_max,
+            curr_mp: self.details.curr_mp,
+            max_mp: self.mp_max,
+            time: 1,
+            ac: self.ac,
+            food: 1.0,
+            weight: 0.5,
+            alignment: self.alignment,
+            fire_resist: self.details.fire_resist,
+            water_resist: self.details.water_resist,
+            wind_resist: self.details.wind_resist,
+            earth_resist: self.details.earth_resist,
+        }
+    }
+
+    /// Set this character as the main character
+    pub fn main_character(&mut self) {
+        self.id = 1;
+    }
+}
+
+/// The extra details for a character to go from Character to FullCharacter
+#[derive(Copy, Clone, Debug)]
+pub struct ExtraCharacterDetails {
+    /// Character experience
+    exp: u32,
+    /// Current hitpoint amount
+    curr_hp: u16,
+    /// Current mana point amount
+    curr_mp: u16,
+    /// time?
+    time: u32,
+    /// Food level
+    food: u8,
+    /// Amount of weight the player is carrying
+    weight: u8,
+    /// Fire resistance
+    fire_resist: u8,
+    /// Water resistance
+    water_resist: u8,
+    /// Wind resistance
+    wind_resist: u8,
+    /// Earth resist
+    earth_resist: u8,
+}
+
+impl mysql_async::prelude::FromRow for ExtraCharacterDetails {
+    fn from_row_opt(row: mysql_async::Row) -> Result<Self, mysql_async::FromRowError>
+    where
+        Self: Sized,
+    {
+        Ok(Self {
+            exp: row.get(0).ok_or(mysql_async::FromRowError(row.clone()))?,
+            curr_hp: row.get(1).ok_or(mysql_async::FromRowError(row.clone()))?,
+            curr_mp: row.get(2).ok_or(mysql_async::FromRowError(row.clone()))?,
+            time: row.get(3).ok_or(mysql_async::FromRowError(row.clone()))?,
+            food: row.get(4).ok_or(mysql_async::FromRowError(row.clone()))?,
+            weight: row.get(5).ok_or(mysql_async::FromRowError(row.clone()))?,
+            fire_resist: row.get(6).ok_or(mysql_async::FromRowError(row.clone()))?,
+            water_resist: row.get(7).ok_or(mysql_async::FromRowError(row.clone()))?,
+            wind_resist: row.get(8).ok_or(mysql_async::FromRowError(row.clone()))?,
+            earth_resist: row.get(9).ok_or(mysql_async::FromRowError(row.clone()))?,
+        })
+    }
+}
+
 /// Represents a playable character in the game
 #[derive(Debug)]
 pub struct Character {
@@ -64,7 +185,7 @@ enum Class {
 
 impl Class {
     /// Get the initial hp for classes, maybe this should depend on initial constitution?
-    fn initial_hp(&self, con: u8) -> u16 {
+    fn initial_hp(&self, _con: u8) -> u16 {
         match self {
             Class::Royal => 14,
             Class::Knight => 16,
@@ -187,6 +308,49 @@ impl Character {
             charisma: self.charisma,
             intelligence: self.intelligence,
         }
+    }
+
+    /// Retrieve all gameplay details of the character
+    pub async fn get_full_details(
+        &self,
+        mysql: &mut mysql_async::Conn,
+    ) -> Result<FullCharacter, crate::server::ClientError> {
+        use mysql_async::prelude::Queryable;
+        let query = "SELECT Exp, CurHp, CurMp, 1, Food, 32, 1, 2, 3, 4 from characters WHERE account_name=? and char_name=?";
+        log::info!(
+            "Checking for account {} -  player {}",
+            self.account_name,
+            self.name
+        );
+        let s = mysql.prep(query).await?;
+        let details = mysql
+            .exec_map(
+                s,
+                (&self.account_name, &self.name),
+                |a: ExtraCharacterDetails| a,
+            )
+            .await?;
+        let details = details[0];
+        Ok(FullCharacter {
+            account_name: self.account_name.clone(),
+            name: self.name.clone(),
+            id: self.id,
+            alignment: self.alignment,
+            level: self.level,
+            pledge: self.pledge.clone(),
+            class: self.class,
+            gender: self.gender,
+            hp_max: self.hp_max,
+            mp_max: self.mp_max,
+            ac: self.ac,
+            strength: self.strength,
+            dexterity: self.dexterity,
+            constitution: self.constitution,
+            wisdom: self.wisdom,
+            charisma: self.charisma,
+            intelligence: self.intelligence,
+            details,
+        })
     }
 
     /// Save a new character into the database, updating the id of the character to a new valid id
