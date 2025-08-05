@@ -56,6 +56,7 @@ pub struct Map {
 }
 
 /// Represents the dynamic information of a map
+#[derive(Debug)]
 pub struct MapInfo {
     objects: HashMap<u32, object::Object>,
 }
@@ -132,12 +133,14 @@ impl World {
 
     /// Add a player to the world
     pub async fn add_player(&self, p: crate::character::FullCharacter) {
-        let location = p.location_ref();
+        let location = p.location_ref().clone();
+        let obj: object::Object = p.into();
+        let id = obj.id().await;
         let mut m = self.map_info.lock().unwrap();
         let m2 = m.get_mut(&location.map);
         if let Some(map) = m2 {
-            let obj: object::Object = p.into();
-            map.objects.insert(obj.id().await, obj);
+            map.objects.insert(id, obj);
+            log::info!("The objects on the map are {:?}", map);
         }
     }
 

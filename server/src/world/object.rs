@@ -47,6 +47,7 @@ impl ObjectTrait for u32 {
 
 /// The things that an object can be
 #[enum_dispatch::enum_dispatch(ObjectTrait)]
+#[derive(Debug)]
 pub enum Object {
     Test(u32),
     Player(FullCharacter),
