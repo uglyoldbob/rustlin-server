@@ -6,7 +6,7 @@ use tokio::net::TcpListener;
 use crate::server_message::ServerMessage;
 use crate::ClientMessage;
 
-mod client;
+pub mod client;
 use crate::server::client::*;
 
 use common::packet::*;

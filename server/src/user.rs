@@ -91,7 +91,10 @@ impl UserAccount {
     }
 
     /// Retrieve characters for user account from database
-    pub async fn retrieve_chars(&self, mysql: &mut mysql_async::Conn) -> Result<Vec<crate::character::Character>, crate::server::ClientError> {
+    pub async fn retrieve_chars(
+        &self,
+        mysql: &mut mysql_async::Conn,
+    ) -> Result<Vec<crate::character::Character>, crate::server::ClientError> {
         crate::character::Character::retrieve_chars(&self.name, mysql).await
     }
 

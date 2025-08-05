@@ -1,7 +1,7 @@
 use std::convert::TryInto;
 
 use common::packet::ServerPacket;
-use mysql_async::Params;
+use mysql_async::{prelude::Queryable, Params};
 
 /// Represents a playable character in the game
 #[derive(Debug)]
@@ -47,19 +47,19 @@ pub struct Character {
 #[derive(Clone, Copy, Debug)]
 enum Class {
     // Prince/princess
-    Royal=0,
+    Royal = 0,
     /// Knight
-    Knight=1,
+    Knight = 1,
     /// Elf
-    Elf=2,
+    Elf = 2,
     /// Wizard
-    Wizard=3,
+    Wizard = 3,
     /// Dark Elf
-    DarkElf=4,
+    DarkElf = 4,
     /// Dragon Knight
-    DragonKnight=5,
+    DragonKnight = 5,
     /// Illusionist
-    Illusionist=6,
+    Illusionist = 6,
 }
 
 impl Class {
@@ -87,28 +87,28 @@ impl Class {
             Class::Knight => match wisdom {
                 12..=13 => 2,
                 _ => 1,
-            }
+            },
             Class::Elf => match wisdom {
                 16..=18 => 6,
                 _ => 4,
-            }
+            },
             Class::Wizard => match wisdom {
                 16..=18 => 8,
                 _ => 6,
-            }
+            },
             Class::DarkElf => match wisdom {
                 12..=15 => 4,
                 16..=18 => 6,
                 _ => 3,
-            }
+            },
             Class::DragonKnight => match wisdom {
                 16..=18 => 6,
                 _ => 4,
-            }
+            },
             Class::Illusionist => match wisdom {
                 16..=18 => 6,
                 _ => 4,
-            }
+            },
         }
     }
 }
@@ -189,50 +189,70 @@ impl Character {
         }
     }
 
-    /// Save a new character into the database
-    pub async fn save_new_to_db(&self, mysql: &mut mysql_async::Conn) -> Result<(), crate::server::ClientError> {
+    /// Save a new character into the database, updating the id of the character to a new valid id
+    pub async fn save_new_to_db(
+        &mut self,
+        mysql: &mut mysql_async::Conn,
+    ) -> Result<(), crate::server::ClientError> {
         use mysql_async::prelude::Queryable;
-        let query = "INSERT INTO characters SET account_name=?,objid=?,char_name=?,level=?,MaxHp=?,MaxMp=?,Class=?,Sex=?,Ac=?,Str=?,Dex=?,Con=?,Wis=?,Cha=?,Intel=?";
-        let tq = mysql.exec_drop(
-            query,
-            self,
-        );
-        let err = tq.await;
-        match err {
-            Err(e) => {
-                log::info!("error inserting character {}", e);
-            }
-            _ => {
-                log::info!("chracter insertion is fine");
-            }
+        let mut t = mysql.start_transaction(mysql_async::TxOpts::new()).await?;
+        let id = crate::world::World::get_new_id(&mut t).await?;
+        if let Some(id) = id {
+            self.id = id;
+        } else {
+            self.id = 2;
         }
+        let query = "INSERT INTO characters SET account_name=?,objid=?,char_name=?,level=?,MaxHp=?,MaxMp=?,Class=?,Sex=?,Ac=?,Str=?,Dex=?,Con=?,Wis=?,Cha=?,Intel=?";
+        t.exec_drop(query, self).await?;
+        t.commit().await?;
+        Ok(())
+    }
+
+    /// Delete the character from the database
+    pub async fn delete_char(
+        &self,
+        mysql: &mut mysql_async::Conn,
+    ) -> Result<(), mysql_async::Error> {
+        let query = "DELETE FROM characters WHERE account_name=? AND char_name=?";
+        mysql
+            .exec_drop(query, (self.account_name.clone(), self.name.clone()))
+            .await?;
         Ok(())
     }
 
     /// Retrieve characters for user account from database
-    pub async fn retrieve_chars(account_name: &String, mysql: &mut mysql_async::Conn) -> Result<Vec<crate::character::Character>, crate::server::ClientError> {
+    pub async fn retrieve_chars(
+        account_name: &String,
+        mysql: &mut mysql_async::Conn,
+    ) -> Result<Vec<crate::character::Character>, crate::server::ClientError> {
         use mysql_async::prelude::Queryable;
         let query = crate::character::Character::QUERY;
         log::info!("Checking for account {}", account_name);
         let s = mysql.prep(query).await?;
-        let asdf = mysql.exec_map(
-            s,
-            (
-                account_name.clone(),
-            ),
-            |a: Character| {
-                a
-            },
-        ).await?;
+        let asdf = mysql
+            .exec_map(s, (account_name.clone(),), |a: Character| a)
+            .await?;
         Ok(asdf)
     }
 
     /// Roll a new character
-    pub fn new(account_name: String, id: u32, name: String, class: u8, gender: u8, str: u8, dex: u8, con: u8, wis: u8, cha: u8, int: u8) -> Option<Self> {
+    pub fn new(
+        account_name: String,
+        id: u32,
+        name: String,
+        class: u8,
+        gender: u8,
+        str: u8,
+        dex: u8,
+        con: u8,
+        wis: u8,
+        cha: u8,
+        int: u8,
+    ) -> Option<Self> {
         if !Self::valid_name(&name) {
             return None;
         }
-        let class : Class = std::convert::TryInto::try_into(class).ok()?;
+        let class: Class = std::convert::TryInto::try_into(class).ok()?;
         Some(Self {
             account_name,
             name,
@@ -255,7 +275,7 @@ impl Character {
     }
 }
 
-impl Into<Params> for &Character {
+impl Into<Params> for &mut Character {
     fn into(self) -> Params {
         let mut p = Vec::new();
         p.push(self.account_name.clone().into());
@@ -279,8 +299,9 @@ impl Into<Params> for &Character {
 
 impl mysql_async::prelude::FromRow for Character {
     fn from_row_opt(row: mysql_async::Row) -> Result<Self, mysql_async::FromRowError>
-        where
-            Self: Sized {
+    where
+        Self: Sized,
+    {
         let c: u8 = row.get(6).ok_or(mysql_async::FromRowError(row.clone()))?;
         Ok(Self {
             account_name: row.get(0).ok_or(mysql_async::FromRowError(row.clone()))?,
@@ -289,7 +310,9 @@ impl mysql_async::prelude::FromRow for Character {
             alignment: row.get(3).ok_or(mysql_async::FromRowError(row.clone()))?,
             level: row.get(4).ok_or(mysql_async::FromRowError(row.clone()))?,
             pledge: row.get(5).ok_or(mysql_async::FromRowError(row.clone()))?,
-            class: c.try_into().map_err(|_| mysql_async::FromRowError(row.clone()))?,
+            class: c
+                .try_into()
+                .map_err(|_| mysql_async::FromRowError(row.clone()))?,
             gender: row.get(7).ok_or(mysql_async::FromRowError(row.clone()))?,
             hp_max: row.get(8).ok_or(mysql_async::FromRowError(row.clone()))?,
             mp_max: row.get(9).ok_or(mysql_async::FromRowError(row.clone()))?,

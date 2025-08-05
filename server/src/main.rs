@@ -19,8 +19,8 @@ mod config;
 use config::*;
 mod user;
 mod world;
-use crate::clients::ClientList;
 use crate::character::Character;
+use crate::clients::ClientList;
 
 #[tokio::main]
 async fn main() -> Result<(), String> {

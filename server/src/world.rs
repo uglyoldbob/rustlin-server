@@ -4,8 +4,12 @@ use std::{
 };
 
 use common::packet::{ServerPacket, ServerPacketSender};
+use mysql_async::prelude::Queryable;
 
-use crate::{client_message::ClientMessage, character::Character, server::ClientError, server_message::ServerMessage};
+use crate::{
+    character::Character, client_message::ClientMessage, server::ClientError,
+    server_message::ServerMessage,
+};
 
 /// Represents the world for a server
 pub struct World {
@@ -21,13 +25,46 @@ pub struct World {
 
 impl World {
     /// Construct a new server world
-    pub fn new(global_tx: tokio::sync::broadcast::Sender<crate::ServerMessage>, mysql: mysql_async::Pool,) -> Self {
+    pub fn new(
+        global_tx: tokio::sync::broadcast::Sender<crate::ServerMessage>,
+        mysql: mysql_async::Pool,
+    ) -> Self {
         Self {
             users: Arc::new(Mutex::new(HashMap::new())),
             client_ids: Arc::new(Mutex::new(crate::ClientList::new())),
             global_tx,
             mysql,
         }
+    }
+
+    /// Insert a character id into the world
+    pub async fn insert_id(&self, id: u32, account: String) -> Result<(), ClientError> {
+        let mut u = self.users.lock().unwrap();
+        u.insert(id, account);
+        Ok(())
+    }
+
+    pub async fn lookup_id(&self, id: u32) -> Option<String> {
+        let u = self.users.lock().unwrap();
+        u.get(&id).map(|e| e.to_owned())
+    }
+
+    /// Get a new object id as part of a transaction.
+    /// This prevents atomicity problems where two threads can get the same new id, and try to insert the same id into the database.
+    /// # Arguments:
+    /// * t - The transaction object
+    pub async fn get_new_id(
+        t: &mut mysql_async::Transaction<'_>,
+    ) -> Result<Option<u32>, mysql_async::Error> {
+        use mysql_async::prelude::Queryable;
+        let query = "select max(id)+1 as nextid from (select id from character_items union all select id from character_teleport union all select id from character_warehouse union all select id from character_elf_warehouse union all select objid as id from characters union all select clan_id as id from clan_data union all select id from clan_warehouse union all select objid as id from pets) t";
+        let a: Vec<u32> = t.exec(query, ()).await?;
+        let r = if let Some(a) = a.first() {
+            Ok(Some(*a))
+        } else {
+            Ok(None)
+        };
+        r
     }
 
     /// Get a connection to the database
@@ -46,7 +83,11 @@ impl World {
     }
 
     /// Process a single message for the server.
-    pub async fn handle_server_message(&self, p: ServerMessage, packet_writer: &mut ServerPacketSender) -> Result<u8, ClientError> {
+    pub async fn handle_server_message(
+        &self,
+        p: ServerMessage,
+        packet_writer: &mut ServerPacketSender,
+    ) -> Result<u8, ClientError> {
         match p {
             ServerMessage::Disconnect => {
                 packet_writer
@@ -177,83 +218,9 @@ impl World {
     }
 
     /// Save a new character into the database
-    pub async fn save_new_character(&self, c: &Character) -> Result<(), ClientError> {
+    pub async fn save_new_character(&self, c: &mut Character) -> Result<(), ClientError> {
         let mut conn = self.get_mysql_conn().await?;
         c.save_new_to_db(&mut conn).await
-    }
-
-    pub async fn send_message(&self, message: crate::client_message::ClientMessage, packet_writer: &mut ServerPacketSender) -> Result<(), crate::server::ClientError> {
-        match message {
-            ClientMessage::LoggedIn(id, account) => {
-                let mut u = self.users.lock().unwrap();
-                u.insert(id, account);
-            }
-            ClientMessage::NewCharacter {
-                id,
-                name,
-                class,
-                gender,
-                strength,
-                dexterity,
-                constitution,
-                wisdom,
-                charisma,
-                intelligence,
-            } => {
-                let a = {
-                    let u = self.users.lock().unwrap();
-                    u.get(&id).map(|e| e.to_owned())
-                };
-                if let Some(account) = a {
-                    log::info!("{} wants to make a new character {}", account, name);
-                    //TODO ensure player name does not already exist
-                    //TODO validate that all stats are legitimately possible
-                    //TODO validate count of characters for account
-    
-                    if let Some(c) = Character::new(account, id, name, class, gender, strength, dexterity, constitution, wisdom, charisma, intelligence) {
-                        self.save_new_character(&c).await?;
-                        packet_writer.send_packet(ServerPacket::CharacterCreationStatus(0).build()).await?;
-                        packet_writer.send_packet(c.get_new_char_details_packet().build()).await?;
-                    } else {
-                        packet_writer.send_packet(ServerPacket::CharacterCreationStatus(1).build()).await?;
-                    }
-                }
-            }
-            ClientMessage::DeleteCharacter { id, name } => {
-                log::info!("{} wants to delete {}", id, name);
-            }
-            ClientMessage::RegularChat { id: _, msg } => {
-                //TODO limit based on distance and map
-                let amsg = format!("[{}] {}", "unknown", msg);
-                let _ = self.global_tx.send(ServerMessage::RegularChat { id: 0, msg: amsg });
-            }
-            ClientMessage::YellChat { id: _, msg, x, y } => {
-                //TODO limit based on distance and map
-                let amsg = format!("[{}] {}", "unknown", msg);
-                let _ = self.global_tx.send(ServerMessage::YellChat {
-                    id: 0,
-                    msg: amsg,
-                    x,
-                    y,
-                });
-            }
-            ClientMessage::GlobalChat(_id, msg) => {
-                let amsg = format!("[{}] {}", "unknown", msg);
-                let _ = self.global_tx.send(ServerMessage::GlobalChat(amsg));
-            }
-            ClientMessage::PledgeChat(_id, msg) => {
-                let amsg = format!("[{}] {}", "unknown", msg);
-                let _ = self.global_tx.send(ServerMessage::PledgeChat(amsg));
-            }
-            ClientMessage::PartyChat(_id, msg) => {
-                let amsg = format!("[{}] {}", "unknown", msg);
-                let _ = self.global_tx.send(ServerMessage::PartyChat(amsg));
-            }
-            ClientMessage::WhisperChat(_id, _person, msg) => {
-                let _ = self.global_tx.send(ServerMessage::WhisperChat("unknown".to_string(), msg));
-            }
-        }
-        Ok(())
     }
 
     /// Unregister a user

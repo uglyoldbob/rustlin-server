@@ -45,10 +45,124 @@ impl Client {
         }
     }
 
-    /// Fetch all characters for the client
-    async fn fetch_chars(&self) -> Result<Vec<crate::Character>, ClientError> {
-        let mut mysql = self.world.get_mysql_conn().await?;
-        Ok(Vec::new())
+    pub async fn send_message(
+        &mut self,
+        message: crate::client_message::ClientMessage,
+    ) -> Result<(), crate::server::ClientError> {
+        match message {
+            ClientMessage::LoggedIn(id, account) => {
+                self.world.insert_id(id, account).await?;
+            }
+            ClientMessage::NewCharacter {
+                id,
+                name,
+                class,
+                gender,
+                strength,
+                dexterity,
+                constitution,
+                wisdom,
+                charisma,
+                intelligence,
+            } => {
+                let a = self.world.lookup_id(id).await;
+                if let Some(account) = a {
+                    log::info!("{} wants to make a new character {}", account, name);
+                    //TODO validate count of characters for account
+                    //TODO validate that all stats are legitimately possible
+
+                    if let Some(mut c) = crate::character::Character::new(
+                        account,
+                        id,
+                        name,
+                        class,
+                        gender,
+                        strength,
+                        dexterity,
+                        constitution,
+                        wisdom,
+                        charisma,
+                        intelligence,
+                    ) {
+                        self.world.save_new_character(&mut c).await?;
+                        self.send_packet(ServerPacket::CharacterCreationStatus(0).build())
+                            .await?;
+                        self.send_packet(c.get_new_char_details_packet().build())
+                            .await?;
+                    } else {
+                        self.send_packet(ServerPacket::CharacterCreationStatus(1).build())
+                            .await?;
+                    }
+                }
+            }
+            ClientMessage::DeleteCharacter { id, name } => {
+                log::info!("{} wants to delete {}", id, name);
+                let mut m = self.world.get_mysql_conn().await?;
+                self.delete_char(&name, &mut m).await?;
+            }
+            ClientMessage::RegularChat { id: _, msg } => {
+                //TODO limit based on distance and map
+                let amsg = format!("[{}] {}", "unknown", msg);
+                let _ = self
+                    .world
+                    .global_tx
+                    .send(ServerMessage::RegularChat { id: 0, msg: amsg });
+            }
+            ClientMessage::YellChat { id: _, msg, x, y } => {
+                //TODO limit based on distance and map
+                let amsg = format!("[{}] {}", "unknown", msg);
+                let _ = self.world.global_tx.send(ServerMessage::YellChat {
+                    id: 0,
+                    msg: amsg,
+                    x,
+                    y,
+                });
+            }
+            ClientMessage::GlobalChat(_id, msg) => {
+                let amsg = format!("[{}] {}", "unknown", msg);
+                let _ = self.world.global_tx.send(ServerMessage::GlobalChat(amsg));
+            }
+            ClientMessage::PledgeChat(_id, msg) => {
+                let amsg = format!("[{}] {}", "unknown", msg);
+                let _ = self.world.global_tx.send(ServerMessage::PledgeChat(amsg));
+            }
+            ClientMessage::PartyChat(_id, msg) => {
+                let amsg = format!("[{}] {}", "unknown", msg);
+                let _ = self.world.global_tx.send(ServerMessage::PartyChat(amsg));
+            }
+            ClientMessage::WhisperChat(_id, _person, msg) => {
+                let _ = self
+                    .world
+                    .global_tx
+                    .send(ServerMessage::WhisperChat("unknown".to_string(), msg));
+            }
+        }
+        Ok(())
+    }
+
+    /// Send a packet to the client
+    pub async fn send_packet(&mut self, data: Packet) -> Result<(), PacketError> {
+        self.packet_writer.send_packet(data).await
+    }
+
+    /// Delete the character with the specified name
+    pub async fn delete_char(
+        &mut self,
+        name: &str,
+        mysql: &mut mysql_async::Conn,
+    ) -> Result<(), mysql_async::Error> {
+        let mut i = None;
+        for (index, c) in self.chars.iter_mut().enumerate() {
+            if c.name() == name {
+                c.delete_char(mysql).await?;
+                i = Some(index);
+                break;
+            }
+        }
+        if let Some(i) = i {
+            self.chars.remove(i);
+        }
+        Ok(())
     }
 
     /// Performs packet testing
@@ -134,7 +248,8 @@ impl Client {
         Ok(())
     }
 
-    async fn login_with_news(&mut self,
+    async fn login_with_news(
+        &mut self,
         config: &std::sync::Arc<crate::ServerConfiguration>,
         username: String,
     ) -> Result<(), ClientError> {
@@ -149,7 +264,7 @@ impl Client {
                 .send_packet(ServerPacket::News(news).build())
                 .await?;
         }
-        self.world.send_message(ClientMessage::LoggedIn(self.id, username), &mut self.packet_writer)
+        self.send_message(ClientMessage::LoggedIn(self.id, username))
             .await?;
         if let Some(account) = &self.account {
             let mut conn = self.world.get_mysql_conn().await?;
@@ -173,7 +288,9 @@ impl Client {
             }
             ClientPacket::Restart => {
                 log::info!("Player restarts");
-                self.packet_writer.send_packet(ServerPacket::BackToCharacterSelect.build()).await?;
+                self.packet_writer
+                    .send_packet(ServerPacket::BackToCharacterSelect.build())
+                    .await?;
             }
             ClientPacket::RemoveFriend(name) => {
                 log::info!("User used the remove friend command with {name}");
@@ -264,28 +381,26 @@ impl Client {
                 charisma,
                 intelligence,
             } => {
-                self.world.send_message(ClientMessage::NewCharacter {
-                        id: self.id,
-                        name,
-                        class,
-                        gender,
-                        strength,
-                        dexterity,
-                        constitution,
-                        wisdom,
-                        charisma,
-                        intelligence,
-                    }, &mut self.packet_writer)
-                    .await?;
+                self.send_message(ClientMessage::NewCharacter {
+                    id: self.id,
+                    name,
+                    class,
+                    gender,
+                    strength,
+                    dexterity,
+                    constitution,
+                    wisdom,
+                    charisma,
+                    intelligence,
+                })
+                .await?;
             }
             ClientPacket::DeleteCharacter(n) => {
-                self
-                    .world
-                    .send_message(ClientMessage::DeleteCharacter {
-                        id: self.id,
-                        name: n,
-                    }, &mut self.packet_writer)
-                    .await?;
+                self.send_message(ClientMessage::DeleteCharacter {
+                    id: self.id,
+                    name: n,
+                })
+                .await?;
                 //TODO determine if character level is 30 or higher
                 //TODO send DeleteCharacterWait if level is 30 or higher
                 self.packet_writer
@@ -380,36 +495,36 @@ impl Client {
                 log::info!("change direction to {}", d);
             }
             ClientPacket::Chat(m) => {
-                self.world.send_message(ClientMessage::RegularChat {
-                        id: self.id,
-                        msg: m,
-                    }, &mut self.packet_writer)
-                    .await?;
+                self.send_message(ClientMessage::RegularChat {
+                    id: self.id,
+                    msg: m,
+                })
+                .await?;
             }
             ClientPacket::YellChat(m) => {
                 //TODO put in the correct coordinates for yelling
-                self.world.send_message(ClientMessage::YellChat {
-                        id: self.id,
-                        msg: m,
-                        x: 32768,
-                        y: 32768,
-                    }, &mut self.packet_writer)
-                    .await?;
+                self.send_message(ClientMessage::YellChat {
+                    id: self.id,
+                    msg: m,
+                    x: 32768,
+                    y: 32768,
+                })
+                .await?;
             }
             ClientPacket::PartyChat(m) => {
-                self.world.send_message(ClientMessage::PartyChat(self.id, m), &mut self.packet_writer)
+                self.send_message(ClientMessage::PartyChat(self.id, m))
                     .await?;
             }
             ClientPacket::PledgeChat(m) => {
-                self.world.send_message(ClientMessage::PledgeChat(self.id, m), &mut self.packet_writer)
+                self.send_message(ClientMessage::PledgeChat(self.id, m))
                     .await?;
             }
             ClientPacket::WhisperChat(n, m) => {
-                self.world.send_message(ClientMessage::WhisperChat(self.id, n, m), &mut self.packet_writer)
+                self.send_message(ClientMessage::WhisperChat(self.id, n, m))
                     .await?;
             }
             ClientPacket::GlobalChat(m) => {
-                self.world.send_message(ClientMessage::GlobalChat(self.id, m), &mut self.packet_writer)
+                self.send_message(ClientMessage::GlobalChat(self.id, m))
                     .await?;
             }
             ClientPacket::CommandChat(m) => {
