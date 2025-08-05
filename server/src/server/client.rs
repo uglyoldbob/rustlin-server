@@ -19,6 +19,8 @@ pub struct Client {
     account: Option<UserAccount>,
     /// The possible characters for the client
     chars: Vec<crate::character::Character>,
+    /// The current character the client is playing with
+    full_char: Option<crate::character::FullCharacter>,
     /// The world object
     world: std::sync::Arc<crate::world::World>,
 }
@@ -40,6 +42,7 @@ impl Client {
             packet_writer,
             account: None,
             chars: Vec::new(),
+            full_char: None,
             id: world.register_user(),
             world,
         }
@@ -102,39 +105,51 @@ impl Client {
             }
             ClientMessage::RegularChat { id: _, msg } => {
                 //TODO limit based on distance and map
-                let amsg = format!("[{}] {}", "unknown", msg);
-                let _ = self
-                    .world
-                    .global_tx
-                    .send(ServerMessage::RegularChat { id: 0, msg: amsg });
+                if let Some(fc) = &self.full_char {
+                    let amsg = format!("[{}] {}", fc.name, msg);
+                    let _ = self
+                        .world
+                        .global_tx
+                        .send(ServerMessage::RegularChat { id: 0, msg: amsg });
+                }
             }
             ClientMessage::YellChat { id: _, msg, x, y } => {
                 //TODO limit based on distance and map
-                let amsg = format!("[{}] {}", "unknown", msg);
-                let _ = self.world.global_tx.send(ServerMessage::YellChat {
-                    id: 0,
-                    msg: amsg,
-                    x,
-                    y,
-                });
+                if let Some(fc) = &self.full_char {
+                    let amsg = format!("[{}] {}", fc.name, msg);
+                    let _ = self.world.global_tx.send(ServerMessage::YellChat {
+                        id: 0,
+                        msg: amsg,
+                        x,
+                        y,
+                    });
+                }
             }
             ClientMessage::GlobalChat(_id, msg) => {
-                let amsg = format!("[{}] {}", "unknown", msg);
-                let _ = self.world.global_tx.send(ServerMessage::GlobalChat(amsg));
+                if let Some(fc) = &self.full_char {
+                    let amsg = format!("[{}] {}", fc.name, msg);
+                    let _ = self.world.global_tx.send(ServerMessage::GlobalChat(amsg));
+                }
             }
             ClientMessage::PledgeChat(_id, msg) => {
-                let amsg = format!("[{}] {}", "unknown", msg);
-                let _ = self.world.global_tx.send(ServerMessage::PledgeChat(amsg));
+                if let Some(fc) = &self.full_char {
+                    let amsg = format!("[{}] {}", fc.name, msg);
+                    let _ = self.world.global_tx.send(ServerMessage::PledgeChat(amsg));
+                }
             }
             ClientMessage::PartyChat(_id, msg) => {
-                let amsg = format!("[{}] {}", "unknown", msg);
-                let _ = self.world.global_tx.send(ServerMessage::PartyChat(amsg));
+                if let Some(fc) = &self.full_char {
+                    let amsg = format!("[{}] {}", fc.name, msg);
+                    let _ = self.world.global_tx.send(ServerMessage::PartyChat(amsg));
+                }
             }
             ClientMessage::WhisperChat(_id, _person, msg) => {
-                let _ = self
-                    .world
-                    .global_tx
-                    .send(ServerMessage::WhisperChat("unknown".to_string(), msg));
+                if let Some(fc) = &self.full_char {
+                    let _ = self
+                        .world
+                        .global_tx
+                        .send(ServerMessage::WhisperChat(fc.name.clone(), msg));
+                }
             }
         }
         Ok(())
@@ -185,37 +200,33 @@ impl Client {
                 )
                 .await?;
         }
-        for j in 0..12 {
-            for i in 0..12 {
-                self.packet_writer
-                    .send_packet(
-                        ServerPacket::PutObject {
-                            x: 33435 + i,
-                            y: 32816 - 2 * j,
-                            id: 2 + 12 * j as u32 + i as u32,
-                            icon: 29,
-                            status: 0,
-                            direction: 1,
-                            light: 7,
-                            speed: 50,
-                            xp: 1235,
-                            alignment: 2767,
-                            name: "steve".to_string(),
-                            title: "".to_string(),
-                            status2: 0,
-                            pledgeid: 0,
-                            pledgename: "".to_string(),
-                            owner_name: "".to_string(),
-                            v1: 0,
-                            hp_bar: 12,
-                            v2: 0,
-                            level: 0,
-                        }
-                        .build(),
-                    )
-                    .await?;
-            }
-        }
+        self.packet_writer
+            .send_packet(
+                ServerPacket::PutObject {
+                    x: 33435,
+                    y: 32816,
+                    id: 2,
+                    icon: 29,
+                    status: 0,
+                    direction: 1,
+                    light: 7,
+                    speed: 50,
+                    xp: 1235,
+                    alignment: -2767,
+                    name: "steve".to_string(),
+                    title: "".to_string(),
+                    status2: 0,
+                    pledgeid: 0,
+                    pledgename: "".to_string(),
+                    owner_name: "".to_string(),
+                    v1: 0,
+                    hp_bar: 12,
+                    v2: 0,
+                    level: 0,
+                }
+                .build(),
+            )
+            .await?;
         Ok(())
     }
 
@@ -298,6 +309,7 @@ impl Client {
             }
             ClientPacket::Restart => {
                 log::info!("Player restarts");
+                self.full_char = None;
                 self.packet_writer
                     .send_packet(ServerPacket::BackToCharacterSelect.build())
                     .await?;
@@ -406,16 +418,23 @@ impl Client {
                 .await?;
             }
             ClientPacket::DeleteCharacter(n) => {
-                self.send_message(ClientMessage::DeleteCharacter {
-                    id: self.id,
-                    name: n,
-                })
-                .await?;
-                //TODO determine if character level is 30 or higher
-                //TODO send DeleteCharacterWait if level is 30 or higher
-                self.packet_writer
-                    .send_packet(ServerPacket::DeleteCharacterOk.build())
-                    .await?;
+                let c = self.find_char(&n);
+                if let Some(c) = c {
+                    let c = &self.chars[c];
+                    if c.needs_delete_waiting() {
+                        //TODO implement the actual delete in a scheduled async task
+                        self.packet_writer.send_packet(ServerPacket::DeleteCharacterWait.build()).await?;       
+                    } else {
+                        self.send_message(ClientMessage::DeleteCharacter {
+                            id: self.id,
+                            name: n,
+                        })
+                        .await?;
+                        self.packet_writer
+                            .send_packet(ServerPacket::DeleteCharacterOk.build())
+                            .await?;
+                    } 
+                }
             }
             ClientPacket::CharacterSelect { name } => {
                 log::info!("login with {}", name);
@@ -432,35 +451,11 @@ impl Client {
                 self.packet_writer.send_packet(response).await?;
 
                 self.packet_writer
-                    .send_packet(ServerPacket::MapId(4, 0).build())
+                    .send_packet(c.get_map_packet().build())
                     .await?;
 
                 self.packet_writer
-                    .send_packet(
-                        ServerPacket::PutObject {
-                            x: 33430,
-                            y: 32815,
-                            id: 1,
-                            icon: 1,
-                            status: 0,
-                            direction: 0,
-                            light: 5,
-                            speed: 50,
-                            xp: 1234,
-                            alignment: 32767,
-                            name: "testing".to_string(),
-                            title: "i am groot".to_string(),
-                            status2: 0,
-                            pledgeid: 0,
-                            pledgename: "avengers".to_string(),
-                            owner_name: "".to_string(),
-                            v1: 0,
-                            hp_bar: 100,
-                            v2: 0,
-                            level: 0,
-                        }
-                        .build(),
-                    )
+                    .send_packet(c.get_object_packet().build())
                     .await?;
 
                 self.packet_writer
@@ -470,6 +465,8 @@ impl Client {
                 self.packet_writer
                     .send_packet(ServerPacket::Weather(0).build())
                     .await?;
+
+                self.full_char = Some(c);
 
                 //TODO send owncharstatus packet
                 self.test1().await?;

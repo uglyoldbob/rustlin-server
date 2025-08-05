@@ -168,7 +168,7 @@ pub enum ServerPacket {
         light: u8,
         speed: u8,
         xp: u32,
-        alignment: u16,
+        alignment: i16,
         name: String,
         title: String,
         status2: u8,
@@ -572,7 +572,7 @@ impl ServerPacket {
                     .add_u8(light)
                     .add_u8(speed)
                     .add_u32(xp)
-                    .add_u16(alignment)
+                    .add_i16(alignment)
                     .add_string(name)
                     .add_string(title)
                     .add_u8(status2)

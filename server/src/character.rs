@@ -9,7 +9,7 @@ pub struct FullCharacter {
     /// The account name for the character
     account_name: String,
     /// The name of the character
-    name: String,
+    pub name: String,
     /// The id of the character in the database
     id: u32,
     /// The alignment of the character
@@ -73,10 +73,52 @@ impl FullCharacter {
         }
     }
 
+    /// Get a put object packet
+    pub fn get_object_packet(&self) -> ServerPacket {
+        ServerPacket::PutObject {
+            x: self.details.location.x,
+            y: self.details.location.y,
+            id: self.id,
+            icon: 1,
+            status: 0,
+            direction: 0,
+            light: 5,
+            speed: 50,
+            xp: self.details.exp,
+            alignment: self.alignment,
+            name: self.name.clone(),
+            title: "i am groot".to_string(),
+            status2: 0,
+            pledgeid: 0,
+            pledgename: self.pledge.clone(),
+            owner_name: "".to_string(),
+            v1: 0,
+            hp_bar: ((self.details.curr_hp as f32 / self.hp_max as f32) * 100.0) as u8,
+            v2: 0,
+            level: self.level,
+        }
+    }
+
+    /// Get a map location packet
+    pub fn get_map_packet(&self) -> ServerPacket {
+        ServerPacket::MapId(self.details.location.map, 0)
+    }
+
     /// Set this character as the main character
     pub fn main_character(&mut self) {
         self.id = 1;
     }
+}
+
+/// The location on a specific map for an object
+#[derive(Copy, Clone, Debug)]
+pub struct Location {
+    /// The x coordinate
+    x: u16,
+    /// The y coordinate
+    y: u16,
+    /// The map id
+    map: u16,
 }
 
 /// The extra details for a character to go from Character to FullCharacter
@@ -102,6 +144,8 @@ pub struct ExtraCharacterDetails {
     wind_resist: u8,
     /// Earth resist
     earth_resist: u8,
+    /// Location
+    location: Location,
 }
 
 impl mysql_async::prelude::FromRow for ExtraCharacterDetails {
@@ -120,6 +164,11 @@ impl mysql_async::prelude::FromRow for ExtraCharacterDetails {
             water_resist: row.get(7).ok_or(mysql_async::FromRowError(row.clone()))?,
             wind_resist: row.get(8).ok_or(mysql_async::FromRowError(row.clone()))?,
             earth_resist: row.get(9).ok_or(mysql_async::FromRowError(row.clone()))?,
+            location: Location {
+                x: row.get(10).ok_or(mysql_async::FromRowError(row.clone()))?,
+                y: row.get(11).ok_or(mysql_async::FromRowError(row.clone()))?,
+                map: row.get(12).ok_or(mysql_async::FromRowError(row.clone()))?,
+            },
         })
     }
 }
@@ -268,6 +317,11 @@ impl Character {
         self.alignment
     }
 
+    /// Does there need to be a waiting period to delete the character?
+    pub fn needs_delete_waiting(&self) -> bool {
+        self.level >= 30
+    }
+
     /// Construct a details packet for informing the user of a character they can log in with
     pub fn get_details_packet(&self) -> ServerPacket {
         ServerPacket::LoginCharacterDetails {
@@ -316,7 +370,7 @@ impl Character {
         mysql: &mut mysql_async::Conn,
     ) -> Result<FullCharacter, crate::server::ClientError> {
         use mysql_async::prelude::Queryable;
-        let query = "SELECT Exp, CurHp, CurMp, 1, Food, 32, 1, 2, 3, 4 from characters WHERE account_name=? and char_name=?";
+        let query = "SELECT Exp, CurHp, CurMp, 1, Food, 32, 1, 2, 3, 4, LocX, LocY, MapID from characters WHERE account_name=? and char_name=?";
         log::info!(
             "Checking for account {} -  player {}",
             self.account_name,
