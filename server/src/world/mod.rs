@@ -8,8 +8,8 @@ pub mod object;
 use common::packet::{ServerPacket, ServerPacketSender};
 
 use crate::{
-    character::Character, server::ClientError,
-    server_message::ServerMessage, world::object::ObjectTrait,
+    character::Character, server::ClientError, server_message::ServerMessage,
+    world::object::ObjectTrait,
 };
 
 /// Represents a single map of the world
@@ -112,7 +112,7 @@ pub struct World {
     /// maps of the world
     maps: Arc<Mutex<HashMap<u16, Map>>>,
     /// dynamic information for all maps
-    map_info: Arc<Mutex<HashMap<u16, MapInfo>>>,
+    map_info: Arc<tokio::sync::Mutex<HashMap<u16, MapInfo>>>,
 }
 
 impl World {
@@ -127,7 +127,7 @@ impl World {
             global_tx,
             mysql,
             maps: Arc::new(Mutex::new(HashMap::new())),
-            map_info: Arc::new(Mutex::new(HashMap::new())),
+            map_info: Arc::new(tokio::sync::Mutex::new(HashMap::new())),
         }
     }
 
@@ -135,13 +135,36 @@ impl World {
     pub async fn add_player(&self, p: crate::character::FullCharacter) {
         let location = p.location_ref().clone();
         let obj: object::Object = p.into();
-        let id = obj.id().await;
-        let mut m = self.map_info.lock().unwrap();
+        let id = obj.id();
+        let mut m = self.map_info.lock().await;
         let m2 = m.get_mut(&location.map);
         if let Some(map) = m2 {
             map.objects.insert(id, obj);
             log::info!("The objects on the map are {:?}", map);
         }
+    }
+
+    /// Run an asynchronous closure on objects close enough to the specified object
+    pub async fn with_objects_nearby_do<F, T, E>(
+        &self,
+        refo: &object::Object,
+        distance: f32,
+        gen: &mut T,
+        f: F,
+    ) -> Result<(), E>
+    where
+        F: AsyncFn(&object::Object, &mut T) -> Result<(), E>,
+    {
+        let mi = self.map_info.lock().await;
+        let map = mi.get(&refo.get_location().map);
+        if let Some(map) = map {
+            for obj in map.objects.values() {
+                if obj.linear_distance_to(refo) < distance && refo.id() != obj.id() {
+                    f(obj, gen).await?;
+                }
+            }
+        }
+        Ok(())
     }
 
     /// (Re)load all maps from the database
@@ -155,7 +178,7 @@ impl World {
             .exec_map(s, (), |a: Map| a)
             .await
             .map_err(|e| e.to_string())?;
-        let mut hdata = self.map_info.lock().unwrap();
+        let mut hdata = self.map_info.lock().await;
         hmaps.clear();
         for m in maps {
             println!("Found map data {:?}", m);

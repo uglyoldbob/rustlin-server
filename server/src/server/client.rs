@@ -4,6 +4,7 @@ use crate::client_message::ClientMessage;
 use crate::server::ClientError;
 use crate::server_message::ServerMessage;
 use crate::user::{self, *};
+use crate::world::object::ObjectTrait;
 use common::packet::*;
 
 use futures::FutureExt;
@@ -200,33 +201,6 @@ impl Client {
                 )
                 .await?;
         }
-        self.packet_writer
-            .send_packet(
-                ServerPacket::PutObject {
-                    x: 33435,
-                    y: 32816,
-                    id: 2,
-                    icon: 29,
-                    status: 0,
-                    direction: 1,
-                    light: 7,
-                    speed: 50,
-                    xp: 1235,
-                    alignment: -2767,
-                    name: "steve".to_string(),
-                    title: "".to_string(),
-                    status2: 0,
-                    pledgeid: 0,
-                    pledgename: "".to_string(),
-                    owner_name: "".to_string(),
-                    v1: 0,
-                    hp_bar: 12,
-                    v2: 0,
-                    level: 0,
-                }
-                .build(),
-            )
-            .await?;
         Ok(())
     }
 
@@ -449,6 +423,9 @@ impl Client {
                 let mut mysql = self.world.get_mysql_conn().await?;
                 let mut c = self.chars[c].get_full_details(&mut mysql).await?;
                 self.world.add_player(c.clone()).await;
+
+                let o = c.clone().into();
+
                 c.main_character();
                 response = c.details_packet().build();
                 self.packet_writer.send_packet(response).await?;
@@ -459,6 +436,18 @@ impl Client {
 
                 self.packet_writer
                     .send_packet(c.get_object_packet().build())
+                    .await?;
+
+                self.world
+                    .with_objects_nearby_do::<_, _, PacketError>(
+                        &o,
+                        30.0,
+                        &mut self.packet_writer,
+                        async |o, pw| {
+                            pw.send_packet(o.build_put_object_packet()).await?;
+                            Ok(())
+                        },
+                    )
                     .await?;
 
                 self.packet_writer

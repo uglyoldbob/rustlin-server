@@ -44,14 +44,39 @@ pub struct FullCharacter {
     details: ExtraCharacterDetails,
 }
 
-
 impl crate::world::object::ObjectTrait for FullCharacter {
-    async fn get_location(&self) -> crate::character::Location {
+    fn get_location(&self) -> crate::character::Location {
         self.details.location
     }
 
-    async fn id(&self) -> u32 {
+    fn id(&self) -> u32 {
         self.id
+    }
+
+    fn build_put_object_packet(&self) -> common::packet::Packet {
+        ServerPacket::PutObject {
+            x: self.details.location.x,
+            y: self.details.location.y,
+            id: self.id,
+            icon: 29,
+            status: 0,
+            direction: 1,
+            light: 7,
+            speed: 50,
+            xp: self.details.exp,
+            alignment: self.alignment,
+            name: self.name.clone(),
+            title: "".to_string(),
+            status2: 0,
+            pledgeid: 0,
+            pledgename: self.pledge.clone(),
+            owner_name: "".to_string(),
+            v1: 0,
+            hp_bar: 255,
+            v2: 0,
+            level: self.level,
+        }
+        .build()
     }
 }
 
