@@ -3,7 +3,7 @@ use std::{collections::HashMap, convert::TryInto};
 use common::packet::{ServerPacket, ServerPacketSender};
 use mysql_async::{prelude::Queryable, Params};
 
-use crate::world::item::ItemTrait;
+use crate::world::item::{ItemInstance, ItemTrait};
 
 /// Represents a complete playable character in the game
 #[derive(Clone, Debug)]
@@ -459,6 +459,21 @@ impl Character {
         }
     }
 
+    /// Retrieve all items for the character
+    async fn get_items(&self, mysql: &mut mysql_async::Conn) -> Result<Vec<ItemInstance>, crate::server::ClientError> {
+        let query = "SELECT * from character_items WHERE char_id=?";
+        let s = mysql.prep(query).await?;
+        let params = Params::Positional(vec![self.id.into()]);
+        let details = mysql
+            .exec_map(
+                s,
+                params,
+                |a: ItemInstance| a,
+            )
+            .await?;
+        Ok(details)
+    }
+
     /// Retrieve all gameplay details of the character
     pub async fn get_full_details(
         &self,
@@ -480,6 +495,7 @@ impl Character {
             )
             .await?;
         let details = details[0];
+        let items = self.get_items(mysql).await?;
         Ok(FullCharacter {
             account_name: self.account_name.clone(),
             name: self.name.clone(),
@@ -499,7 +515,7 @@ impl Character {
             charisma: self.charisma,
             intelligence: self.intelligence,
             details,
-            items: Vec::new(),
+            items,
         })
     }
 
