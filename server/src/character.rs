@@ -104,18 +104,16 @@ impl FullCharacter {
         w: &crate::world::World,
         packet_writer: &mut ServerPacketSender,
     ) -> Result<(), crate::server::ClientError> {
-        let mut packets = Vec::new();
+        let mut elements = Vec::new();
         {
             let item_table = w.item_table.lock().unwrap();
             for i in &mut self.items {
-                if let Some(p) = i.inventory_packet(&item_table) {
-                    packets.push(p);
+                if let Some(p) = i.inventory_element(&item_table) {
+                    elements.push(p);
                 }
             }
         }
-        for p in packets {
-            packet_writer.send_packet(p).await?;
-        }
+        packet_writer.send_packet(common::packet::ServerPacket::InventoryVec(elements).build()).await?;
         Ok(())
     }
 

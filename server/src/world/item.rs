@@ -8,7 +8,7 @@ pub trait ItemTrait {
     /// Retrieve the item id
     fn id(&self) -> u32;
     /// Get the inventory packet
-    fn inventory_packet(&self, stuff: &ItemStuff) -> common::packet::Packet;
+    fn inventory_element(&self, stuff: &ItemStuff) -> common::packet::InventoryElement;
 }
 
 /// A player usable weapon
@@ -43,9 +43,9 @@ impl ItemTrait for Weapon {
         self.id
     }
 
-    fn inventory_packet(&self, stuff: &ItemStuff) -> common::packet::Packet {
+    fn inventory_element(&self, stuff: &ItemStuff) -> common::packet::InventoryElement {
         log::info!("Sending inventory packet for {:?}", self);
-        common::packet::ServerPacket::Inventory {
+        common::packet::InventoryElement {
             id: self.id,
             i_type: 1,
             n_use: 1,
@@ -56,7 +56,6 @@ impl ItemTrait for Weapon {
             description: " $1".to_string(),
             ed: Vec::new(),
         }
-        .build()
     }
 }
 
@@ -92,20 +91,19 @@ impl ItemTrait for Armor {
         self.id
     }
 
-    fn inventory_packet(&self, stuff: &ItemStuff) -> common::packet::Packet {
+    fn inventory_element(&self, stuff: &ItemStuff) -> common::packet::InventoryElement {
         log::info!("Sending armor inventory packet for {:?}", self);
-        common::packet::ServerPacket::Inventory {
+        common::packet::InventoryElement {
             id: self.id,
             i_type: 1,
             n_use: 1,
             icon: self.inventory_graphic,
             blessing: common::packet::ItemBlessing::Normal,
-            count: 1,
-            identified: 0,
+            count: stuff.count,
+            identified: if stuff.identified { 1 } else { 0 },
             description: " $1".to_string(),
             ed: Vec::new(),
         }
-        .build()
     }
 }
 
@@ -141,20 +139,19 @@ impl ItemTrait for EtcItem {
         self.id
     }
 
-    fn inventory_packet(&self, stuff: &ItemStuff) -> common::packet::Packet {
-        log::info!("Sending etc inventory packet for {:?}", self);
-        common::packet::ServerPacket::Inventory {
+    fn inventory_element(&self, stuff: &ItemStuff) -> common::packet::InventoryElement {
+        log::info!("Sending etc inventory element for {:?}", self);
+        common::packet::InventoryElement {
             id: self.id,
             i_type: 1,
             n_use: 1,
             icon: self.inventory_graphic,
             blessing: common::packet::ItemBlessing::Normal,
-            count: 1,
-            identified: 0,
+            count: stuff.count,
+            identified: if stuff.identified { 1 } else { 0 },
             description: " $1".to_string(),
             ed: Vec::new(),
         }
-        .build()
     }
 }
 
@@ -217,10 +214,10 @@ impl ItemInstance {
     }
 
     /// Get the inventory packet for this item instance, retrieving the item details if needed
-    pub fn inventory_packet(&mut self, item_table: &HashMap<u32, Item>) -> Option<common::packet::Packet> {
+    pub fn inventory_element(&mut self, item_table: &HashMap<u32, Item>) -> Option<common::packet::InventoryElement> {
         self.populate_item_definition(item_table);
         if let ItemOrId::Item(i) = &self.definition {
-            Some(i.inventory_packet(&self.stuff))
+            Some(i.inventory_element(&self.stuff))
         } else {
             None
         }

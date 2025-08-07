@@ -83,6 +83,108 @@ pub enum ClientPacket {
     Unknown(Vec<u8>),
 }
 
+pub struct InventoryElement {
+    /// Item id
+    pub id: u32,
+    /// Item type
+    pub i_type: i8,
+    /// usage?
+    pub n_use: u8,
+    /// icon
+    pub icon: i16,
+    /// bless status
+    pub blessing: ItemBlessing,
+    /// item count
+    pub count: u32,
+    /// identified
+    pub identified: u8,
+    /// description, $numeric references use a string from the stringtable of the game client, as long as the $ is not the first character
+    pub description: String,
+    /// extended description.
+    /// # opcodes
+    /// * 1 - Hit value small+?/large+?, small: u8, large: u8, material: u8, weight: u32, if followed by 2, the next u8 is the + value for large and small
+    /// * 3 - Damage d, d: u8
+    /// * 4 - Two handed Weapon
+    /// * 5 - Hit bonus +d, d: u8
+    /// * 6 - Damage bonus +d, d: u8
+    /// * 7 - Usable: bitmask: bitmask: u8 - 1 = Prince/Princess, 2 = Knight, 4 = Elf, 8 = Wizard, 16 = Dark Elf, 32 = Dragon Knight, 64 = Illusionist, 128 = High Pet, 127 = All Classes
+    /// * 8 - STR +d: d: u8
+    /// * 9 - DEX +d: d: u8
+    /// * 10 - CON +d: d: u8
+    /// * 11 - WIS +d: d: u8
+    /// * 12 - INT +d: d: u8
+    /// * 13 - CHA +d: d: u8
+    /// * 14 - Maximum HP +d: d: u16
+    /// * 15 - Magic Defense +d: d: u16
+    /// * 16 - Mana Absorption
+    /// * 17 - Spell Power +d: d: u8
+    /// * 18 - Maintains haste state when held
+    /// * 19 - AC ac+?: ac: u8, grade: u8, material: u8, weight: u32, if followed by 2, the next u8 is the + value (grade: high = 0, medium = 1, low = 2)
+    /// * 20 - Luck +d: d: u8
+    /// * 21 - Nutrition - nutrition: nitrition: u16, material: u8, weight: u32
+    /// * 22 - Lightness d: d: u16, material: u8, weight: u32
+    /// * 23 - Nothing : material: u8, weight: u32
+    /// * 24 - Bow hit bonus +d: d: u8
+    /// * 25 - Class $d: d: u16, unsure of valid values
+    /// * 26 - Level d: d: u16
+    /// * 27 - Fire Elemental d: d: u8
+    /// * 28 - Water Elemental d: d: u8
+    /// * 29 - Wind Elementa d: d: u8
+    /// * 30 - Earth Elemental d: d: u8
+    /// * 31 - Maximum HP d: d: i16
+    /// * 32 - Maximum MP +d: d: i8
+    /// * 33 - Modifies magic defense with v, must come after a opcode 15: v: u8 (1 = Freeze Resistance, 2 = Petrify Resistance, 3 = Sleep Resistance, 4 = Darkness Resistance, 5 = Stun Resistance, 6 = Hold Resistance, 7 = None)
+    /// * 34 - Life Suction
+    /// * 35 - Bow Damage +d: d: u8
+    /// * 36 - dummy for branch d: d: u8
+    /// * 37 - Healing Rate d: d: u8
+    /// * 38 - Mana Healing Rate d: d: u8
+    /// * 39 - plain string: null terminated string
+    /// * 40 - nothing?: unknown: u8
+    /// * others: immediately finish processing
+    /// # Materials 1-22
+    /// * 1 - Liquid
+    /// * 2 - Web
+    /// * 3 - Vegetation
+    /// * 4 - Animal Matter
+    /// * 5 - Paper
+    /// * 6 - Cloth
+    /// * 7 - Leather
+    /// * 8 - Wood
+    /// * 9 - Bone
+    /// * 10 - Dragon Scale
+    /// * 11 - Iron
+    /// * 12 - Metal
+    /// * 13 - Copper
+    /// * 14 - Silver
+    /// * 15 - Gold
+    /// * 16 - Platinum
+    /// * 17 - Mithril
+    /// * 18 - Black Mithril
+    /// * 19 - Glass
+    /// * 20 - Gemstone
+    /// * 21 - Mineral
+    /// * 22 - Oriharukon
+    pub ed: Vec<u8>,
+}
+
+impl InventoryElement {
+    fn add(&self, p: &mut Packet) {
+        p.add_u32(self.id)
+            .add_i8(self.i_type)
+            .add_u8(self.n_use)
+            .add_i16(self.icon)
+            .add_u8(self.blessing as u8)
+            .add_u32(self.count)
+            .add_u8(self.identified)
+            .add_string(&self.description)
+            .add_u8(self.ed.len() as u8);
+        if self.ed.len() > 0 {
+            p.add_vec(&self.ed);
+        }
+    }
+}
+
 //TODO create enums for the option values
 
 /// Represents packets sent to the client, from the server
@@ -225,91 +327,10 @@ pub enum ServerPacket {
     ///msg = "[player name] message"
     PledgeChat(String),
     PartyChat(String),
+    /// Adds a bunch of inventory items
+    InventoryVec (Vec<InventoryElement>),
     /// Add an inventory item
-    Inventory {
-        /// Item id
-        id: u32,
-        /// Item type
-        i_type: i8,
-        /// usage?
-        n_use: u8,
-        /// icon
-        icon: i16,
-        /// bless status
-        blessing: ItemBlessing,
-        /// item count
-        count: u32,
-        /// identified
-        identified: u8,
-        /// description, $numeric references use a string from the stringtable of the game client, as long as the $ is not the first character
-        description: String,
-        /// extended description.
-        /// # opcodes
-        /// * 1 - Hit value small+?/large+?, small: u8, large: u8, material: u8, weight: u32, if followed by 2, the next u8 is the + value for large and small
-        /// * 3 - Damage d, d: u8
-        /// * 4 - Two handed Weapon
-        /// * 5 - Hit bonus +d, d: u8
-        /// * 6 - Damage bonus +d, d: u8
-        /// * 7 - Usable: bitmask: bitmask: u8 - 1 = Prince/Princess, 2 = Knight, 4 = Elf, 8 = Wizard, 16 = Dark Elf, 32 = Dragon Knight, 64 = Illusionist, 128 = High Pet, 127 = All Classes
-        /// * 8 - STR +d: d: u8
-        /// * 9 - DEX +d: d: u8
-        /// * 10 - CON +d: d: u8
-        /// * 11 - WIS +d: d: u8
-        /// * 12 - INT +d: d: u8
-        /// * 13 - CHA +d: d: u8
-        /// * 14 - Maximum HP +d: d: u16
-        /// * 15 - Magic Defense +d: d: u16
-        /// * 16 - Mana Absorption
-        /// * 17 - Spell Power +d: d: u8
-        /// * 18 - Maintains haste state when held
-        /// * 19 - AC ac+?: ac: u8, grade: u8, material: u8, weight: u32, if followed by 2, the next u8 is the + value (grade: high = 0, medium = 1, low = 2)
-        /// * 20 - Luck +d: d: u8
-        /// * 21 - Nutrition - nutrition: nitrition: u16, material: u8, weight: u32
-        /// * 22 - Lightness d: d: u16, material: u8, weight: u32
-        /// * 23 - Nothing : material: u8, weight: u32
-        /// * 24 - Bow hit bonus +d: d: u8
-        /// * 25 - Class $d: d: u16, unsure of valid values
-        /// * 26 - Level d: d: u16
-        /// * 27 - Fire Elemental d: d: u8
-        /// * 28 - Water Elemental d: d: u8
-        /// * 29 - Wind Elementa d: d: u8
-        /// * 30 - Earth Elemental d: d: u8
-        /// * 31 - Maximum HP d: d: i16
-        /// * 32 - Maximum MP +d: d: i8
-        /// * 33 - Modifies magic defense with v, must come after a opcode 15: v: u8 (1 = Freeze Resistance, 2 = Petrify Resistance, 3 = Sleep Resistance, 4 = Darkness Resistance, 5 = Stun Resistance, 6 = Hold Resistance, 7 = None)
-        /// * 34 - Life Suction
-        /// * 35 - Bow Damage +d: d: u8
-        /// * 36 - dummy for branch d: d: u8
-        /// * 37 - Healing Rate d: d: u8
-        /// * 38 - Mana Healing Rate d: d: u8
-        /// * 39 - plain string: null terminated string
-        /// * 40 - nothing?: unknown: u8
-        /// * others: immediately finish processing
-        /// # Materials 1-22
-        /// * 1 - Liquid
-        /// * 2 - Web
-        /// * 3 - Vegetation
-        /// * 4 - Animal Matter
-        /// * 5 - Paper
-        /// * 6 - Cloth
-        /// * 7 - Leather
-        /// * 8 - Wood
-        /// * 9 - Bone
-        /// * 10 - Dragon Scale
-        /// * 11 - Iron
-        /// * 12 - Metal
-        /// * 13 - Copper
-        /// * 14 - Silver
-        /// * 15 - Gold
-        /// * 16 - Platinum
-        /// * 17 - Mithril
-        /// * 18 - Black Mithril
-        /// * 19 - Glass
-        /// * 20 - Gemstone
-        /// * 21 - Mineral
-        /// * 22 - Oriharukon
-        ed: Vec<u8>,
-    },
+    Inventory(InventoryElement),
     /// change direction packet
     ChangeDirection {
         /// The id of the userobject
@@ -347,7 +368,7 @@ pub enum ServerPacket {
 
 /// Potential bless status for an item
 #[repr(u8)]
-#[derive(Clone)]
+#[derive(Copy, Clone)]
 pub enum ItemBlessing {
     /// The item is blessed
     Blessed = 0,
@@ -399,7 +420,7 @@ impl ServerPacket {
                     .add_u16(poly_id)
                     .add_i16(alignment)
                     .add_u8(poly_arg)
-                    .add_string(title);
+                    .add_string(&title);
             }
             ServerPacket::ServerVersion {
                 id,
@@ -429,7 +450,7 @@ impl ServerPacket {
                 p.add_u8(21).add_u8(code).add_u32(0);
             }
             ServerPacket::News(news) => {
-                p.add_u8(90).add_string(news);
+                p.add_u8(90).add_string(&news);
             }
             //TODO verify this
             ServerPacket::CharacterCreationStatus(v) => {
@@ -453,8 +474,8 @@ impl ServerPacket {
                 intelligence,
             } => {
                 p.add_u8(98)
-                    .add_string(name)
-                    .add_string(pledge)
+                    .add_string(&name)
+                    .add_string(&pledge)
                     .add_u8(class)
                     .add_u8(gender)
                     .add_i16(alignment)
@@ -501,8 +522,8 @@ impl ServerPacket {
                 intelligence,
             } => {
                 p.add_u8(99)
-                    .add_string(name)
-                    .add_string(pledge)
+                    .add_string(&name)
+                    .add_string(&pledge)
                     .add_u8(ctype)
                     .add_u8(gender)
                     .add_i16(alignment)
@@ -606,12 +627,12 @@ impl ServerPacket {
                     .add_u8(speed)
                     .add_u32(xp)
                     .add_i16(alignment)
-                    .add_string(name)
-                    .add_string(title)
+                    .add_string(&name)
+                    .add_string(&title)
                     .add_u8(status2)
                     .add_u32(pledgeid)
-                    .add_string(pledgename)
-                    .add_string(unknown)
+                    .add_string(&pledgename)
+                    .add_string(&unknown)
                     .add_u8(v1)
                     .add_u8(hp_bar)
                     .add_u8(v2)
@@ -624,63 +645,49 @@ impl ServerPacket {
                 p.add_u8(83).add_u8(w);
             }
             ServerPacket::SystemMessage(m) => {
-                p.add_u8(105).add_u8(9).add_string(m);
+                p.add_u8(105).add_u8(9).add_string(&m);
             }
             ServerPacket::NpcShout(m) => {
                 p.add_u8(42)
                     .add_u8(2)
                     .add_u32(0)
-                    .add_string(m)
+                    .add_string(&m)
                     .add_u16(1)
                     .add_u16(2);
             }
             ServerPacket::RegularChat { id, msg } => {
-                p.add_u8(8).add_u8(0).add_u32(id).add_string(msg);
+                p.add_u8(8).add_u8(0).add_u32(id).add_string(&msg);
             }
             ServerPacket::YellChat { id, msg, x, y } => {
                 p.add_u8(8)
                     .add_u8(2)
                     .add_u32(id)
-                    .add_string(msg)
+                    .add_string(&msg)
                     .add_u16(x)
                     .add_u16(y);
             }
             ServerPacket::GlobalChat(msg) => {
-                p.add_u8(105).add_u8(3).add_string(msg);
+                p.add_u8(105).add_u8(3).add_string(&msg);
             }
             ServerPacket::PledgeChat(msg) => {
-                p.add_u8(105).add_u8(4).add_string(msg);
+                p.add_u8(105).add_u8(4).add_string(&msg);
             }
             ServerPacket::PartyChat(msg) => {
-                p.add_u8(105).add_u8(11).add_string(msg);
+                p.add_u8(105).add_u8(11).add_string(&msg);
             }
             ServerPacket::WhisperChat { name, msg } => {
-                p.add_u8(91).add_string(name).add_string(msg);
+                p.add_u8(91).add_string(&name).add_string(&msg);
             }
-            ServerPacket::Inventory {
-                id,
-                i_type,
-                n_use,
-                icon,
-                blessing,
-                count,
-                identified,
-                description,
-                ed,
-            } => {
-                p.add_u8(6)
-                    .add_u32(id)
-                    .add_i8(i_type)
-                    .add_u8(n_use)
-                    .add_i16(icon)
-                    .add_u8(blessing as u8)
-                    .add_u32(count)
-                    .add_u8(identified)
-                    .add_string(description)
-                    .add_u8(ed.len() as u8);
-                if ed.len() > 0 {
-                    p.add_vec(&ed);
+            ServerPacket::InventoryVec(v) => {
+                p.add_u8(47);
+                p.add_u8(v.len() as u8);
+                for e in v {
+                    e.add(&mut p);
                 }
+            }
+            ServerPacket::Inventory(e) => {
+                p.add_u8(6);
+                e.add(&mut p);
             }
             ServerPacket::ChangeDirection { id, direction } => {
                 p.add_u32(id).add_u8(direction);
@@ -896,7 +903,7 @@ impl Packet {
     }
 
     /// Write a string to the packet
-    pub fn add_string(&mut self, d: String) -> &mut Packet {
+    pub fn add_string(&mut self, d: &str) -> &mut Packet {
         for n in d.bytes() {
             self.add_u8(n);
         }
