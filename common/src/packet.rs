@@ -328,7 +328,7 @@ pub enum ServerPacket {
     PledgeChat(String),
     PartyChat(String),
     /// Adds a bunch of inventory items
-    InventoryVec (Vec<InventoryElement>),
+    InventoryVec(Vec<InventoryElement>),
     /// Add an inventory item
     Inventory(InventoryElement),
     /// change direction packet
@@ -610,7 +610,7 @@ impl ServerPacket {
                 status2,
                 pledgeid,
                 pledgename,
-                owner_name: unknown,
+                owner_name,
                 v1,
                 hp_bar,
                 v2,
@@ -632,7 +632,7 @@ impl ServerPacket {
                     .add_u8(status2)
                     .add_u32(pledgeid)
                     .add_string(&pledgename)
-                    .add_string(&unknown)
+                    .add_string(&owner_name)
                     .add_u8(v1)
                     .add_u8(hp_bar)
                     .add_u8(v2)
@@ -754,17 +754,17 @@ impl Packet {
 
     /// Construct a raw packet from a vector
     pub fn raw_packet(d: Vec<u8>) -> Self {
-        Packet {
-            data: d,
-            read: 0,
-        }
+        Packet { data: d, read: 0 }
     }
 
     /// Convert the packet to a `ClientPacket`
     pub fn convert(mut self) -> ClientPacket {
         let opcode: u8 = self.pull_u8();
         match opcode {
-            1 => ClientPacket::UseItem { id: self.pull_u32(), remainder: self.pull_remainder() },
+            1 => ClientPacket::UseItem {
+                id: self.pull_u32(),
+                remainder: self.pull_remainder(),
+            },
             12 => ClientPacket::Login(
                 self.pull_string(),
                 self.pull_string(),

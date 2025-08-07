@@ -175,7 +175,10 @@ impl World {
     }
 
     /// (Re)load the weapons table
-    pub async fn load_weapons(&self, item_table: &mut HashMap<u32, item::Item>) -> Result<(), String> {
+    pub async fn load_weapons(
+        &self,
+        item_table: &mut HashMap<u32, item::Item>,
+    ) -> Result<(), String> {
         use mysql_async::prelude::Queryable;
         let query = "SELECT * from weapon";
         let mut mysql = self.get_mysql_conn().await.map_err(|e| e.to_string())?;
@@ -191,7 +194,10 @@ impl World {
     }
 
     /// (Re)load the etc items table
-    pub async fn load_etc_items(&self, item_table: &mut HashMap<u32, item::Item>) -> Result<(), String> {
+    pub async fn load_etc_items(
+        &self,
+        item_table: &mut HashMap<u32, item::Item>,
+    ) -> Result<(), String> {
         use mysql_async::prelude::Queryable;
         let query = "SELECT * from etcitem";
         let mut mysql = self.get_mysql_conn().await.map_err(|e| e.to_string())?;
@@ -207,7 +213,10 @@ impl World {
     }
 
     /// (Re)load the armor table
-    pub async fn load_armor(&self, item_table: &mut HashMap<u32, item::Item>) -> Result<(), String> {
+    pub async fn load_armor(
+        &self,
+        item_table: &mut HashMap<u32, item::Item>,
+    ) -> Result<(), String> {
         use mysql_async::prelude::Queryable;
         let query = "SELECT * from armor";
         let mut mysql = self.get_mysql_conn().await.map_err(|e| e.to_string())?;
