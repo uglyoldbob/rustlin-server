@@ -130,7 +130,7 @@ impl FullCharacter {
     pub fn details_packet(&self) -> ServerPacket {
         ServerPacket::CharacterDetails {
             id: self.id,
-            level: 54,
+            level: self.level,
             xp: self.details.exp,
             strength: self.strength,
             dexterity: self.strength,

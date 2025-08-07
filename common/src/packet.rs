@@ -509,8 +509,8 @@ impl ServerPacket {
                     .add_u8(wisdom)
                     .add_u8(charisma)
                     .add_u8(intelligence)
-                    .add_u8(14) //TODO
-                    .add_u32(15); //TODO
+                    .add_u8(0) //isBuilder
+                    .add_u32(0); //birthday
             }
             ServerPacket::CharacterDetails {
                 id,
