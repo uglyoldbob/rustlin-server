@@ -138,7 +138,7 @@ impl FullCharacter {
             wisdom: self.wisdom,
             charisma: self.charisma,
             intelligence: self.intelligence,
-            curr_hp: self.details.curr_hp,
+            curr_hp: self.hp_max,
             max_hp: self.hp_max,
             curr_mp: self.details.curr_mp,
             max_mp: self.mp_max,
@@ -366,13 +366,13 @@ impl std::convert::TryFrom<u16> for Class {
     type Error = ();
     fn try_from(value: u16) -> Result<Self, Self::Error> {
         match value {
-            0 => Ok(Self::Royal),
-            1 => Ok(Self::Knight),
-            2 => Ok(Self::Elf),
-            3 => Ok(Self::Wizard),
-            2786 => Ok(Self::DarkElf),
-            5 => Ok(Self::DragonKnight),
-            6 => Ok(Self::Illusionist),
+            0 | 1 => Ok(Self::Royal),
+            48 | 61 => Ok(Self::Knight),
+            37 | 138 => Ok(Self::Elf),
+            734 | 1186 => Ok(Self::Wizard),
+            2786 | 2796 => Ok(Self::DarkElf),
+            6658 | 6661 => Ok(Self::DragonKnight),
+            6650 | 6671 => Ok(Self::Illusionist),
             _ => Err(()),
         }
     }
