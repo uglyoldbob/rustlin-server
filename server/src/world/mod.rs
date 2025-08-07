@@ -174,9 +174,8 @@ impl World {
         Ok(())
     }
 
-    /// (Re)load all item data from database
-    pub async fn load_item_data(&self) -> Result<(), String> {
-        let mut item_table = self.item_table.lock().map_err(|e| e.to_string())?;
+    /// (Re)load the weapons table
+    pub async fn load_weapons(&self, item_table: &mut HashMap<u32, item::Item>) -> Result<(), String> {
         use mysql_async::prelude::Queryable;
         let query = "SELECT * from weapon";
         let mut mysql = self.get_mysql_conn().await.map_err(|e| e.to_string())?;
@@ -188,7 +187,51 @@ impl World {
         for w in weapons {
             item_table.insert(w.id(), w.into());
         }
-        log::info!("Items: {:?}", item_table);
+        Ok(())
+    }
+
+    /// (Re)load the etc items table
+    pub async fn load_etc_items(&self, item_table: &mut HashMap<u32, item::Item>) -> Result<(), String> {
+        use mysql_async::prelude::Queryable;
+        let query = "SELECT * from etcitem";
+        let mut mysql = self.get_mysql_conn().await.map_err(|e| e.to_string())?;
+        let s = mysql.prep(query).await.map_err(|e| e.to_string())?;
+        let items = mysql
+            .exec_map(s, (), |a: item::EtcItem| a)
+            .await
+            .map_err(|e| e.to_string())?;
+        for w in items {
+            item_table.insert(w.id(), w.into());
+        }
+        Ok(())
+    }
+
+    /// (Re)load the armor table
+    pub async fn load_armor(&self, item_table: &mut HashMap<u32, item::Item>) -> Result<(), String> {
+        use mysql_async::prelude::Queryable;
+        let query = "SELECT * from armor";
+        let mut mysql = self.get_mysql_conn().await.map_err(|e| e.to_string())?;
+        let s = mysql.prep(query).await.map_err(|e| e.to_string())?;
+        let items = mysql
+            .exec_map(s, (), |a: item::Armor| a)
+            .await
+            .map_err(|e| e.to_string())?;
+        for w in items {
+            item_table.insert(w.id(), w.into());
+        }
+        Ok(())
+    }
+
+    /// (Re)load all item data from database
+    pub async fn load_item_data(&self) -> Result<(), String> {
+        let mut item_table = self.item_table.lock().map_err(|e| e.to_string())?;
+        log::info!("There are {} items", item_table.len());
+        self.load_weapons(&mut item_table).await?;
+        log::info!("There are {} items", item_table.len());
+        self.load_etc_items(&mut item_table).await?;
+        log::info!("There are {} items", item_table.len());
+        self.load_armor(&mut item_table).await?;
+        log::info!("There are {} items", item_table.len());
         Ok(())
     }
 
@@ -238,6 +281,7 @@ impl World {
         Ok(())
     }
 
+    /// lookup account name from user id
     pub async fn lookup_id(&self, id: u32) -> Option<String> {
         let u = self.users.lock().unwrap();
         u.get(&id).map(|e| e.to_owned())
