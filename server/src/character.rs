@@ -100,23 +100,21 @@ impl FullCharacter {
 
     /// Send all items the player has to the user
     pub async fn send_all_items(
-        &self,
+        &mut self,
         w: &crate::world::World,
         packet_writer: &mut ServerPacketSender,
     ) -> Result<(), crate::server::ClientError> {
-        let items = {
+        let mut packets = Vec::new();
+        {
             let item_table = w.item_table.lock().unwrap();
-            let mut items = Vec::new();
-            for i in &self.items {
-                match i.item(&item_table) {
-                    Some(p) => items.push(p.clone()),
-                    None => log::error!("Character has an invalid item"),
+            for i in &mut self.items {
+                if let Some(p) = i.inventory_packet(&item_table) {
+                    packets.push(p);
                 }
             }
-            items
-        };
-        for i in items {
-            packet_writer.send_packet(i.inventory_packet()).await?;
+        }
+        for p in packets {
+            packet_writer.send_packet(p).await?;
         }
         Ok(())
     }

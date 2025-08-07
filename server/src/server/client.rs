@@ -443,11 +443,6 @@ impl Client {
                     .send_packet(ServerPacket::Weather(0).build())
                     .await?;
 
-                {
-                    if let Some(i) = c.items_mut() {
-                        i.push(crate::world::item::ItemInstance::new(1));
-                    }
-                }
                 c.send_all_items(&self.world, &mut self.packet_writer)
                     .await?;
                 self.full_char = Some(c);

@@ -8,7 +8,7 @@ pub trait ItemTrait {
     /// Retrieve the item id
     fn id(&self) -> u32;
     /// Get the inventory packet
-    fn inventory_packet(&self) -> common::packet::Packet;
+    fn inventory_packet(&self, stuff: &ItemStuff) -> common::packet::Packet;
 }
 
 /// A player usable weapon
@@ -43,7 +43,7 @@ impl ItemTrait for Weapon {
         self.id
     }
 
-    fn inventory_packet(&self) -> common::packet::Packet {
+    fn inventory_packet(&self, stuff: &ItemStuff) -> common::packet::Packet {
         log::info!("Sending inventory packet for {:?}", self);
         common::packet::ServerPacket::Inventory {
             id: self.id,
@@ -51,8 +51,8 @@ impl ItemTrait for Weapon {
             n_use: 1,
             icon: self.inventory_graphic,
             blessing: common::packet::ItemBlessing::Normal,
-            count: 1,
-            identified: 0,
+            count: stuff.count,
+            identified: if stuff.identified { 1 } else { 0 },
             description: " $1".to_string(),
             ed: Vec::new(),
         }
@@ -92,7 +92,7 @@ impl ItemTrait for Armor {
         self.id
     }
 
-    fn inventory_packet(&self) -> common::packet::Packet {
+    fn inventory_packet(&self, stuff: &ItemStuff) -> common::packet::Packet {
         log::info!("Sending armor inventory packet for {:?}", self);
         common::packet::ServerPacket::Inventory {
             id: self.id,
@@ -141,7 +141,7 @@ impl ItemTrait for EtcItem {
         self.id
     }
 
-    fn inventory_packet(&self) -> common::packet::Packet {
+    fn inventory_packet(&self, stuff: &ItemStuff) -> common::packet::Packet {
         log::info!("Sending etc inventory packet for {:?}", self);
         common::packet::ServerPacket::Inventory {
             id: self.id,
@@ -167,28 +167,81 @@ pub enum Item {
     Armor(Armor),
 }
 
+#[derive(Clone, Debug)]
+pub enum ItemOrId {
+    Item(Item),
+    Id(u32),
+}
+
+/// The stuff for an item instance
+#[derive(Clone, Debug)]
+pub struct ItemStuff {
+    /// The item id
+    item_id: u32,
+    /// Item count
+    count: u32,
+    /// Equipped
+    equipped: bool,
+    /// Enchantment
+    enchanted_level: i8,
+    /// Is the item identified?
+    identified: bool,
+    /// Durability
+    durability: u8,
+    /// Is the item blessed
+    blessed: u8,
+    /// Number of charges
+    charges: u8,
+    /// Remaining time
+    time_ramaining: u32,
+}
+
 /// an instance of an item, as opposed to Item, which defines what an item is
 #[derive(Clone, Debug)]
 pub struct ItemInstance {
-    /// The item instance id
-    id: u32,
-    /// The item id
-    item_id: u32,
+    /// The item definition
+    definition: ItemOrId,
+    stuff: ItemStuff,
 }
 
 impl ItemInstance {
-    /// Get the item instance
-    pub fn item<'a>(&'_ self, item_table: &'a HashMap<u32, Item>) -> Option<&'a Item> {
-        item_table.get(&self.item_id)
+    /// Populate the item definition, if necessary
+    pub fn populate_item_definition(&mut self, item_table: &HashMap<u32, Item>) {
+        if let ItemOrId::Id(id) = self.definition {
+            if let Some(item) = item_table.get(&id) {
+                self.definition = ItemOrId::Item(item.to_owned());
+            } else {
+                log::error!("Item {} not found in table", id);
+            }
+        }
     }
 
-    /// Create a new item instance
-    pub fn new(id: u32) -> Self {
-        ///TODO actually get a new item id using a mysql transaction
-        Self {
-            id: 1000,
-            item_id: id,
+    /// Get the inventory packet for this item instance, retrieving the item details if needed
+    pub fn inventory_packet(&mut self, item_table: &HashMap<u32, Item>) -> Option<common::packet::Packet> {
+        self.populate_item_definition(item_table);
+        if let ItemOrId::Item(i) = &self.definition {
+            Some(i.inventory_packet(&self.stuff))
+        } else {
+            None
         }
+    }
+}
+
+impl mysql_async::prelude::FromRow for ItemStuff {
+    fn from_row_opt(row: mysql_async::Row) -> Result<Self, mysql_async::FromRowError>
+        where
+            Self: Sized {
+        Ok(Self {
+            item_id: row.get(0).ok_or(mysql_async::FromRowError(row.clone()))?,
+            count: row.get(4).ok_or(mysql_async::FromRowError(row.clone()))?,
+            equipped: row.get(5).ok_or(mysql_async::FromRowError(row.clone()))?,
+            enchanted_level: row.get(6).ok_or(mysql_async::FromRowError(row.clone()))?,
+            identified: row.get(7).ok_or(mysql_async::FromRowError(row.clone()))?,
+            durability: row.get(8).ok_or(mysql_async::FromRowError(row.clone()))?,
+            blessed: row.get(10).ok_or(mysql_async::FromRowError(row.clone()))?,
+            charges: row.get(13).ok_or(mysql_async::FromRowError(row.clone()))?,
+            time_ramaining: row.get(14).ok_or(mysql_async::FromRowError(row.clone()))?,
+        })
     }
 }
 
@@ -197,9 +250,10 @@ impl mysql_async::prelude::FromRow for ItemInstance {
     where
         Self: Sized,
     {
+        let id : u32 = row.get(1).ok_or(mysql_async::FromRowError(row.clone()))?;
         Ok(Self {
-            id: row.get(0).ok_or(mysql_async::FromRowError(row.clone()))?,
-            item_id: row.get(1).ok_or(mysql_async::FromRowError(row.clone()))?,
+            definition: ItemOrId::Id(id),
+            stuff: mysql_async::prelude::FromRow::from_row_opt(row)?,
         })
     }
 }
