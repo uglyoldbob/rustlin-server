@@ -362,6 +362,22 @@ impl Class {
     }
 }
 
+impl std::convert::TryFrom<u16> for Class {
+    type Error = ();
+    fn try_from(value: u16) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(Self::Royal),
+            1 => Ok(Self::Knight),
+            2 => Ok(Self::Elf),
+            3 => Ok(Self::Wizard),
+            2786 => Ok(Self::DarkElf),
+            5 => Ok(Self::DragonKnight),
+            6 => Ok(Self::Illusionist),
+            _ => Err(()),
+        }
+    }
+}
+
 impl std::convert::TryFrom<u8> for Class {
     type Error = ();
     fn try_from(value: u8) -> Result<Self, Self::Error> {
@@ -582,7 +598,7 @@ impl Into<Params> for &mut Character {
         p.push(self.level.into());
         p.push(self.hp_max.into());
         p.push(self.mp_max.into());
-        p.push((self.class as u8).into());
+        p.push((self.class as u16).into());
         p.push(self.gender.into());
         p.push(self.ac.into());
         p.push(self.strength.into());
@@ -600,7 +616,7 @@ impl mysql_async::prelude::FromRow for Character {
     where
         Self: Sized,
     {
-        let c: u8 = row.get(6).ok_or(mysql_async::FromRowError(row.clone()))?;
+        let c: u16 = row.get(6).ok_or(mysql_async::FromRowError(row.clone()))?;
         Ok(Self {
             account_name: row.get(0).ok_or(mysql_async::FromRowError(row.clone()))?,
             name: row.get(1).ok_or(mysql_async::FromRowError(row.clone()))?,

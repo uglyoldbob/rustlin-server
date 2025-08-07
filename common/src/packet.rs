@@ -73,6 +73,13 @@ pub enum ClientPacket {
     Ping(u8),
     /// The player wants to restart with another character
     Restart,
+    /// The player is using an item
+    UseItem {
+        /// Item id of item being used
+        id: u32,
+        /// The rest of the packet
+        remainder: Vec<u8>,
+    },
     Unknown(Vec<u8>),
 }
 
@@ -738,10 +745,19 @@ impl Packet {
         }
     }
 
+    /// Construct a raw packet from a vector
+    pub fn raw_packet(d: Vec<u8>) -> Self {
+        Packet {
+            data: d,
+            read: 0,
+        }
+    }
+
     /// Convert the packet to a `ClientPacket`
     pub fn convert(mut self) -> ClientPacket {
         let opcode: u8 = self.pull_u8();
         match opcode {
+            1 => ClientPacket::UseItem { id: self.pull_u32(), remainder: self.pull_remainder() },
             12 => ClientPacket::Login(
                 self.pull_string(),
                 self.pull_string(),
@@ -886,6 +902,13 @@ impl Packet {
         }
         self.add_u8(0);
         self
+    }
+
+    /// Fetch the rest of the packet as a vector
+    fn pull_remainder(&mut self) -> Vec<u8> {
+        let v = self.data[self.read..].to_vec();
+        self.read = self.data.len();
+        v
     }
 
     /// Fetch a u8 from the packet

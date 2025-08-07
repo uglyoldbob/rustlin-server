@@ -183,24 +183,6 @@ impl Client {
 
     /// Performs packet testing
     pub async fn test1(&mut self) -> Result<(), ClientError> {
-        for i in 1..=32 {
-            self.packet_writer
-                .send_packet(
-                    ServerPacket::Inventory {
-                        id: i,
-                        i_type: i as i8,
-                        n_use: 1,
-                        icon: 35,
-                        blessing: common::packet::ItemBlessing::Normal,
-                        count: 1,
-                        identified: 0,
-                        description: " $70".to_string(),
-                        ed: vec![23, 0, i as u8, 0, 0, 0],
-                    }
-                    .build(),
-                )
-                .await?;
-        }
         Ok(())
     }
 
@@ -278,6 +260,10 @@ impl Client {
     ) -> Result<(), ClientError> {
         let c = p.convert();
         match c {
+            ClientPacket::UseItem { id, remainder } => {
+                log::info!("User wants to use item {}: {:X?}", id, remainder);
+                let p = common::packet::Packet::raw_packet(remainder);
+            }
             ClientPacket::Ping(v) => {
                 log::info!("The user pinged us {v}");
             }
