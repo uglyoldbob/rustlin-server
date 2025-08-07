@@ -3,13 +3,17 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+pub mod item;
+pub mod npc;
 pub mod object;
 
 use common::packet::{ServerPacket, ServerPacketSender};
 
 use crate::{
-    character::Character, server::ClientError, server_message::ServerMessage,
-    world::object::ObjectTrait,
+    character::Character,
+    server::ClientError,
+    server_message::ServerMessage,
+    world::{item::ItemTrait, object::ObjectTrait},
 };
 
 /// Represents a single map of the world
@@ -113,6 +117,8 @@ pub struct World {
     maps: Arc<Mutex<HashMap<u16, Map>>>,
     /// dynamic information for all maps
     map_info: Arc<tokio::sync::Mutex<HashMap<u16, MapInfo>>>,
+    /// The item lookup table
+    pub item_table: Arc<Mutex<HashMap<u32, item::Item>>>,
 }
 
 impl World {
@@ -128,6 +134,7 @@ impl World {
             mysql,
             maps: Arc::new(Mutex::new(HashMap::new())),
             map_info: Arc::new(tokio::sync::Mutex::new(HashMap::new())),
+            item_table: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 
@@ -167,6 +174,24 @@ impl World {
         Ok(())
     }
 
+    /// (Re)load all item data from database
+    pub async fn load_item_data(&self) -> Result<(), String> {
+        let mut item_table = self.item_table.lock().map_err(|e| e.to_string())?;
+        use mysql_async::prelude::Queryable;
+        let query = "SELECT * from weapon";
+        let mut mysql = self.get_mysql_conn().await.map_err(|e| e.to_string())?;
+        let s = mysql.prep(query).await.map_err(|e| e.to_string())?;
+        let weapons = mysql
+            .exec_map(s, (), |a: item::Weapon| a)
+            .await
+            .map_err(|e| e.to_string())?;
+        for w in weapons {
+            item_table.insert(w.id(), w.into());
+        }
+        log::info!("Items: {:?}", item_table);
+        Ok(())
+    }
+
     /// (Re)load all maps from the database
     pub async fn load_maps_data(&self) -> Result<(), String> {
         let mut hmaps = self.maps.lock().unwrap();
@@ -179,15 +204,29 @@ impl World {
             .await
             .map_err(|e| e.to_string())?;
         let mut hdata = self.map_info.lock().await;
+        /// TODO do something when an object is on a map that no longer exists
         hmaps.clear();
         for m in maps {
             println!("Found map data {:?}", m);
             if !hdata.contains_key(&m.id) {
-                let mut map_info = MapInfo::new();
-                map_info.objects.insert(3, 42.into());
-                hdata.insert(m.id, map_info);
+                hdata.insert(m.id, MapInfo::new());
             }
             hmaps.insert(m.id, m);
+        }
+        if let Some(m) = hdata.get_mut(&4) {
+            m.objects.insert(
+                3,
+                npc::Npc::new(
+                    3,
+                    crate::character::Location {
+                        x: 33430,
+                        y: 32820,
+                        direction: 7,
+                        map: 4,
+                    },
+                )
+                .into(),
+            );
         }
         Ok(())
     }
@@ -249,16 +288,6 @@ impl World {
                     .send_packet(ServerPacket::Disconnect.build())
                     .await?;
             }
-            ServerMessage::SystemMessage(m) => {
-                packet_writer
-                    .send_packet(ServerPacket::SystemMessage(m).build())
-                    .await?;
-            }
-            ServerMessage::NpcShout(m) => {
-                packet_writer
-                    .send_packet(ServerPacket::NpcShout(m).build())
-                    .await?;
-            }
             ServerMessage::RegularChat { id, msg } => {
                 packet_writer
                     .send_packet(ServerPacket::RegularChat { id: id, msg: msg }.build())
@@ -301,71 +330,6 @@ impl World {
             ServerMessage::PartyChat(m) => {
                 packet_writer
                     .send_packet(ServerPacket::PartyChat(m).build())
-                    .await?;
-            }
-            ServerMessage::CharacterCreateStatus(v) => match v {
-                0 => {
-                    packet_writer
-                        .send_packet(ServerPacket::CharacterCreationStatus(2).build())
-                        .await?;
-                }
-                1 => {
-                    packet_writer
-                        .send_packet(ServerPacket::CharacterCreationStatus(9).build())
-                        .await?;
-                }
-                2 => {
-                    packet_writer
-                        .send_packet(ServerPacket::CharacterCreationStatus(6).build())
-                        .await?;
-                }
-                3 => {
-                    packet_writer
-                        .send_packet(ServerPacket::CharacterCreationStatus(21).build())
-                        .await?;
-                }
-                _ => {
-                    log::info!("wrong char creation status");
-                }
-            },
-            ServerMessage::NewCharacterDetails {
-                name,
-                pledge,
-                class,
-                gender,
-                alignment,
-                hp,
-                mp,
-                ac,
-                level,
-                strength,
-                dexterity,
-                constitution,
-                wisdom,
-                charisma,
-                intelligence,
-            } => {
-                packet_writer
-                    .send_packet(
-                        ServerPacket::NewCharacterDetails {
-                            name: name,
-                            pledge: pledge,
-                            class: class,
-                            gender: gender,
-                            alignment: alignment,
-                            hp: hp,
-                            mp: mp,
-                            ac: ac,
-                            level: level,
-                            strength: strength,
-                            dexterity: dexterity,
-                            constitution: constitution,
-                            wisdom: wisdom,
-                            charisma: charisma,
-                            intelligence: intelligence,
-                        }
-                        .build(),
-                    )
                     .await?;
             }
         }

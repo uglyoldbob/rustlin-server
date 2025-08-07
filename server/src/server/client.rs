@@ -3,7 +3,7 @@
 use crate::client_message::ClientMessage;
 use crate::server::ClientError;
 use crate::server_message::ServerMessage;
-use crate::user::{self, *};
+use crate::user::*;
 use crate::world::object::ObjectTrait;
 use common::packet::*;
 
@@ -183,19 +183,19 @@ impl Client {
 
     /// Performs packet testing
     pub async fn test1(&mut self) -> Result<(), ClientError> {
-        for i in 1..=16 {
+        for i in 1..=32 {
             self.packet_writer
                 .send_packet(
                     ServerPacket::Inventory {
-                        id: 1,
-                        i_type: 1,
+                        id: i,
+                        i_type: i as i8,
                         n_use: 1,
-                        icon: 1,
+                        icon: 35,
                         blessing: common::packet::ItemBlessing::Normal,
                         count: 1,
                         identified: 0,
-                        description: " $1".to_string(),
-                        ed: vec![23, i, i, 0, 0, 0],
+                        description: " $70".to_string(),
+                        ed: vec![23, 0, i as u8, 0, 0, 0],
                     }
                     .build(),
                 )
@@ -426,7 +426,6 @@ impl Client {
 
                 let o = c.clone().into();
 
-                c.main_character();
                 response = c.details_packet().build();
                 self.packet_writer.send_packet(response).await?;
 
@@ -458,6 +457,13 @@ impl Client {
                     .send_packet(ServerPacket::Weather(0).build())
                     .await?;
 
+                {
+                    if let Some(i) = c.items_mut() {
+                        i.push(crate::world::item::ItemInstance::new(1));
+                    }
+                }
+                c.send_all_items(&self.world, &mut self.packet_writer)
+                    .await?;
                 self.full_char = Some(c);
 
                 //TODO send owncharstatus packet
@@ -470,7 +476,24 @@ impl Client {
             }
             ClientPacket::Save => {}
             ClientPacket::Move { x, y, heading } => {
-                log::info!("moving to {} {} {}", x, y, heading);
+                log::info!("moving from {} {} {}", x, y, heading);
+                let (x2, y2) = match heading {
+                    0 => (x, y - 1),
+                    1 => (x + 1, y - 1),
+                    2 => (x + 1, y),
+                    3 => (x + 1, y + 1),
+                    4 => (x, y + 1),
+                    5 => (x - 1, y + 1),
+                    6 => (x - 1, y),
+                    7 => (x - 1, y - 1),
+                    _ => (x, y),
+                };
+                if let Some(fc) = &mut self.full_char {
+                    let l = fc.location_mut();
+                    l.x = x2;
+                    l.y = y2;
+                    l.direction = heading;
+                }
             }
             ClientPacket::ChangeDirection(d) => {
                 log::info!("change direction to {}", d);
@@ -597,7 +620,7 @@ impl Client {
             ClientPacket::ChangePassword {
                 account,
                 oldpass,
-                newpass,
+                newpass: _,
             } => {
                 let mut mysql = self.world.get_mysql_conn().await?;
                 let user = get_user_details(account.clone(), &mut mysql).await;
@@ -613,14 +636,12 @@ impl Client {
                                 .send_packet(ServerPacket::LoginResult { code: 0x30 }.build())
                                 .await?;
                         } else {
-                            let mut p = Packet::new();
                             self.packet_writer
                                 .send_packet(ServerPacket::LoginResult { code: 8 }.build())
                                 .await?;
                         }
                     }
                     _ => {
-                        let mut p = Packet::new();
                         self.packet_writer
                             .send_packet(ServerPacket::LoginResult { code: 8 }.build())
                             .await?;
@@ -639,7 +660,6 @@ impl Client {
         mut self,
         reader: tokio::net::tcp::OwnedReadHalf,
         mut brd_rx: tokio::sync::broadcast::Receiver<ServerMessage>,
-        mut rx: tokio::sync::mpsc::UnboundedReceiver<ServerMessage>,
         config: &std::sync::Arc<crate::ServerConfiguration>,
     ) -> Result<u8, ClientError> {
         let encryption_key: u32 = rand::thread_rng().gen();
@@ -661,14 +681,7 @@ impl Client {
                     let p = msg.unwrap();
                     self.world.handle_server_message(p, &mut self.packet_writer).await?;
                 }
-                msg = rx.recv().fuse() => {
-                    match msg {
-                        None => {}
-                        Some(p) => {self.world.handle_server_message(p, &mut self.packet_writer).await?;}
-                    }
-                }
             }
         }
-        Ok(0)
     }
 }

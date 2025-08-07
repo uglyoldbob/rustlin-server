@@ -1,7 +1,9 @@
-use std::convert::TryInto;
+use std::{collections::HashMap, convert::TryInto};
 
-use common::packet::ServerPacket;
+use common::packet::{ServerPacket, ServerPacketSender};
 use mysql_async::{prelude::Queryable, Params};
+
+use crate::world::item::ItemTrait;
 
 /// Represents a complete playable character in the game
 #[derive(Clone, Debug)]
@@ -42,6 +44,8 @@ pub struct FullCharacter {
     intelligence: u8,
     /// Extra details
     details: ExtraCharacterDetails,
+    /// All the items the character holds
+    items: Vec<crate::world::item::ItemInstance>,
 }
 
 impl crate::world::object::ObjectTrait for FullCharacter {
@@ -51,6 +55,14 @@ impl crate::world::object::ObjectTrait for FullCharacter {
 
     fn id(&self) -> u32 {
         self.id
+    }
+
+    fn get_items(&self) -> Option<Vec<crate::world::item::ItemInstance>> {
+        None
+    }
+
+    fn items_mut(&mut self) -> Option<&mut Vec<crate::world::item::ItemInstance>> {
+        Some(&mut self.items)
     }
 
     fn build_put_object_packet(&self) -> common::packet::Packet {
@@ -81,16 +93,44 @@ impl crate::world::object::ObjectTrait for FullCharacter {
 }
 
 impl FullCharacter {
-    /// Get the location of the character
+    /// Get a reference to the location of the character
     pub fn location_ref(&self) -> &Location {
         &self.details.location
+    }
+
+    /// Send all items the player has to the user
+    pub async fn send_all_items(
+        &self,
+        w: &crate::world::World,
+        packet_writer: &mut ServerPacketSender,
+    ) -> Result<(), crate::server::ClientError> {
+        let items = {
+            let item_table = w.item_table.lock().unwrap();
+            let mut items = Vec::new();
+            for i in &self.items {
+                match i.item(&item_table) {
+                    Some(p) => items.push(p.clone()),
+                    None => log::error!("Character has an invalid item"),
+                }
+            }
+            items
+        };
+        for i in items {
+            packet_writer.send_packet(i.inventory_packet()).await?;
+        }
+        Ok(())
+    }
+
+    /// Get a mutable reference to the location of the character
+    pub fn location_mut(&mut self) -> &mut Location {
+        &mut self.details.location
     }
 
     /// Get the details packet for sending to the user
     pub fn details_packet(&self) -> ServerPacket {
         ServerPacket::CharacterDetails {
             id: self.id,
-            level: self.level,
+            level: 54,
             xp: self.details.exp,
             strength: self.strength,
             dexterity: self.strength,
@@ -144,11 +184,6 @@ impl FullCharacter {
     pub fn get_map_packet(&self) -> ServerPacket {
         ServerPacket::MapId(self.details.location.map, 0)
     }
-
-    /// Set this character as the main character
-    pub fn main_character(&mut self) {
-        self.id = 1;
-    }
 }
 
 /// The location on a specific map for an object
@@ -160,6 +195,8 @@ pub struct Location {
     pub y: u16,
     /// The map id
     pub map: u16,
+    /// The direction that is being faced
+    pub direction: u8,
 }
 
 /// The extra details for a character to go from Character to FullCharacter
@@ -209,6 +246,7 @@ impl mysql_async::prelude::FromRow for ExtraCharacterDetails {
                 x: row.get(10).ok_or(mysql_async::FromRowError(row.clone()))?,
                 y: row.get(11).ok_or(mysql_async::FromRowError(row.clone()))?,
                 map: row.get(12).ok_or(mysql_async::FromRowError(row.clone()))?,
+                direction: 5,
             },
         })
     }
@@ -445,6 +483,7 @@ impl Character {
             charisma: self.charisma,
             intelligence: self.intelligence,
             details,
+            items: Vec::new(),
         })
     }
 

@@ -8,7 +8,7 @@ pub trait ObjectTrait {
     /// Get the location of the object
     fn get_location(&self) -> crate::character::Location;
 
-    /// Get the object ide for this object
+    /// Get the object id for this object
     fn id(&self) -> u32;
 
     /// Get the linear distance from this object to another object (as the crow flies).
@@ -37,52 +37,20 @@ pub trait ObjectTrait {
 
     /// Build a packet for placing the object on the map for a user
     fn build_put_object_packet(&self) -> common::packet::Packet;
-}
 
-impl ObjectTrait for u32 {
-    fn id(&self) -> u32 {
-        3
-    }
+    /// Get the list of items the object is posessing
+    fn get_items(&self) -> Option<Vec<super::item::ItemInstance>>;
 
-    fn get_location(&self) -> crate::character::Location {
-        crate::character::Location {
-            x: 33435,
-            y: 32820,
-            map: 4,
-        }
-    }
-
-    fn build_put_object_packet(&self) -> common::packet::Packet {
-        common::packet::ServerPacket::PutObject {
-            x: 33435,
-            y: 32820,
-            id: 3,
-            icon: 29,
-            status: 0,
-            direction: 1,
-            light: 7,
-            speed: 50,
-            xp: 1235,
-            alignment: -2767,
-            name: "steve".to_string(),
-            title: "".to_string(),
-            status2: 0,
-            pledgeid: 0,
-            pledgename: "".to_string(),
-            owner_name: "".to_string(),
-            v1: 0,
-            hp_bar: 12,
-            v2: 0,
-            level: 0,
-        }
-        .build()
-    }
+    /// Get the list of items, mutable
+    fn items_mut(&mut self) -> Option<&mut Vec<super::item::ItemInstance>>;
 }
 
 /// The things that an object can be
 #[enum_dispatch::enum_dispatch(ObjectTrait)]
 #[derive(Debug)]
 pub enum Object {
-    Test(u32),
+    /// A character played by a user
     Player(FullCharacter),
+    /// A generic npc
+    GenericNpc(super::npc::Npc),
 }

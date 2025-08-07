@@ -11,15 +11,12 @@ use client_message::*;
 mod server_message;
 use server_message::*;
 
-use std::collections::HashMap;
-
 mod character;
 mod clients;
 mod config;
 use config::*;
 mod user;
 mod world;
-use crate::character::Character;
 use crate::clients::ClientList;
 
 #[tokio::main]
@@ -43,6 +40,7 @@ async fn main() -> Result<(), String> {
 
     let world = std::sync::Arc::new(world::World::new(broadcast, mysql_pool));
     world.load_maps_data().await?;
+    world.load_item_data().await?;
 
     let update_tx = update::setup_update_server(&mut tasks, world.clone())
         .await
@@ -50,13 +48,6 @@ async fn main() -> Result<(), String> {
     let server_tx = server::setup_game_server(&mut tasks, world.clone(), &settings.config)
         .await
         .expect("Failed to setup legacy server");
-
-    let mut client_ids: ClientList = ClientList::new();
-    let mut clients: HashMap<u32, tokio::sync::mpsc::UnboundedSender<ServerMessage>> =
-        HashMap::new();
-    let mut client_accounts: HashMap<u32, String> = HashMap::new();
-
-    let mut testvar: u32 = 0;
 
     let mut error = Ok(());
 

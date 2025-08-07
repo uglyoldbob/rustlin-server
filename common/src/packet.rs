@@ -158,6 +158,7 @@ pub enum ServerPacket {
         earth_resist: u8,
     },
     MapId(u16, u8),
+    /// put a new object on the user map
     PutObject {
         x: u16,
         y: u16,
@@ -182,6 +183,13 @@ pub enum ServerPacket {
         /// 8 = drunken, not 8 = speed becomes 2
         v2: u8,
         level: u8,
+    },
+    /// Move an object
+    MoveObject {
+        id: u32,
+        x: u16,
+        y: u16,
+        direction: u8,
     },
     CharSpMrBonus {
         sp: u8,
@@ -270,7 +278,7 @@ pub enum ServerPacket {
         /// * 39 - plain string: null terminated string
         /// * 40 - nothing?: unknown: u8
         /// * others: immediately finish processing
-        /// # Materials 1-16
+        /// # Materials 1-22
         /// * 1 - Liquid
         /// * 2 - Web
         /// * 3 - Vegetation
@@ -287,6 +295,12 @@ pub enum ServerPacket {
         /// * 14 - Silver
         /// * 15 - Gold
         /// * 16 - Platinum
+        /// * 17 - Mithril
+        /// * 18 - Black Mithril
+        /// * 19 - Glass
+        /// * 20 - Gemstone
+        /// * 21 - Mineral
+        /// * 22 - Oriharukon
         ed: Vec<u8>,
     },
     /// change direction packet
@@ -343,6 +357,18 @@ impl ServerPacket {
     pub fn build(self) -> Packet {
         let mut p = Packet::new();
         match self {
+            ServerPacket::MoveObject {
+                id,
+                x,
+                y,
+                direction,
+            } => {
+                p.add_u8(61)
+                    .add_u32(id)
+                    .add_u16(x)
+                    .add_u16(y)
+                    .add_u8(direction);
+            }
             ServerPacket::BackToCharacterSelect => {
                 p.add_u8(107).add_u8(42);
             }
@@ -638,6 +664,7 @@ impl ServerPacket {
                 p.add_u8(6)
                     .add_u32(id)
                     .add_i8(i_type)
+                    .add_u8(n_use)
                     .add_i16(icon)
                     .add_u8(blessing as u8)
                     .add_u32(count)

@@ -1,7 +1,6 @@
 use futures::FutureExt;
 use std::collections::HashMap;
 use std::error::Error;
-use std::io::Read;
 use std::panic::AssertUnwindSafe;
 use tokio::net::TcpListener;
 
@@ -145,7 +144,7 @@ pub async fn setup_update_server(
     world: std::sync::Arc<crate::world::World>,
 ) -> Result<tokio::sync::oneshot::Sender<u32>, Box<dyn Error>> {
     log::info!("update: Starting the update server");
-    let (update_tx, mut update_rx) = tokio::sync::oneshot::channel::<u32>();
+    let (update_tx, update_rx) = tokio::sync::oneshot::channel::<u32>();
     let update_listener = TcpListener::bind("0.0.0.0:2003").await?;
 
     let mut updates = UpdateFiles {

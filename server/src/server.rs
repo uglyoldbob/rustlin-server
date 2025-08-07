@@ -69,11 +69,9 @@ async fn process_client(
 
     let brd_rx: tokio::sync::broadcast::Receiver<ServerMessage> = world.get_broadcast_rx();
 
-    let (tx, rx) = tokio::sync::mpsc::unbounded_channel::<ServerMessage>();
-
     let c = Client::new(packet_writer, world.clone());
 
-    if let Err(e) = c.event_loop(reader, brd_rx, rx, &config).await {
+    if let Err(e) = c.event_loop(reader, brd_rx, &config).await {
         log::info!("test: Client errored: {:?}", e);
     }
 
