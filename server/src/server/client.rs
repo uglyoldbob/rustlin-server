@@ -116,7 +116,12 @@ impl Client {
                         })
                         .await;
                     if let Some(m) = m {
-                        let _ = self.world.global_tx.send(m);
+                        let _ = self.world.with_mut_objects_near_me_do(&r, 30.0, true, &mut self.packet_writer, async move |o: &mut crate::world::object::Object, pw| {
+                            if let Some(sender) = o.sender() {
+                                let _ = sender.send(m.clone()).await;
+                            }
+                            Ok::<(), String>(())
+                        }).await;
                     }
                 }
             }
@@ -136,7 +141,12 @@ impl Client {
                         })
                         .await;
                     if let Some(m) = m {
-                        let _ = self.world.global_tx.send(m);
+                        let _ = self.world.with_mut_objects_near_me_do(&r, 60.0, true, &mut self.packet_writer, async move |o: &mut crate::world::object::Object, pw| {
+                            if let Some(sender) = o.sender() {
+                                let _ = sender.send(m.clone()).await;
+                            }
+                            Ok::<(), String>(())
+                        }).await;
                     }
                 }
             }
@@ -150,7 +160,7 @@ impl Client {
                         })
                         .await;
                     if let Some(m) = m {
-                        let _ = self.world.global_tx.send(m);
+                        self.world.send_global_chat(m).await;
                     }
                 }
             }
@@ -164,7 +174,7 @@ impl Client {
                         })
                         .await;
                     if let Some(m) = m {
-                        let _ = self.world.global_tx.send(m);
+                        self.world.send_global_chat(m).await;
                     }
                 }
             }
@@ -178,11 +188,11 @@ impl Client {
                         })
                         .await;
                     if let Some(m) = m {
-                        let _ = self.world.global_tx.send(m);
+                        self.world.send_global_chat(m).await;
                     }
                 }
             }
-            ClientMessage::WhisperChat(_id, _person, msg) => {
+            ClientMessage::WhisperChat(_id, person, msg) => {
                 if let Some(r) = self.char_ref {
                     let m = self
                         .world
@@ -191,7 +201,7 @@ impl Client {
                         })
                         .await;
                     if let Some(m) = m {
-                        let _ = self.world.global_tx.send(m);
+                        log::error!("Whispering to {} with {:?}", person, m)
                     }
                 }
             }
@@ -309,6 +319,7 @@ impl Client {
         p: Packet,
         peer: std::net::SocketAddr,
         config: &std::sync::Arc<crate::ServerConfiguration>,
+        sender: &tokio::sync::mpsc::Sender<ServerMessage>,
     ) -> Result<(), ClientError> {
         let c = p.convert();
         match c {
@@ -487,7 +498,7 @@ impl Client {
                 self.char_ref = {
                     let c = {
                         let item_table = self.world.item_table.lock().unwrap();
-                        c.to_full(&item_table)
+                        c.to_full(&item_table, sender.clone())
                     };
                     self.world.add_player(c).await
                 };
@@ -504,17 +515,19 @@ impl Client {
                         .await;
                 }
 
-                self.world
-                    .with_objects_nearby_do::<_, _, PacketError>(
-                        todo!(),
-                        30.0,
-                        &mut self.packet_writer,
-                        async |o, pw| {
-                            pw.send_packet(o.build_put_object_packet()).await?;
-                            Ok(())
-                        },
-                    )
-                    .await?;
+                if let Some(r) = self.char_ref {
+                    self.world
+                        .with_objects_nearby_do::<_, _, PacketError>(
+                            r,
+                            30.0,
+                            &mut self.packet_writer,
+                            async |o, pw| {
+                                pw.send_packet(o.build_put_object_packet()).await?;
+                                Ok(())
+                            },
+                        )
+                        .await?;
+                }
 
                 self.packet_writer
                     .send_packet(ServerPacket::CharSpMrBonus { sp: 0, mr: 0 }.build())
@@ -718,11 +731,41 @@ impl Client {
         Ok(())
     }
 
+    /// Process a message received from the server
+    async fn process_server_message(&mut self, p: ServerMessage) -> Result<(), ClientError> {
+        log::info!("Processing a message: {:?}", p);
+        match p {
+            ServerMessage::Disconnect => {
+                self.packet_writer.send_packet(ServerPacket::Disconnect.build()).await?;
+            }
+            ServerMessage::RegularChat { id, msg } => {
+                self.packet_writer.send_packet(ServerPacket::RegularChat { id, msg }.build()).await?;
+            }
+            ServerMessage::YellChat { id, msg, x, y } => {
+                self.packet_writer.send_packet(ServerPacket::YellChat { id, msg, x, y }.build()).await?;
+            }
+            ServerMessage::GlobalChat(m) => {
+                self.packet_writer.send_packet(ServerPacket::GlobalChat(m).build()).await?;
+            }
+            ServerMessage::PledgeChat(m) => {
+                self.packet_writer.send_packet(ServerPacket::PledgeChat(m).build()).await?;
+            }
+            ServerMessage::PartyChat(m) => {
+                self.packet_writer.send_packet(ServerPacket::PartyChat(m).build()).await?;
+            }
+            ServerMessage::WhisperChat(u, m) => {
+                self.packet_writer.send_packet(ServerPacket::WhisperChat { name: u, msg: m }.build()).await?;
+            }
+        }
+        Ok(())
+    }
+
     /// The main event loop for a client in a server.
     pub async fn event_loop(
         mut self,
         reader: tokio::net::tcp::OwnedReadHalf,
-        mut brd_rx: tokio::sync::broadcast::Receiver<ServerMessage>,
+        mut receiver: tokio::sync::mpsc::Receiver<ServerMessage>,
+        sender: tokio::sync::mpsc::Sender<ServerMessage>,
         config: &std::sync::Arc<crate::ServerConfiguration>,
     ) -> Result<u8, ClientError> {
         let encryption_key: u32 = rand::thread_rng().gen();
@@ -734,15 +777,16 @@ impl Client {
         self.packet_writer.send_packet(key_packet).await?;
         self.packet_writer
             .set_encryption_key(packet_reader.get_key());
+
         loop {
             futures::select! {
                 packet = packet_reader.read_packet().fuse() => {
                     let p = packet?;
-                    self.process_packet(p, peer, config).await?;
+                    self.process_packet(p, peer, config, &sender).await?;
                 }
-                msg = brd_rx.recv().fuse() => {
+                msg = receiver.recv().fuse() => {
                     let p = msg.unwrap();
-                    self.world.handle_server_message(p, &mut self.packet_writer).await?;
+                    self.process_server_message(p).await?;
                 }
             }
         }

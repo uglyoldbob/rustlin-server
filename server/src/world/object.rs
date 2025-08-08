@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use crate::character::FullCharacter;
+use crate::{character::FullCharacter, server_message::ServerMessage};
 
 /// The generic object trait for the server
 #[enum_dispatch::enum_dispatch]
@@ -45,6 +45,9 @@ pub trait ObjectTrait {
 
     /// Get the list of items, mutable
     fn items_mut(&mut self) -> Option<&mut HashMap<u32, super::item::ItemInstance>>;
+
+    /// If applicable (only for Player objects), get the object for sending messages to the user
+    fn sender(&mut self) -> Option<&mut tokio::sync::mpsc::Sender<ServerMessage>>;
 }
 
 /// The things that an object can be

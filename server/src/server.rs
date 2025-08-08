@@ -67,11 +67,11 @@ async fn process_client(
     let (reader, writer) = socket.into_split();
     let packet_writer = ServerPacketSender::new(writer);
 
-    let brd_rx: tokio::sync::broadcast::Receiver<ServerMessage> = world.get_broadcast_rx();
+    let s = tokio::sync::mpsc::channel(10);
 
     let c = Client::new(packet_writer, world.clone());
 
-    if let Err(e) = c.event_loop(reader, brd_rx, &config).await {
+    if let Err(e) = c.event_loop(reader, s.1, s.0, &config).await {
         log::info!("test: Client errored: {:?}", e);
     }
 
@@ -124,7 +124,7 @@ impl GameServer {
                 }
             }
         }
-        let _ = self.world.global_tx.send(ServerMessage::Disconnect);
+        ///TODO disconnect all players
         f.clear();
         log::info!("Ending the server thread!");
         Ok(())

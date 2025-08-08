@@ -3,7 +3,7 @@ use std::{collections::HashMap, convert::TryInto};
 use common::packet::{ServerPacket, ServerPacketSender};
 use mysql_async::{prelude::Queryable, Params};
 
-use crate::world::item::{ItemInstance, ItemInstanceWithoutDefinition};
+use crate::{server_message::ServerMessage, world::item::{ItemInstance, ItemInstanceWithoutDefinition}};
 
 /// Represents a complete playable character in the game
 #[derive(Debug)]
@@ -46,6 +46,8 @@ pub struct FullCharacter {
     details: ExtraCharacterDetails,
     /// All the items the character holds
     items: HashMap<u32, crate::world::item::ItemInstance>,
+    /// Used to send messages to the user when needed
+    sender: tokio::sync::mpsc::Sender<crate::server_message::ServerMessage>,
 }
 
 /// Represents a partial playable character in the game
@@ -92,8 +94,8 @@ pub struct PartialCharacter {
 }
 
 impl PartialCharacter {
-    /// Convert into a full character
-    pub fn to_full(self, item_table: &HashMap<u32, crate::world::item::Item>) -> FullCharacter {
+    /// Convert into a full character, returning a FullCharacter and a receiver
+    pub fn to_full(self, item_table: &HashMap<u32, crate::world::item::Item>, sender: tokio::sync::mpsc::Sender<ServerMessage>) -> FullCharacter {
         let mut items = HashMap::new();
         for (k, i) in self.items.into_iter() {
             if let Some(i) = i.populate_item_definition(item_table) {
@@ -120,6 +122,7 @@ impl PartialCharacter {
             intelligence: self.intelligence,
             details: self.details,
             items,
+            sender: sender,
         }
     }
 }
@@ -139,6 +142,12 @@ impl crate::world::object::ObjectTrait for FullCharacter {
 
     fn items_mut(&mut self) -> Option<&mut HashMap<u32, crate::world::item::ItemInstance>> {
         Some(&mut self.items)
+    }
+
+    fn sender(
+        &mut self,
+    ) -> Option<&mut tokio::sync::mpsc::Sender<crate::server_message::ServerMessage>> {
+        Some(&mut self.sender)
     }
 
     fn build_put_object_packet(&self) -> common::packet::Packet {

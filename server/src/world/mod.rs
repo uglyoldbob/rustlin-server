@@ -115,8 +115,6 @@ pub struct World {
     users: Arc<Mutex<HashMap<u32, String>>>,
     /// The id generator for users
     client_ids: Arc<Mutex<crate::ClientList>>,
-    /// Used to broadcast server messages to the entire server
-    pub global_tx: tokio::sync::broadcast::Sender<crate::ServerMessage>,
     /// The connection to the database
     mysql: mysql_async::Pool,
     /// maps of the world
@@ -136,7 +134,6 @@ impl World {
         Self {
             users: Arc::new(Mutex::new(HashMap::new())),
             client_ids: Arc::new(Mutex::new(crate::ClientList::new())),
-            global_tx,
             mysql,
             maps: Arc::new(Mutex::new(HashMap::new())),
             map_info: Arc::new(tokio::sync::Mutex::new(HashMap::new())),
@@ -232,10 +229,47 @@ impl World {
         Ok(())
     }
 
+    /// Send a global chat message
+    pub async fn send_global_chat(&self, m: ServerMessage) {
+        let mut mi = self.map_info.lock().await;
+        for map in mi.values_mut() {
+            for obj in &mut map.objects {
+                if let Some(sender) = obj.1.sender() {
+                    sender.send(m.clone()).await;
+                }
+            }
+        }
+    }
+
+    /// Run an asynchronous closure on objects close enough to the specified object
+    pub async fn with_mut_objects_near_me_do<F, T, E>(
+        &self,
+        refo: &PlayerRef,
+        distance: f32,
+        include_self: bool,
+        gen: &mut T,
+        f: F,
+    ) -> Result<(), E>
+    where
+        F: AsyncFn(&mut object::Object, &mut T) -> Result<(), E>,
+    {
+        let mut mi = self.map_info.lock().await;
+        let map = mi.get_mut(&refo.map);
+        if let Some(map) = map {
+            let my_location = map.objects.get(&refo.id).unwrap().get_location();
+            for obj in map.objects.values_mut() {
+                if obj.linear_distance(&my_location) < distance && (include_self || refo.id != obj.id()) {
+                    f(obj, gen).await?;
+                }
+            }
+        }
+        Ok(())
+    }
+
     /// Run an asynchronous closure on objects close enough to the specified object
     pub async fn with_objects_nearby_do<F, T, E>(
         &self,
-        refo: &object::Object,
+        refo: PlayerRef,
         distance: f32,
         gen: &mut T,
         f: F,
@@ -244,10 +278,11 @@ impl World {
         F: AsyncFn(&object::Object, &mut T) -> Result<(), E>,
     {
         let mi = self.map_info.lock().await;
-        let map = mi.get(&refo.get_location().map);
+        let map = mi.get(&refo.map);
         if let Some(map) = map {
+            let mylocation = map.objects.get(&refo.id).map(|o| o.get_location()).unwrap();
             for obj in map.objects.values() {
-                if obj.linear_distance_to(refo) < distance && refo.id() != obj.id() {
+                if obj.linear_distance(&mylocation) < distance && refo.id != obj.id() {
                     f(obj, gen).await?;
                 }
             }
@@ -404,70 +439,6 @@ impl World {
     pub fn register_user(&self) -> u32 {
         let mut c = self.client_ids.lock().unwrap();
         c.new_entry()
-    }
-
-    pub fn get_broadcast_rx(&self) -> tokio::sync::broadcast::Receiver<crate::ServerMessage> {
-        self.global_tx.subscribe()
-    }
-
-    /// Process a single message for the server.
-    pub async fn handle_server_message(
-        &self,
-        p: ServerMessage,
-        packet_writer: &mut ServerPacketSender,
-    ) -> Result<u8, ClientError> {
-        match p {
-            ServerMessage::Disconnect => {
-                packet_writer
-                    .send_packet(ServerPacket::Disconnect.build())
-                    .await?;
-            }
-            ServerMessage::RegularChat { id, msg } => {
-                packet_writer
-                    .send_packet(ServerPacket::RegularChat { id: id, msg: msg }.build())
-                    .await?;
-            }
-            ServerMessage::WhisperChat(name, msg) => {
-                packet_writer
-                    .send_packet(
-                        ServerPacket::WhisperChat {
-                            name: name,
-                            msg: msg,
-                        }
-                        .build(),
-                    )
-                    .await?;
-            }
-            ServerMessage::YellChat { id, msg, x, y } => {
-                packet_writer
-                    .send_packet(
-                        ServerPacket::YellChat {
-                            id: id,
-                            msg: msg,
-                            x: x,
-                            y: y,
-                        }
-                        .build(),
-                    )
-                    .await?;
-            }
-            ServerMessage::GlobalChat(m) => {
-                packet_writer
-                    .send_packet(ServerPacket::GlobalChat(m).build())
-                    .await?;
-            }
-            ServerMessage::PledgeChat(m) => {
-                packet_writer
-                    .send_packet(ServerPacket::PledgeChat(m).build())
-                    .await?;
-            }
-            ServerMessage::PartyChat(m) => {
-                packet_writer
-                    .send_packet(ServerPacket::PartyChat(m).build())
-                    .await?;
-            }
-        }
-        Ok(0)
     }
 
     /// Save a new character into the database

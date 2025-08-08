@@ -65,7 +65,8 @@ async fn main() -> Result<(), String> {
         }
     }
 
-    let _ = world.global_tx.send(ServerMessage::Disconnect);
+    /// disconnect all players
+    todo!();
 
     tokio::time::sleep(tokio::time::Duration::from_millis(5000)).await;
 
