@@ -5,6 +5,7 @@ use crate::server::ClientError;
 use crate::server_message::ServerMessage;
 use crate::user::*;
 use crate::world::object::ObjectTrait;
+use crate::world::PlayerRef;
 use common::packet::*;
 
 use futures::FutureExt;
@@ -20,6 +21,8 @@ pub struct Client {
     account: Option<UserAccount>,
     /// The possible characters for the client
     chars: Vec<crate::character::Character>,
+    /// The player reference
+    char_ref: Option<PlayerRef>,
     /// The current character the client is playing with
     full_char: Option<crate::character::FullCharacter>,
     /// The world object
@@ -43,6 +46,7 @@ impl Client {
             packet_writer,
             account: None,
             chars: Vec::new(),
+            char_ref: None,
             full_char: None,
             id: world.register_user(),
             world,
@@ -437,7 +441,7 @@ impl Client {
                     .await?;
                 let mut mysql = self.world.get_mysql_conn().await?;
                 let c = self.chars[c].get_partial_details(&mut mysql).await?;
-                let pref = {
+                self.char_ref = {
                     let c = {
                         let item_table = self.world.item_table.lock().unwrap();
                         c.to_full(&item_table)
@@ -445,7 +449,7 @@ impl Client {
                     self.world.add_player(c).await
                 };
 
-                if let Some(r) = pref {
+                if let Some(r) = self.char_ref {
                     self.world
                         .with_player_ref_do(r, &mut self.packet_writer, async |c, pw| {
                             pw.send_packet(c.details_packet().build()).await.ok()?;
