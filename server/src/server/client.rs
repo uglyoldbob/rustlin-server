@@ -276,14 +276,15 @@ impl Client {
                 if let Some(fc) = &mut self.full_char {
                     if let Some(item) = fc.items_mut().unwrap().get_mut(&id) {
                         let item_table = self.world.item_table.lock().unwrap();
-                        if crate::world::item::ItemUsage::None == item.usage(&item_table) {
-                            packets.push(ServerPacket::Message {
-                                ty: 74,
-                                msgs: vec![item.name(&item_table)],
-                            }
-                            .build());
+                        if crate::world::item::ItemUsage::None == item.usage() {
+                            packets.push(
+                                ServerPacket::Message {
+                                    ty: 74,
+                                    msgs: vec![item.name()],
+                                }
+                                .build(),
+                            );
                         } else {
-                            
                         }
                     }
                 }
@@ -431,28 +432,34 @@ impl Client {
                     .find_char(&name)
                     .ok_or(ClientError::InvalidCharSelection)?;
 
-                let mut response = ServerPacket::StartGame(0).build();
-                self.packet_writer.send_packet(response).await?;
+                self.packet_writer
+                    .send_packet(ServerPacket::StartGame(0).build())
+                    .await?;
                 let mut mysql = self.world.get_mysql_conn().await?;
-                let mut c = self.chars[c].get_full_details(&mut mysql).await?;
-                self.world.add_player(c.clone()).await;
+                let c = self.chars[c].get_partial_details(&mut mysql).await?;
+                let pref = {
+                    let c = {
+                        let item_table = self.world.item_table.lock().unwrap();
+                        c.to_full(&item_table)
+                    };
+                    self.world.add_player(c).await
+                };
 
-                let o = c.clone().into();
-
-                response = c.details_packet().build();
-                self.packet_writer.send_packet(response).await?;
-
-                self.packet_writer
-                    .send_packet(c.get_map_packet().build())
-                    .await?;
-
-                self.packet_writer
-                    .send_packet(c.get_object_packet().build())
-                    .await?;
+                if let Some(r) = pref {
+                    self.world
+                        .with_player_ref_do(r, &mut self.packet_writer, async |c, pw| {
+                            pw.send_packet(c.details_packet().build()).await.ok()?;
+                            pw.send_packet(c.get_map_packet().build()).await.ok()?;
+                            pw.send_packet(c.get_object_packet().build()).await.ok()?;
+                            c.send_all_items(pw).await.ok()?;
+                            Some(42)
+                        })
+                        .await;
+                }
 
                 self.world
                     .with_objects_nearby_do::<_, _, PacketError>(
-                        &o,
+                        todo!(),
                         30.0,
                         &mut self.packet_writer,
                         async |o, pw| {
@@ -469,10 +476,6 @@ impl Client {
                 self.packet_writer
                     .send_packet(ServerPacket::Weather(0).build())
                     .await?;
-
-                c.send_all_items(&self.world, &mut self.packet_writer)
-                    .await?;
-                self.full_char = Some(c);
 
                 //TODO send owncharstatus packet
                 self.test1().await?;

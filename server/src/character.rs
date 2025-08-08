@@ -3,10 +3,10 @@ use std::{collections::HashMap, convert::TryInto};
 use common::packet::{ServerPacket, ServerPacketSender};
 use mysql_async::{prelude::Queryable, Params};
 
-use crate::world::item::{ItemInstance, ItemTrait};
+use crate::world::item::{ItemInstance, ItemInstanceWithoutDefinition};
 
 /// Represents a complete playable character in the game
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct FullCharacter {
     /// The account name for the character
     account_name: String,
@@ -46,6 +46,82 @@ pub struct FullCharacter {
     details: ExtraCharacterDetails,
     /// All the items the character holds
     items: HashMap<u32, crate::world::item::ItemInstance>,
+}
+
+/// Represents a partial playable character in the game
+#[derive(Debug)]
+pub struct PartialCharacter {
+    /// The account name for the character
+    account_name: String,
+    /// The name of the character
+    pub name: String,
+    /// The id of the character in the database
+    id: u32,
+    /// The alignment of the character
+    alignment: i16,
+    /// The level of the character
+    level: u8,
+    /// The pledge name of the character (empty string if no pledge)
+    pledge: String,
+    /// The class of character
+    class: Class,
+    /// The gender
+    gender: u8,
+    /// The current max hp
+    hp_max: u16,
+    /// The current mp max
+    mp_max: u16,
+    /// Current armor class
+    ac: i8,
+    /// Character strength
+    strength: u8,
+    /// Character dexterity
+    dexterity: u8,
+    /// Character constitution
+    constitution: u8,
+    /// Character wisdom
+    wisdom: u8,
+    /// Character charisma
+    charisma: u8,
+    /// Character intelligence
+    intelligence: u8,
+    /// Extra details
+    details: ExtraCharacterDetails,
+    /// All the items the character holds
+    items: HashMap<u32, crate::world::item::ItemInstanceWithoutDefinition>,
+}
+
+impl PartialCharacter {
+    /// Convert into a full character
+    pub fn to_full(self, item_table: &HashMap<u32, crate::world::item::Item>) -> FullCharacter {
+        let mut items = HashMap::new();
+        for (k, i) in self.items.into_iter() {
+            if let Some(i) = i.populate_item_definition(item_table) {
+                items.insert(k, i);
+            }
+        }
+        FullCharacter {
+            account_name: self.account_name,
+            name: self.name,
+            id: self.id,
+            alignment: self.alignment,
+            level: self.level,
+            pledge: self.pledge,
+            class: self.class,
+            gender: self.gender,
+            hp_max: self.hp_max,
+            mp_max: self.mp_max,
+            ac: self.ac,
+            strength: self.strength,
+            dexterity: self.dexterity,
+            constitution: self.constitution,
+            wisdom: self.wisdom,
+            charisma: self.charisma,
+            intelligence: self.intelligence,
+            details: self.details,
+            items,
+        }
+    }
 }
 
 impl crate::world::object::ObjectTrait for FullCharacter {
@@ -100,17 +176,13 @@ impl FullCharacter {
 
     /// Send all items the player has to the user
     pub async fn send_all_items(
-        &mut self,
-        w: &crate::world::World,
+        &self,
         packet_writer: &mut ServerPacketSender,
     ) -> Result<(), crate::server::ClientError> {
         let mut elements = Vec::new();
         {
-            let item_table = w.item_table.lock().unwrap();
-            for i in self.items.values_mut() {
-                if let Some(p) = i.inventory_element(&item_table) {
-                    elements.push(p);
-                }
+            for i in self.items.values() {
+                elements.push(i.inventory_element());
             }
         }
         packet_writer
@@ -461,19 +533,21 @@ impl Character {
     async fn get_items(
         &self,
         mysql: &mut mysql_async::Conn,
-    ) -> Result<Vec<ItemInstance>, crate::server::ClientError> {
+    ) -> Result<Vec<ItemInstanceWithoutDefinition>, crate::server::ClientError> {
         let query = "SELECT * from character_items WHERE char_id=?";
         let s = mysql.prep(query).await?;
         let params = Params::Positional(vec![self.id.into()]);
-        let details = mysql.exec_map(s, params, |a: ItemInstance| a).await?;
+        let details = mysql
+            .exec_map(s, params, |a: ItemInstanceWithoutDefinition| a)
+            .await?;
         Ok(details)
     }
 
-    /// Retrieve all gameplay details of the character
-    pub async fn get_full_details(
+    /// Retrieve all gameplay details of the character from the database, some of the elements need to be looked up to finish the character.
+    pub async fn get_partial_details(
         &self,
         mysql: &mut mysql_async::Conn,
-    ) -> Result<FullCharacter, crate::server::ClientError> {
+    ) -> Result<PartialCharacter, crate::server::ClientError> {
         use mysql_async::prelude::Queryable;
         let query = "SELECT Exp, CurHp, CurMp, 1, Food, 32, 1, 2, 3, 4, LocX, LocY, MapID from characters WHERE account_name=? and char_name=?";
         log::info!(
@@ -495,7 +569,7 @@ impl Character {
         for i in items {
             item_map.insert(i.id(), i);
         }
-        Ok(FullCharacter {
+        Ok(PartialCharacter {
             account_name: self.account_name.clone(),
             name: self.name.clone(),
             id: self.id,

@@ -59,6 +59,12 @@ pub struct Map {
     skill_usage: bool,
 }
 
+#[derive(Clone, Copy)]
+pub struct PlayerRef {
+    map: u16,
+    id: u32,
+}
+
 /// Represents the dynamic information of a map
 #[derive(Debug)]
 pub struct MapInfo {
@@ -139,7 +145,7 @@ impl World {
     }
 
     /// Add a player to the world
-    pub async fn add_player(&self, p: crate::character::FullCharacter) {
+    pub async fn add_player(&self, p: crate::character::FullCharacter) -> Option<PlayerRef> {
         let location = p.location_ref().clone();
         let obj: object::Object = p.into();
         let id = obj.id();
@@ -147,8 +153,71 @@ impl World {
         let m2 = m.get_mut(&location.map);
         if let Some(map) = m2 {
             map.objects.insert(id, obj);
-            log::info!("The objects on the map are {:?}", map);
+            Some(PlayerRef {
+                map: location.map,
+                id,
+            })
+        } else {
+            None
         }
+    }
+
+    /// Run an asynchronous closure on the player object
+    pub async fn with_player_ref_do<F, T, E>(&self, refo: PlayerRef, gen: &mut T, f: F) -> Option<E>
+    where
+        F: AsyncFn(&crate::character::FullCharacter, &mut T) -> Option<E>,
+    {
+        let mi = self.map_info.lock().await;
+        let map = mi.get(&refo.map);
+        if let Some(map) = map {
+            if let Some(obj) = map.objects.get(&refo.id) {
+                if let object::Object::Player(fc) = obj {
+                    return f(fc, gen).await;
+                }
+            }
+        }
+        None
+    }
+
+    /// Run an asynchronous closure on the player object
+    pub async fn with_player_mut_do<F, T, E>(&self, refo: PlayerRef, gen: &mut T, f: F) -> Option<E>
+    where
+        F: AsyncFn(&mut crate::character::FullCharacter, &mut T) -> Option<E>,
+    {
+        let mut mi = self.map_info.lock().await;
+        let map = mi.get_mut(&refo.map);
+        if let Some(map) = map {
+            if let Some(obj) = map.objects.get_mut(&refo.id) {
+                if let object::Object::Player(fc) = obj {
+                    return f(fc, gen).await;
+                }
+            }
+        }
+        None
+    }
+
+    /// Run an asynchronous closure on objects close enough to the specified object
+    pub async fn with_objects_near_me_do<F, T, E>(
+        &self,
+        refo: &PlayerRef,
+        distance: f32,
+        gen: &mut T,
+        f: F,
+    ) -> Result<(), E>
+    where
+        F: AsyncFn(&object::Object, &mut T) -> Result<(), E>,
+    {
+        let mut mi = self.map_info.lock().await;
+        let map = mi.get_mut(&refo.map);
+        if let Some(map) = map {
+            let my_location = map.objects.get(&refo.id).unwrap().get_location();
+            for obj in map.objects.values() {
+                if obj.linear_distance(&my_location) < distance && refo.id != obj.id() {
+                    f(obj, gen).await?;
+                }
+            }
+        }
+        Ok(())
     }
 
     /// Run an asynchronous closure on objects close enough to the specified object

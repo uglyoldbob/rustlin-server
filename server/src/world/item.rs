@@ -588,60 +588,59 @@ pub struct ItemStuff {
 
 /// an instance of an item, as opposed to Item, which defines what an item is
 #[derive(Clone, Debug)]
+pub struct ItemInstanceWithoutDefinition {
+    /// The item id
+    id: u32,
+    stuff: ItemStuff,
+}
+
+/// an instance of an item, as opposed to Item, which defines what an item is
+#[derive(Clone, Debug)]
 pub struct ItemInstance {
     /// The item definition
-    definition: ItemOrId,
+    definition: Item,
     stuff: ItemStuff,
 }
 
 impl ItemInstance {
-    /// Populate the item definition, if necessary
-    pub fn populate_item_definition(&mut self, item_table: &HashMap<u32, Item>) {
-        if let ItemOrId::Id(id) = self.definition {
-            if let Some(item) = item_table.get(&id) {
-                self.definition = ItemOrId::Item(item.to_owned());
-            } else {
-                log::error!("Item {} not found in table", id);
-            }
-        }
-    }
-
     /// Get the item id
     pub fn id(&self) -> u32 {
         self.stuff.item_id
     }
 
     /// Get the item name
-    pub fn name(&mut self, item_table: &HashMap<u32, Item>) -> String {
-        self.populate_item_definition(item_table);
-        if let ItemOrId::Item(i) = &self.definition {
-            i.name(&self.stuff)
-        } else {
-            unimplemented!()
-        }
+    pub fn name(&mut self) -> String {
+        self.definition.name(&self.stuff)
     }
 
     /// Get item usage
-    pub fn usage(&mut self, item_table: &HashMap<u32, Item>) -> ItemUsage {
-        self.populate_item_definition(item_table);
-        if let ItemOrId::Item(i) = &self.definition {
-            i.usage()
-        } else {
-            unimplemented!()
-        }
+    pub fn usage(&mut self) -> ItemUsage {
+        self.definition.usage()
     }
 
     /// Get the inventory packet for this item instance, retrieving the item details if needed
-    pub fn inventory_element(
-        &mut self,
-        item_table: &HashMap<u32, Item>,
-    ) -> Option<common::packet::InventoryElement> {
-        self.populate_item_definition(item_table);
-        if let ItemOrId::Item(i) = &self.definition {
-            Some(i.inventory_element(&self.stuff))
+    pub fn inventory_element(&self) -> common::packet::InventoryElement {
+        self.definition.inventory_element(&self.stuff)
+    }
+}
+
+impl ItemInstanceWithoutDefinition {
+    /// Populate the item definition, if necessary
+    pub fn populate_item_definition(self, item_table: &HashMap<u32, Item>) -> Option<ItemInstance> {
+        if let Some(item) = item_table.get(&self.id) {
+            Some(ItemInstance {
+                definition: item.to_owned(),
+                stuff: self.stuff,
+            })
         } else {
+            log::error!("Item {} not found in table", self.id);
             None
         }
+    }
+
+    /// Get the item id
+    pub fn id(&self) -> u32 {
+        self.stuff.item_id
     }
 }
 
@@ -684,14 +683,13 @@ impl mysql_async::prelude::FromRow for ItemStuff {
     }
 }
 
-impl mysql_async::prelude::FromRow for ItemInstance {
+impl mysql_async::prelude::FromRow for ItemInstanceWithoutDefinition {
     fn from_row_opt(row: mysql_async::Row) -> Result<Self, mysql_async::FromRowError>
     where
         Self: Sized,
     {
-        let id: u32 = row.get(1).ok_or(mysql_async::FromRowError(row.clone()))?;
         Ok(Self {
-            definition: ItemOrId::Id(id),
+            id: row.get(1).ok_or(mysql_async::FromRowError(row.clone()))?,
             stuff: mysql_async::prelude::FromRow::from_row_opt(row)?,
         })
     }
