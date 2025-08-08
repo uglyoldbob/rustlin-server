@@ -364,6 +364,13 @@ pub enum ServerPacket {
     RemoveObject(u32),
     /// Send the player back to the character select screen
     BackToCharacterSelect,
+    /// A message presented to the user
+    Message {
+        /// message type
+        ty: u16,
+        /// message strings
+        msgs: Vec<String>,
+    },
 }
 
 /// Potential bless status for an item
@@ -385,6 +392,12 @@ impl ServerPacket {
     pub fn build(self) -> Packet {
         let mut p = Packet::new();
         match self {
+            ServerPacket::Message { ty, msgs } => {
+                p.add_u8(87).add_u16(ty).add_u8(msgs.len() as u8);
+                for m in msgs {
+                    p.add_string(&m);
+                }
+            }
             ServerPacket::MoveObject {
                 id,
                 x,

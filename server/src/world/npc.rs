@@ -1,5 +1,7 @@
 //! NPC related code
 
+use std::collections::HashMap;
+
 #[derive(Debug)]
 pub struct Npc {
     /// The object id for the npc
@@ -24,11 +26,11 @@ impl super::object::ObjectTrait for Npc {
         self.id
     }
 
-    fn get_items(&self) -> Option<Vec<super::item::ItemInstance>> {
+    fn get_items(&self) -> Option<&HashMap<u32, super::item::ItemInstance>> {
         None
     }
 
-    fn items_mut(&mut self) -> Option<&mut Vec<super::item::ItemInstance>> {
+    fn items_mut(&mut self) -> Option<&mut HashMap<u32, super::item::ItemInstance>> {
         None
     }
 

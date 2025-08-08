@@ -1,5 +1,7 @@
 //! This holds code generally used for all objects in the game
 
+use std::collections::HashMap;
+
 use crate::character::FullCharacter;
 
 /// The generic object trait for the server
@@ -39,10 +41,10 @@ pub trait ObjectTrait {
     fn build_put_object_packet(&self) -> common::packet::Packet;
 
     /// Get the list of items the object is posessing
-    fn get_items(&self) -> Option<Vec<super::item::ItemInstance>>;
+    fn get_items(&self) -> Option<&HashMap<u32, super::item::ItemInstance>>;
 
     /// Get the list of items, mutable
-    fn items_mut(&mut self) -> Option<&mut Vec<super::item::ItemInstance>>;
+    fn items_mut(&mut self) -> Option<&mut HashMap<u32, super::item::ItemInstance>>;
 }
 
 /// The things that an object can be

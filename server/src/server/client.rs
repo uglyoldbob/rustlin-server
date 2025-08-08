@@ -183,6 +183,15 @@ impl Client {
 
     /// Performs packet testing
     pub async fn test1(&mut self) -> Result<(), ClientError> {
+        self.packet_writer
+            .send_packet(
+                ServerPacket::Message {
+                    ty: 74,
+                    msgs: vec!["stuff".to_string()],
+                }
+                .build(),
+            )
+            .await?;
         Ok(())
     }
 
@@ -262,7 +271,25 @@ impl Client {
         match c {
             ClientPacket::UseItem { id, remainder } => {
                 log::info!("User wants to use item {}: {:X?}", id, remainder);
+                let mut packets = Vec::new();
                 let p = common::packet::Packet::raw_packet(remainder);
+                if let Some(fc) = &mut self.full_char {
+                    if let Some(item) = fc.items_mut().unwrap().get_mut(&id) {
+                        let item_table = self.world.item_table.lock().unwrap();
+                        if crate::world::item::ItemUsage::None == item.usage(&item_table) {
+                            packets.push(ServerPacket::Message {
+                                ty: 74,
+                                msgs: vec![item.name(&item_table)],
+                            }
+                            .build());
+                        } else {
+                            
+                        }
+                    }
+                }
+                for p in packets {
+                    self.packet_writer.send_packet(p).await?;
+                }
             }
             ClientPacket::Ping(v) => {
                 log::info!("The user pinged us {v}");

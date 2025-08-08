@@ -9,6 +9,10 @@ pub trait ItemTrait {
     fn id(&self) -> u32;
     /// Get the inventory packet
     fn inventory_element(&self, stuff: &ItemStuff) -> common::packet::InventoryElement;
+    /// Get the item name
+    fn name(&self, stuff: &ItemStuff) -> String;
+    /// Get the item usage
+    fn usage(&self) -> ItemUsage;
 }
 
 #[derive(Clone, Debug)]
@@ -18,6 +22,119 @@ pub enum ElementalEnchantType {
     Fire = 2,
     Water = 4,
     Wind = 8,
+}
+
+/// The ways an item can be used
+#[derive(Clone, Copy, Debug, PartialEq)]
+#[repr(i8)]
+pub enum ItemUsage {
+    None = -1,
+    Normal = 0,
+    Weapon = 1,
+    Armor = 2,
+    Wand = 3,
+    WishWand = 4,
+    WandWithTarget = 5,
+    TeleportScroll0 = 9,
+    TeleportScroll1 = 6,
+    IdentifyScroll = 7,
+    ResurrectScroll = 8,
+    Letter = 12,
+    Letter2 = 13,
+    WithTarget = 14,
+    MusicalInstrument = 15,
+    Polymorph = 16,
+    WandNearbyTarget = 17,
+    HeroRing = 23,
+    EnchantWeaponScroll = 26,
+    EnchantArmorScroll = 27,
+    BlankScroll = 28,
+    BlessedTeleport = 29,
+    SpellBuff = 30,
+    ChristmasCard = 31,
+    ChristmasCard2 = 32,
+    ValentinesCard = 33,
+    ValentinesCard2 = 34,
+    WhiteDayCard = 35,
+    WhiteDayCard2 = 36,
+    Earring = 40,
+    FishingRod = 42,
+    EnchantAccessoryScroll = 46,
+}
+
+impl From<i8> for ItemUsage {
+    fn from(value: i8) -> Self {
+        match value {
+            -1 => Self::None,
+            0 => Self::Normal,
+            1 => Self::Weapon,
+            2 => Self::Armor,
+            3 => Self::Wand,
+            4 | 38 => Self::WishWand,
+            5 => Self::WandWithTarget,
+            9 => Self::TeleportScroll0,
+            6 => Self::TeleportScroll1,
+            7 => Self::IdentifyScroll,
+            8 => Self::ResurrectScroll,
+            12 => Self::Letter,
+            13 => Self::Letter2,
+            14 => Self::WithTarget,
+            15 => Self::MusicalInstrument,
+            16 => Self::Polymorph,
+            17 => Self::WandNearbyTarget,
+            23 => Self::HeroRing,
+            26 => Self::EnchantWeaponScroll,
+            27 => Self::EnchantArmorScroll,
+            28 => Self::BlankScroll,
+            29 => Self::BlessedTeleport,
+            30 => Self::SpellBuff,
+            31 => Self::ChristmasCard,
+            32 => Self::ChristmasCard2,
+            33 => Self::ValentinesCard,
+            34 => Self::ValentinesCard2,
+            35 => Self::WhiteDayCard,
+            36 => Self::WhiteDayCard2,
+            40 => Self::Earring,
+            42 => Self::FishingRod,
+            46 => Self::EnchantAccessoryScroll,
+            _ => unimplemented!(),
+        }
+    }
+}
+
+impl From<&str> for ItemUsage {
+    fn from(value: &str) -> Self {
+        match value {
+            "none" => Self::None,
+            "normal" => Self::Normal,
+            "weapon" => Self::Weapon,
+            "armor" => Self::Armor,
+            "spell_long" => Self::WandWithTarget,
+            "ntele" => Self::TeleportScroll1,
+            "identify" => Self::IdentifyScroll,
+            "res" => Self::ResurrectScroll,
+            "letter" => Self::Letter,
+            "letter_w" => Self::Letter2,
+            "choice" => Self::WithTarget,
+            "instrument" => Self::MusicalInstrument,
+            "sosc" => Self::Polymorph,
+            "spell_short" => Self::WandNearbyTarget,
+            "zel" => Self::EnchantArmorScroll,
+            "dai" => Self::EnchantWeaponScroll,
+            "blank" => Self::BlankScroll,
+            "ccard" => Self::ChristmasCard,
+            "ccard_w" => Self::ChristmasCard2,
+            "vcard" => Self::ValentinesCard,
+            "vcard_w" => Self::ValentinesCard2,
+            "spell_buff" => Self::SpellBuff,
+            "earring" => Self::Earring,
+            "ring" => Self::HeroRing,
+            "btele" => Self::BlessedTeleport,
+            "fishing_rod" => Self::FishingRod,
+            "del" => Self::EnchantAccessoryScroll,
+            _ => Self::None,
+        }
+    }
 }
 
 /// A player usable weapon
@@ -61,9 +178,11 @@ impl ItemTrait for Weapon {
         self.id
     }
 
-    fn inventory_element(&self, stuff: &ItemStuff) -> common::packet::InventoryElement {
-        log::info!("Sending inventory packet for {:?}", self);
+    fn usage(&self) -> ItemUsage {
+        ItemUsage::Weapon
+    }
 
+    fn name(&self, stuff: &ItemStuff) -> String {
         let mut description = " ".to_string();
         if stuff.identified {
             if let Some((t, l)) = &stuff.elemental_enchant {
@@ -112,15 +231,22 @@ impl ItemTrait for Weapon {
         if stuff.count > 1 {
             description.push_str(&format!("({}) ", stuff.count));
         }
+        description
+    }
+
+    fn inventory_element(&self, stuff: &ItemStuff) -> common::packet::InventoryElement {
+        log::info!("Sending inventory packet for {:?}", self);
+
+        let mut description = self.name(stuff);
 
         if stuff.equipped {
             description.push_str("($9)");
         }
 
         common::packet::InventoryElement {
-            id: self.id,
+            id: stuff.item_id,
             i_type: 1,
-            n_use: 1,
+            n_use: ItemUsage::Weapon as u8,
             icon: self.inventory_graphic,
             blessing: common::packet::ItemBlessing::Normal,
             count: stuff.count,
@@ -172,9 +298,11 @@ impl ItemTrait for Armor {
         self.id
     }
 
-    fn inventory_element(&self, stuff: &ItemStuff) -> common::packet::InventoryElement {
-        log::info!("Sending armor inventory packet for {:?}", self);
+    fn usage(&self) -> ItemUsage {
+        ItemUsage::Armor
+    }
 
+    fn name(&self, stuff: &ItemStuff) -> String {
         let mut description = " ".to_string();
 
         if stuff.identified {
@@ -195,15 +323,22 @@ impl ItemTrait for Armor {
         if stuff.count > 1 {
             description.push_str(&format!("({}) ", stuff.count));
         }
+        description
+    }
+
+    fn inventory_element(&self, stuff: &ItemStuff) -> common::packet::InventoryElement {
+        log::info!("Sending armor inventory packet for {:?}", self);
+
+        let mut description = self.name(stuff);
 
         if stuff.equipped {
             description.push_str("($17)");
         }
 
         common::packet::InventoryElement {
-            id: self.id,
+            id: stuff.item_id,
             i_type: 1,
-            n_use: 1,
+            n_use: ItemUsage::Armor as u8,
             icon: self.inventory_graphic,
             blessing: common::packet::ItemBlessing::Normal,
             count: stuff.count,
@@ -214,7 +349,7 @@ impl ItemTrait for Armor {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 #[repr(u8)]
 pub enum EtcItemType {
     Arrow = 0,
@@ -305,6 +440,8 @@ pub struct EtcItem {
     unidentified: String,
     /// Identified name
     identified: String,
+    /// Item usage
+    usage: ItemUsage,
 }
 
 impl EtcItem {
@@ -321,6 +458,7 @@ impl mysql_async::prelude::FromRow for EtcItem {
         Self: Sized,
     {
         let itype: String = row.get(4).ok_or(mysql_async::FromRowError(row.clone()))?;
+        let usage: String = row.get(5).ok_or(mysql_async::FromRowError(row.clone()))?;
         Ok(Self {
             id: row.get(0).ok_or(mysql_async::FromRowError(row.clone()))?,
             weight: row.get(7).ok_or(mysql_async::FromRowError(row.clone()))?,
@@ -330,6 +468,7 @@ impl mysql_async::prelude::FromRow for EtcItem {
             unidentified: row.get(2).ok_or(mysql_async::FromRowError(row.clone()))?,
             identified: row.get(3).ok_or(mysql_async::FromRowError(row.clone()))?,
             itype: itype.as_str().into(),
+            usage: usage.as_str().into(),
         })
     }
 }
@@ -339,8 +478,11 @@ impl ItemTrait for EtcItem {
         self.id
     }
 
-    fn inventory_element(&self, stuff: &ItemStuff) -> common::packet::InventoryElement {
-        log::info!("Sending etc inventory element for {:?}", self);
+    fn usage(&self) -> ItemUsage {
+        self.usage
+    }
+
+    fn name(&self, stuff: &ItemStuff) -> String {
         let mut description = " ".to_string();
 
         description.push_str(if stuff.identified {
@@ -362,6 +504,7 @@ impl ItemTrait for EtcItem {
         }
 
         if EtcItemType::Light == self.itype {
+            ///TODO
             let emitting_light = false;
             if emitting_light {
                 description.push_str("($10) ");
@@ -375,6 +518,12 @@ impl ItemTrait for EtcItem {
                 _ => {}
             }
         }
+        description
+    }
+
+    fn inventory_element(&self, stuff: &ItemStuff) -> common::packet::InventoryElement {
+        log::info!("Sending etc inventory element for {:?}", self);
+        let mut description = self.name(stuff);
 
         if stuff.equipped {
             if self.itype == EtcItemType::PetItem {
@@ -383,9 +532,9 @@ impl ItemTrait for EtcItem {
         }
 
         common::packet::InventoryElement {
-            id: self.id,
-            i_type: 1,
-            n_use: 1,
+            id: stuff.item_id,
+            i_type: self.itype as i8,
+            n_use: self.usage as u8,
             icon: self.inventory_graphic,
             blessing: common::packet::ItemBlessing::Normal,
             count: stuff.count,
@@ -454,6 +603,31 @@ impl ItemInstance {
             } else {
                 log::error!("Item {} not found in table", id);
             }
+        }
+    }
+
+    /// Get the item id
+    pub fn id(&self) -> u32 {
+        self.stuff.item_id
+    }
+
+    /// Get the item name
+    pub fn name(&mut self, item_table: &HashMap<u32, Item>) -> String {
+        self.populate_item_definition(item_table);
+        if let ItemOrId::Item(i) = &self.definition {
+            i.name(&self.stuff)
+        } else {
+            unimplemented!()
+        }
+    }
+
+    /// Get item usage
+    pub fn usage(&mut self, item_table: &HashMap<u32, Item>) -> ItemUsage {
+        self.populate_item_definition(item_table);
+        if let ItemOrId::Item(i) = &self.definition {
+            i.usage()
+        } else {
+            unimplemented!()
         }
     }
 

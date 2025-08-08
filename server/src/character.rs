@@ -45,7 +45,7 @@ pub struct FullCharacter {
     /// Extra details
     details: ExtraCharacterDetails,
     /// All the items the character holds
-    items: Vec<crate::world::item::ItemInstance>,
+    items: HashMap<u32, crate::world::item::ItemInstance>,
 }
 
 impl crate::world::object::ObjectTrait for FullCharacter {
@@ -57,11 +57,11 @@ impl crate::world::object::ObjectTrait for FullCharacter {
         self.id
     }
 
-    fn get_items(&self) -> Option<Vec<crate::world::item::ItemInstance>> {
-        None
+    fn get_items(&self) -> Option<&HashMap<u32, crate::world::item::ItemInstance>> {
+        Some(&self.items)
     }
 
-    fn items_mut(&mut self) -> Option<&mut Vec<crate::world::item::ItemInstance>> {
+    fn items_mut(&mut self) -> Option<&mut HashMap<u32, crate::world::item::ItemInstance>> {
         Some(&mut self.items)
     }
 
@@ -107,7 +107,7 @@ impl FullCharacter {
         let mut elements = Vec::new();
         {
             let item_table = w.item_table.lock().unwrap();
-            for i in &mut self.items {
+            for i in self.items.values_mut() {
                 if let Some(p) = i.inventory_element(&item_table) {
                     elements.push(p);
                 }
@@ -491,6 +491,10 @@ impl Character {
             .await?;
         let details = details[0];
         let items = self.get_items(mysql).await?;
+        let mut item_map = HashMap::new();
+        for i in items {
+            item_map.insert(i.id(), i);
+        }
         Ok(FullCharacter {
             account_name: self.account_name.clone(),
             name: self.name.clone(),
@@ -510,7 +514,7 @@ impl Character {
             charisma: self.charisma,
             intelligence: self.intelligence,
             details,
-            items,
+            items: item_map,
         })
     }
 
