@@ -932,14 +932,14 @@ impl Packet {
     }
 
     /// Fetch a u8 from the packet
-    fn pull_u8(&mut self) -> u8 {
+    pub fn pull_u8(&mut self) -> u8 {
         let val: u8 = self.data[self.read];
         self.read += 1;
         val
     }
 
     /// Fetch a u16 from the packet
-    fn pull_u16(&mut self) -> u16 {
+    pub fn pull_u16(&mut self) -> u16 {
         let mut val: u16 = (self.data[self.read + 1] as u16) << 8;
         val |= self.data[self.read] as u16;
         self.read += 2;
@@ -947,7 +947,7 @@ impl Packet {
     }
 
     /// Fetch a u32 from the packet
-    fn pull_u32(&mut self) -> u32 {
+    pub fn pull_u32(&mut self) -> u32 {
         let mut val: u32 = self.data[self.read + 3] as u32;
         val = (val << 8) | (self.data[self.read + 2] as u32);
         val = (val << 8) | (self.data[self.read + 1] as u32);
@@ -957,7 +957,7 @@ impl Packet {
     }
 
     /// Fetch a string from the packet
-    fn pull_string(&mut self) -> String {
+    pub fn pull_string(&mut self) -> String {
         let mut v: String = "".to_string();
         //a do while loop
         while {

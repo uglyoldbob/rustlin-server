@@ -4,6 +4,7 @@ use crate::client_message::ClientMessage;
 use crate::server::ClientError;
 use crate::server_message::ServerMessage;
 use crate::user::*;
+use crate::world::item::ItemUsage;
 use crate::world::object::ObjectTrait;
 use crate::world::PlayerRef;
 use common::packet::*;
@@ -110,18 +111,27 @@ impl Client {
                 if let Some(r) = self.char_ref {
                     let m = self
                         .world
-                        .with_player_ref_do(r, &mut self.packet_writer, async move |fc, pw| {
+                        .with_player_ref_do(r, &mut self.packet_writer, async move |fc, pw, _| {
                             let amsg = format!("[{}] {}", fc.name, msg);
                             Some(ServerMessage::RegularChat { id: 0, msg: amsg })
                         })
                         .await;
                     if let Some(m) = m {
-                        let _ = self.world.with_mut_objects_near_me_do(&r, 30.0, true, &mut self.packet_writer, async move |o: &mut crate::world::object::Object, pw| {
-                            if let Some(sender) = o.sender() {
-                                let _ = sender.send(m.clone()).await;
-                            }
-                            Ok::<(), String>(())
-                        }).await;
+                        let _ = self
+                            .world
+                            .with_mut_objects_near_me_do(
+                                &r,
+                                30.0,
+                                true,
+                                &mut self.packet_writer,
+                                async move |o: &mut crate::world::object::Object, pw| {
+                                    if let Some(sender) = o.sender() {
+                                        let _ = sender.send(m.clone()).await;
+                                    }
+                                    Ok::<(), String>(())
+                                },
+                            )
+                            .await;
                     }
                 }
             }
@@ -130,7 +140,7 @@ impl Client {
                 if let Some(r) = self.char_ref {
                     let m = self
                         .world
-                        .with_player_ref_do(r, &mut self.packet_writer, async move |fc, pw| {
+                        .with_player_ref_do(r, &mut self.packet_writer, async move |fc, pw, _| {
                             let amsg = format!("[{}] {}", fc.name, msg);
                             Some(ServerMessage::YellChat {
                                 id: 0,
@@ -141,12 +151,21 @@ impl Client {
                         })
                         .await;
                     if let Some(m) = m {
-                        let _ = self.world.with_mut_objects_near_me_do(&r, 60.0, true, &mut self.packet_writer, async move |o: &mut crate::world::object::Object, pw| {
-                            if let Some(sender) = o.sender() {
-                                let _ = sender.send(m.clone()).await;
-                            }
-                            Ok::<(), String>(())
-                        }).await;
+                        let _ = self
+                            .world
+                            .with_mut_objects_near_me_do(
+                                &r,
+                                60.0,
+                                true,
+                                &mut self.packet_writer,
+                                async move |o: &mut crate::world::object::Object, pw| {
+                                    if let Some(sender) = o.sender() {
+                                        let _ = sender.send(m.clone()).await;
+                                    }
+                                    Ok::<(), String>(())
+                                },
+                            )
+                            .await;
                     }
                 }
             }
@@ -154,7 +173,7 @@ impl Client {
                 if let Some(r) = self.char_ref {
                     let m = self
                         .world
-                        .with_player_ref_do(r, &mut self.packet_writer, async move |fc, pw| {
+                        .with_player_ref_do(r, &mut self.packet_writer, async move |fc, pw, _| {
                             let amsg = format!("[{}] {}", fc.name, msg);
                             Some(ServerMessage::GlobalChat(amsg))
                         })
@@ -168,7 +187,7 @@ impl Client {
                 if let Some(r) = self.char_ref {
                     let m = self
                         .world
-                        .with_player_ref_do(r, &mut self.packet_writer, async move |fc, pw| {
+                        .with_player_ref_do(r, &mut self.packet_writer, async move |fc, pw, _| {
                             let amsg = format!("[{}] {}", fc.name, msg);
                             Some(ServerMessage::PledgeChat(amsg))
                         })
@@ -182,7 +201,7 @@ impl Client {
                 if let Some(r) = self.char_ref {
                     let m = self
                         .world
-                        .with_player_ref_do(r, &mut self.packet_writer, async move |fc, pw| {
+                        .with_player_ref_do(r, &mut self.packet_writer, async move |fc, pw, _| {
                             let amsg = format!("[{}] {}", fc.name, msg);
                             Some(ServerMessage::PartyChat(amsg))
                         })
@@ -196,13 +215,21 @@ impl Client {
                 if let Some(r) = self.char_ref {
                     let m = self
                         .world
-                        .with_player_ref_do(r, &mut self.packet_writer, async move |fc, pw| {
+                        .with_player_ref_do(r, &mut self.packet_writer, async move |fc, pw, _| {
                             Some(ServerMessage::WhisperChat(fc.name.clone(), msg.clone()))
                         })
                         .await;
                     if let Some(m) = m {
                         if let Err(e) = self.world.send_whisper_to(person.as_str(), m).await {
-                            self.packet_writer.send_packet(ServerPacket::Message { ty: 73, msgs: vec![person]}.build()).await?;
+                            self.packet_writer
+                                .send_packet(
+                                    ServerPacket::Message {
+                                        ty: 73,
+                                        msgs: vec![person],
+                                    }
+                                    .build(),
+                                )
+                                .await?;
                         }
                     }
                 }
@@ -331,7 +358,7 @@ impl Client {
                 let p = common::packet::Packet::raw_packet(remainder);
                 if let Some(r) = self.char_ref {
                     self.world
-                        .with_player_mut_do(r, &mut packets, async move |fc, packets| {
+                        .with_player_mut_do(r, &mut packets, async move |fc, packets, map| {
                             if let Some(item) = fc.items_mut().unwrap().get_mut(&id) {
                                 if crate::world::item::ItemUsage::None == item.usage() {
                                     packets.push(
@@ -341,8 +368,28 @@ impl Client {
                                         }
                                         .build(),
                                     );
-                                } else {
+                                    return None;
                                 }
+                                // Can't use items whe you are dead
+                                if fc.curr_hp() == 0 {
+                                    return None;
+                                }
+                                // Or when the map you are on disallows item usage
+                                if !map.can_use_items() {
+                                    packets.push(
+                                        ServerPacket::Message {
+                                            ty: 563,
+                                            msgs: vec![],
+                                        }
+                                        .build(),
+                                    );
+                                    return None;
+                                }
+                                let mut poly_name = None;
+                                if item.usage() == ItemUsage::Polymorph {
+                                    poly_name = Some(p.pull_string());
+                                }
+                                
                             }
                             Some(42)
                         })
@@ -507,7 +554,7 @@ impl Client {
 
                 if let Some(r) = self.char_ref {
                     self.world
-                        .with_player_ref_do(r, &mut self.packet_writer, async |c, pw| {
+                        .with_player_ref_do(r, &mut self.packet_writer, async |c, pw, _| {
                             pw.send_packet(c.details_packet().build()).await.ok()?;
                             pw.send_packet(c.get_map_packet().build()).await.ok()?;
                             pw.send_packet(c.get_object_packet().build()).await.ok()?;
@@ -563,7 +610,7 @@ impl Client {
                 };
                 if let Some(r) = self.char_ref {
                     self.world
-                        .with_player_mut_do(r, &mut 42, async move |fc, _| {
+                        .with_player_mut_do(r, &mut 42, async move |fc, _, _| {
                             let l = fc.location_mut();
                             l.x = x2;
                             l.y = y2;
@@ -738,25 +785,39 @@ impl Client {
         log::info!("Processing a message: {:?}", p);
         match p {
             ServerMessage::Disconnect => {
-                self.packet_writer.send_packet(ServerPacket::Disconnect.build()).await?;
+                self.packet_writer
+                    .send_packet(ServerPacket::Disconnect.build())
+                    .await?;
             }
             ServerMessage::RegularChat { id, msg } => {
-                self.packet_writer.send_packet(ServerPacket::RegularChat { id, msg }.build()).await?;
+                self.packet_writer
+                    .send_packet(ServerPacket::RegularChat { id, msg }.build())
+                    .await?;
             }
             ServerMessage::YellChat { id, msg, x, y } => {
-                self.packet_writer.send_packet(ServerPacket::YellChat { id, msg, x, y }.build()).await?;
+                self.packet_writer
+                    .send_packet(ServerPacket::YellChat { id, msg, x, y }.build())
+                    .await?;
             }
             ServerMessage::GlobalChat(m) => {
-                self.packet_writer.send_packet(ServerPacket::GlobalChat(m).build()).await?;
+                self.packet_writer
+                    .send_packet(ServerPacket::GlobalChat(m).build())
+                    .await?;
             }
             ServerMessage::PledgeChat(m) => {
-                self.packet_writer.send_packet(ServerPacket::PledgeChat(m).build()).await?;
+                self.packet_writer
+                    .send_packet(ServerPacket::PledgeChat(m).build())
+                    .await?;
             }
             ServerMessage::PartyChat(m) => {
-                self.packet_writer.send_packet(ServerPacket::PartyChat(m).build()).await?;
+                self.packet_writer
+                    .send_packet(ServerPacket::PartyChat(m).build())
+                    .await?;
             }
             ServerMessage::WhisperChat(u, m) => {
-                self.packet_writer.send_packet(ServerPacket::WhisperChat { name: u, msg: m }.build()).await?;
+                self.packet_writer
+                    .send_packet(ServerPacket::WhisperChat { name: u, msg: m }.build())
+                    .await?;
             }
         }
         Ok(())

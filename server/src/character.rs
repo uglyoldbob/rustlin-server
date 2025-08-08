@@ -3,7 +3,10 @@ use std::{collections::HashMap, convert::TryInto};
 use common::packet::{ServerPacket, ServerPacketSender};
 use mysql_async::{prelude::Queryable, Params};
 
-use crate::{server_message::ServerMessage, world::item::{ItemInstance, ItemInstanceWithoutDefinition}};
+use crate::{
+    server_message::ServerMessage,
+    world::item::{ItemInstance, ItemInstanceWithoutDefinition},
+};
 
 /// Represents a complete playable character in the game
 #[derive(Debug)]
@@ -95,7 +98,11 @@ pub struct PartialCharacter {
 
 impl PartialCharacter {
     /// Convert into a full character, returning a FullCharacter and a receiver
-    pub fn to_full(self, item_table: &HashMap<u32, crate::world::item::Item>, sender: tokio::sync::mpsc::Sender<ServerMessage>) -> FullCharacter {
+    pub fn to_full(
+        self,
+        item_table: &HashMap<u32, crate::world::item::Item>,
+        sender: tokio::sync::mpsc::Sender<ServerMessage>,
+    ) -> FullCharacter {
         let mut items = HashMap::new();
         for (k, i) in self.items.into_iter() {
             if let Some(i) = i.populate_item_definition(item_table) {
@@ -185,6 +192,11 @@ impl FullCharacter {
     /// Get a reference to the location of the character
     pub fn location_ref(&self) -> &Location {
         &self.details.location
+    }
+
+    /// Get the current hp of the player
+    pub fn curr_hp(&self) -> u16 {
+        self.details.curr_hp
     }
 
     /// Send all items the player has to the user

@@ -17,7 +17,7 @@ use crate::{
 };
 
 /// Represents a single map of the world
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Map {
     /// The mapid
     id: u16,
@@ -57,6 +57,13 @@ pub struct Map {
     item_usage: bool,
     /// Are skills allowed on this map?
     skill_usage: bool,
+}
+
+impl Map {
+    /// Can players use items on this map?
+    pub fn can_use_items(&self) -> bool {
+        self.item_usage
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -174,14 +181,19 @@ impl World {
     /// Run an asynchronous closure on the player object
     pub async fn with_player_ref_do<F, T, E>(&self, refo: PlayerRef, gen: &mut T, f: F) -> Option<E>
     where
-        F: AsyncFn(&crate::character::FullCharacter, &mut T) -> Option<E>,
+        F: AsyncFn(&crate::character::FullCharacter, &mut T, &Map) -> Option<E>,
     {
         let mi = self.map_info.lock().await;
         let map = mi.get(&refo.map);
         if let Some(map) = map {
             if let Some(obj) = map.objects.get(&refo.id) {
                 if let object::Object::Player(fc) = obj {
-                    return f(fc, gen).await;
+                    let themap = {
+                        let themaps = self.maps.lock().unwrap();
+                        let themap = themaps.get(&refo.map).unwrap().clone();
+                        themap
+                    };
+                    return f(fc, gen, &themap).await;
                 }
             }
         }
@@ -191,14 +203,19 @@ impl World {
     /// Run an asynchronous closure on the player object
     pub async fn with_player_mut_do<F, T, E>(&self, refo: PlayerRef, gen: &mut T, f: F) -> Option<E>
     where
-        F: AsyncFn(&mut crate::character::FullCharacter, &mut T) -> Option<E>,
+        F: AsyncFn(&mut crate::character::FullCharacter, &mut T, &Map) -> Option<E>,
     {
         let mut mi = self.map_info.lock().await;
         let map = mi.get_mut(&refo.map);
         if let Some(map) = map {
             if let Some(obj) = map.objects.get_mut(&refo.id) {
                 if let object::Object::Player(fc) = obj {
-                    return f(fc, gen).await;
+                    let themap = {
+                        let themaps = self.maps.lock().unwrap();
+                        let themap = themaps.get(&refo.map).unwrap().clone();
+                        themap
+                    };
+                    return f(fc, gen, &themap).await;
                 }
             }
         }
@@ -214,15 +231,20 @@ impl World {
         f: F,
     ) -> Result<(), E>
     where
-        F: AsyncFn(&object::Object, &mut T) -> Result<(), E>,
+        F: AsyncFn(&object::Object, &mut T, &Map) -> Result<(), E>,
     {
         let mut mi = self.map_info.lock().await;
         let map = mi.get_mut(&refo.map);
         if let Some(map) = map {
             let my_location = map.objects.get(&refo.id).unwrap().get_location();
+            let themap = {
+                let themaps = self.maps.lock().unwrap();
+                let themap = themaps.get(&refo.map).unwrap().clone();
+                themap
+            };
             for obj in map.objects.values() {
                 if obj.linear_distance(&my_location) < distance && refo.id != obj.id() {
-                    f(obj, gen).await?;
+                    f(obj, gen, &themap).await?;
                 }
             }
         }
@@ -230,7 +252,11 @@ impl World {
     }
 
     /// Send a whisper message to the specified player
-    pub async fn send_whisper_to(&self, other_person: &str, m: ServerMessage) -> Result<(), String> {
+    pub async fn send_whisper_to(
+        &self,
+        other_person: &str,
+        m: ServerMessage,
+    ) -> Result<(), String> {
         let mut mi = self.map_info.lock().await;
         for map in mi.values_mut() {
             for obj in &mut map.objects {
@@ -276,7 +302,9 @@ impl World {
         if let Some(map) = map {
             let my_location = map.objects.get(&refo.id).unwrap().get_location();
             for obj in map.objects.values_mut() {
-                if obj.linear_distance(&my_location) < distance && (include_self || refo.id != obj.id()) {
+                if obj.linear_distance(&my_location) < distance
+                    && (include_self || refo.id != obj.id())
+                {
                     f(obj, gen).await?;
                 }
             }
