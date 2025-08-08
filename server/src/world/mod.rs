@@ -162,6 +162,18 @@ impl World {
         }
     }
 
+    /// Remove a player from the world
+    pub async fn remove_player(&self, r: &mut Option<PlayerRef>) {
+        if let Some(r) = &r {
+            let mut mi = self.map_info.lock().await;
+            let map = mi.get_mut(&r.map);
+            if let Some(map) = map {
+                map.objects.remove_entry(&r.id);
+            }
+        }
+        *r = None;
+    }
+
     /// Run an asynchronous closure on the player object
     pub async fn with_player_ref_do<F, T, E>(&self, refo: PlayerRef, gen: &mut T, f: F) -> Option<E>
     where

@@ -23,8 +23,6 @@ pub struct Client {
     chars: Vec<crate::character::Character>,
     /// The player reference
     char_ref: Option<PlayerRef>,
-    /// The current character the client is playing with
-    full_char: Option<crate::character::FullCharacter>,
     /// The world object
     world: std::sync::Arc<crate::world::World>,
 }
@@ -47,7 +45,6 @@ impl Client {
             account: None,
             chars: Vec::new(),
             char_ref: None,
-            full_char: None,
             id: world.register_user(),
             world,
         }
@@ -110,50 +107,92 @@ impl Client {
             }
             ClientMessage::RegularChat { id: _, msg } => {
                 //TODO limit based on distance and map
-                if let Some(fc) = &self.full_char {
-                    let amsg = format!("[{}] {}", fc.name, msg);
-                    let _ = self
+                if let Some(r) = self.char_ref {
+                    let m = self
                         .world
-                        .global_tx
-                        .send(ServerMessage::RegularChat { id: 0, msg: amsg });
+                        .with_player_ref_do(r, &mut self.packet_writer, async move |fc, pw| {
+                            let amsg = format!("[{}] {}", fc.name, msg);
+                            Some(ServerMessage::RegularChat { id: 0, msg: amsg })
+                        })
+                        .await;
+                    if let Some(m) = m {
+                        let _ = self.world.global_tx.send(m);
+                    }
                 }
             }
             ClientMessage::YellChat { id: _, msg, x, y } => {
                 //TODO limit based on distance and map
-                if let Some(fc) = &self.full_char {
-                    let amsg = format!("[{}] {}", fc.name, msg);
-                    let _ = self.world.global_tx.send(ServerMessage::YellChat {
-                        id: 0,
-                        msg: amsg,
-                        x,
-                        y,
-                    });
+                if let Some(r) = self.char_ref {
+                    let m = self
+                        .world
+                        .with_player_ref_do(r, &mut self.packet_writer, async move |fc, pw| {
+                            let amsg = format!("[{}] {}", fc.name, msg);
+                            Some(ServerMessage::YellChat {
+                                id: 0,
+                                msg: amsg,
+                                x,
+                                y,
+                            })
+                        })
+                        .await;
+                    if let Some(m) = m {
+                        let _ = self.world.global_tx.send(m);
+                    }
                 }
             }
             ClientMessage::GlobalChat(_id, msg) => {
-                if let Some(fc) = &self.full_char {
-                    let amsg = format!("[{}] {}", fc.name, msg);
-                    let _ = self.world.global_tx.send(ServerMessage::GlobalChat(amsg));
+                if let Some(r) = self.char_ref {
+                    let m = self
+                        .world
+                        .with_player_ref_do(r, &mut self.packet_writer, async move |fc, pw| {
+                            let amsg = format!("[{}] {}", fc.name, msg);
+                            Some(ServerMessage::GlobalChat(amsg))
+                        })
+                        .await;
+                    if let Some(m) = m {
+                        let _ = self.world.global_tx.send(m);
+                    }
                 }
             }
             ClientMessage::PledgeChat(_id, msg) => {
-                if let Some(fc) = &self.full_char {
-                    let amsg = format!("[{}] {}", fc.name, msg);
-                    let _ = self.world.global_tx.send(ServerMessage::PledgeChat(amsg));
+                if let Some(r) = self.char_ref {
+                    let m = self
+                        .world
+                        .with_player_ref_do(r, &mut self.packet_writer, async move |fc, pw| {
+                            let amsg = format!("[{}] {}", fc.name, msg);
+                            Some(ServerMessage::PledgeChat(amsg))
+                        })
+                        .await;
+                    if let Some(m) = m {
+                        let _ = self.world.global_tx.send(m);
+                    }
                 }
             }
             ClientMessage::PartyChat(_id, msg) => {
-                if let Some(fc) = &self.full_char {
-                    let amsg = format!("[{}] {}", fc.name, msg);
-                    let _ = self.world.global_tx.send(ServerMessage::PartyChat(amsg));
+                if let Some(r) = self.char_ref {
+                    let m = self
+                        .world
+                        .with_player_ref_do(r, &mut self.packet_writer, async move |fc, pw| {
+                            let amsg = format!("[{}] {}", fc.name, msg);
+                            Some(ServerMessage::PartyChat(amsg))
+                        })
+                        .await;
+                    if let Some(m) = m {
+                        let _ = self.world.global_tx.send(m);
+                    }
                 }
             }
             ClientMessage::WhisperChat(_id, _person, msg) => {
-                if let Some(fc) = &self.full_char {
-                    let _ = self
+                if let Some(r) = self.char_ref {
+                    let m = self
                         .world
-                        .global_tx
-                        .send(ServerMessage::WhisperChat(fc.name.clone(), msg));
+                        .with_player_ref_do(r, &mut self.packet_writer, async move |fc, pw| {
+                            Some(ServerMessage::WhisperChat(fc.name.clone(), msg.clone()))
+                        })
+                        .await;
+                    if let Some(m) = m {
+                        let _ = self.world.global_tx.send(m);
+                    }
                 }
             }
         }
@@ -277,20 +316,24 @@ impl Client {
                 log::info!("User wants to use item {}: {:X?}", id, remainder);
                 let mut packets = Vec::new();
                 let p = common::packet::Packet::raw_packet(remainder);
-                if let Some(fc) = &mut self.full_char {
-                    if let Some(item) = fc.items_mut().unwrap().get_mut(&id) {
-                        let item_table = self.world.item_table.lock().unwrap();
-                        if crate::world::item::ItemUsage::None == item.usage() {
-                            packets.push(
-                                ServerPacket::Message {
-                                    ty: 74,
-                                    msgs: vec![item.name()],
+                if let Some(r) = self.char_ref {
+                    self.world
+                        .with_player_mut_do(r, &mut packets, async move |fc, packets| {
+                            if let Some(item) = fc.items_mut().unwrap().get_mut(&id) {
+                                if crate::world::item::ItemUsage::None == item.usage() {
+                                    packets.push(
+                                        ServerPacket::Message {
+                                            ty: 74,
+                                            msgs: vec![item.name()],
+                                        }
+                                        .build(),
+                                    );
+                                } else {
                                 }
-                                .build(),
-                            );
-                        } else {
-                        }
-                    }
+                            }
+                            Some(42)
+                        })
+                        .await;
                 }
                 for p in packets {
                     self.packet_writer.send_packet(p).await?;
@@ -301,7 +344,7 @@ impl Client {
             }
             ClientPacket::Restart => {
                 log::info!("Player restarts");
-                self.full_char = None;
+                self.world.remove_player(&mut self.char_ref).await;
                 self.packet_writer
                     .send_packet(ServerPacket::BackToCharacterSelect.build())
                     .await?;
@@ -503,11 +546,16 @@ impl Client {
                     7 => (x - 1, y - 1),
                     _ => (x, y),
                 };
-                if let Some(fc) = &mut self.full_char {
-                    let l = fc.location_mut();
-                    l.x = x2;
-                    l.y = y2;
-                    l.direction = heading;
+                if let Some(r) = self.char_ref {
+                    self.world
+                        .with_player_mut_do(r, &mut 42, async move |fc, _| {
+                            let l = fc.location_mut();
+                            l.x = x2;
+                            l.y = y2;
+                            l.direction = heading;
+                            Some(42)
+                        })
+                        .await;
                 }
             }
             ClientPacket::ChangeDirection(d) => {
