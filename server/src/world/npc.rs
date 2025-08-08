@@ -26,6 +26,10 @@ impl super::object::ObjectTrait for Npc {
         self.id
     }
 
+    fn player_name(&self) -> Option<String> {
+        None
+    }
+
     fn get_items(&self) -> Option<&HashMap<u32, super::item::ItemInstance>> {
         None
     }

@@ -229,6 +229,24 @@ impl World {
         Ok(())
     }
 
+    /// Send a whisper message to the specified player
+    pub async fn send_whisper_to(&self, other_person: &str, m: ServerMessage) -> Result<(), String> {
+        let mut mi = self.map_info.lock().await;
+        for map in mi.values_mut() {
+            for obj in &mut map.objects {
+                if let Some(name) = obj.1.player_name() {
+                    if name == other_person {
+                        if let Some(sender) = obj.1.sender() {
+                            let _ = sender.send(m).await;
+                            return Ok(());
+                        }
+                    }
+                }
+            }
+        }
+        Err(format!("Character not online right now: {:?}", m))
+    }
+
     /// Send a global chat message
     pub async fn send_global_chat(&self, m: ServerMessage) {
         let mut mi = self.map_info.lock().await;

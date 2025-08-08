@@ -201,7 +201,9 @@ impl Client {
                         })
                         .await;
                     if let Some(m) = m {
-                        log::error!("Whispering to {} with {:?}", person, m)
+                        if let Err(e) = self.world.send_whisper_to(person.as_str(), m).await {
+                            self.packet_writer.send_packet(ServerPacket::Message { ty: 73, msgs: vec![person]}.build()).await?;
+                        }
                     }
                 }
             }

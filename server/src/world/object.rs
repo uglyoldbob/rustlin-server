@@ -48,6 +48,9 @@ pub trait ObjectTrait {
 
     /// If applicable (only for Player objects), get the object for sending messages to the user
     fn sender(&mut self) -> Option<&mut tokio::sync::mpsc::Sender<ServerMessage>>;
+
+    /// Returns the name of the character if it is a player
+    fn player_name(&self) -> Option<String>;
 }
 
 /// The things that an object can be
