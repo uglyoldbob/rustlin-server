@@ -125,9 +125,11 @@ impl UpdateServer {
                     });
                 }
                 Ok(Some(_)) = AssertUnwindSafe(f.next()).catch_unwind() => {}
-                _ = (&mut self.update_rx) => {
-                    log::info!("update: Received a message to shut down");
-                    break;
+                a = (&mut self.update_rx) => {
+                    if let Ok(a) = a {
+                        log::info!("update: Received a message {:?} to shut down", a);
+                        break;
+                    }
                 }
                 _ = tokio::signal::ctrl_c() => {
                     break;

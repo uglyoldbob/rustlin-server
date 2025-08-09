@@ -73,11 +73,7 @@ async fn process_client(
     let s = tokio::sync::mpsc::channel(10);
 
     let c = Client::new(packet_writer, world.clone());
-
-    if let Err(e) = c.event_loop(reader, s.1, s.0, &config, end_rx).await {
-        log::info!("test: Client errored: {:?}", e);
-    }
-
+    c.event_loop(reader, s.1, s.0, &config, end_rx).await?;
     Ok(0)
 }
 

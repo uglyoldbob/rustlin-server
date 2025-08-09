@@ -856,10 +856,17 @@ impl Client {
                     let p = msg.unwrap();
                     self.process_server_message(p).await?;
                 }
-                _ = end_rx.recv().fuse() => {
-                    log::info!("Received message to kill connection to client");
+                end = end_rx.recv().fuse() => {
+                    if let Some(end) = end {
+                        log::info!("Received message {} to kill connection to client", end);
+                    }
+                    else {
+                        log::info!("Received implicit message to kill connection to client");
+                    }
+                    break;
                 }
             }
         }
+        Ok(0)
     }
 }

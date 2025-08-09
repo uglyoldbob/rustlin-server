@@ -42,9 +42,9 @@ async fn main() -> Result<(), String> {
     world.load_maps_data().await?;
     world.load_item_data().await?;
 
-    update::setup_update_server(&mut tasks, world.clone())
+    let mut update_tx = Some(update::setup_update_server(&mut tasks, world.clone())
         .await
-        .expect("Failed to setup update server");
+        .expect("Failed to setup update server"));
     let mut server_tx = Some(
         server::setup_game_server(&mut tasks, world.clone(), &settings.config)
             .await
@@ -63,6 +63,11 @@ async fn main() -> Result<(), String> {
             }
             _ = tokio::signal::ctrl_c() => {
                 if let Some(tx) = server_tx.take() {
+                    log::info!("Signal end of server");
+                    tx.send(0);
+                }
+                if let Some(tx) = update_tx.take() {
+                    log::info!("Signal end of update");
                     tx.send(0);
                 }
             }
