@@ -1,6 +1,8 @@
 use futures::FutureExt;
+use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::panic::AssertUnwindSafe;
+use std::sync::{Arc, Mutex};
 use tokio::net::TcpListener;
 
 use crate::server_message::ServerMessage;
@@ -63,6 +65,7 @@ async fn process_client(
     socket: tokio::net::TcpStream,
     world: std::sync::Arc<crate::world::World>,
     config: std::sync::Arc<crate::ServerConfiguration>,
+    end_rx: tokio::sync::mpsc::Receiver<u32>,
 ) -> Result<u8, ClientError> {
     let (reader, writer) = socket.into_split();
     let packet_writer = ServerPacketSender::new(writer);
@@ -71,7 +74,7 @@ async fn process_client(
 
     let c = Client::new(packet_writer, world.clone());
 
-    if let Err(e) = c.event_loop(reader, s.1, s.0, &config).await {
+    if let Err(e) = c.event_loop(reader, s.1, s.0, &config, end_rx).await {
         log::info!("test: Client errored: {:?}", e);
     }
 
@@ -97,6 +100,7 @@ impl GameServer {
     /// Run the server
     async fn run(mut self) -> Result<(), u32> {
         let mut f = futures::stream::FuturesUnordered::new();
+        let kills = Arc::new(Mutex::new(HashMap::new()));
         loop {
             use futures::stream::StreamExt;
             tokio::select! {
@@ -105,9 +109,19 @@ impl GameServer {
                     log::info!("Received a client from {}", addr);
                     let world2 = self.world.clone();
                     let config3 = self.config.clone();
+                    let (kill_s, kill_r) = tokio::sync::mpsc::channel(5);
+                    let kills2 = kills.clone();
                     f.push(async move {
-                        if let Err(e) = process_client(socket, world2, config3).await {
+                        {
+                            let mut k = kills2.lock().unwrap();
+                            k.insert(addr, kill_s);
+                        }
+                        if let Err(e) = process_client(socket, world2, config3, kill_r).await {
                             log::warn!("Client {} errored {:?}", addr, e);
+                        }
+                        {
+                            let mut k = kills2.lock().unwrap();
+                            k.remove(&addr);
                         }
                     });
                 }
@@ -118,13 +132,15 @@ impl GameServer {
                     log::error!("Received a message {a} to shut down");
                     break;
                 }
-                _ = tokio::signal::ctrl_c() => {
-                    log::info!("Caught ctrl c message");
-                    break;
-                }
             }
         }
-        ///TODO disconnect all players
+        {
+            let k = kills.lock().unwrap();
+            for (addr, k) in k.iter() {
+                log::info!("Sending kill to {:?}", addr);
+                let _ = k.send(0);
+            }
+        }
         f.clear();
         log::info!("Ending the server thread!");
         Ok(())

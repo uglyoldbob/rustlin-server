@@ -5,7 +5,7 @@ This is a server and client implementation of a recreation of an old game.
 **Ubuntu**
 
 *Requirements*
-* Packages - libsdl2-mixer-dev
+* Packages - libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev
 
 *Building*
 * cargo build

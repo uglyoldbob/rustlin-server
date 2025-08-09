@@ -42,14 +42,16 @@ async fn main() -> Result<(), String> {
     world.load_maps_data().await?;
     world.load_item_data().await?;
 
-    let update_tx = update::setup_update_server(&mut tasks, world.clone())
+    update::setup_update_server(&mut tasks, world.clone())
         .await
         .expect("Failed to setup update server");
-    let server_tx = server::setup_game_server(&mut tasks, world.clone(), &settings.config)
-        .await
-        .expect("Failed to setup legacy server");
+    let mut server_tx = Some(
+        server::setup_game_server(&mut tasks, world.clone(), &settings.config)
+            .await
+            .expect("Failed to setup legacy server"),
+    );
 
-    let mut error = Ok(());
+    let error;
 
     loop {
         tokio::select! {
@@ -60,30 +62,13 @@ async fn main() -> Result<(), String> {
                 break;
             }
             _ = tokio::signal::ctrl_c() => {
-                break;
+                if let Some(tx) = server_tx.take() {
+                    tx.send(0);
+                }
             }
         }
     }
 
-    /// disconnect all players
-    todo!();
-
-    tokio::time::sleep(tokio::time::Duration::from_millis(5000)).await;
-
-    log::info!("server: Server is shutting down");
-    if let Err(e) = update_tx.send(0) {
-        log::info!(
-            "server: Failed to signal the update server to shutdown {}",
-            e
-        );
-    }
-
-    //mysql_conn.disconnect().await.expect("Failed to disconnect from mmysql server");
-
-    if let Err(e) = server_tx.send(0) {
-        log::info!("server: Failed to signal the server to shutdown {}", e);
-    }
-    tokio::time::sleep(tokio::time::Duration::from_millis(1000)).await;
     log::info!("server: Server will now close");
     error
 }

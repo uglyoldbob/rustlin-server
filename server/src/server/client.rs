@@ -353,15 +353,24 @@ impl Client {
         let c = p.convert();
         match c {
             ClientPacket::UseItem { id, remainder } => {
+                struct ItemUseData {
+                    p: Packet,
+                    packets: Vec<Packet>,
+                }
+
                 log::info!("User wants to use item {}: {:X?}", id, remainder);
-                let mut packets = Vec::new();
                 let p = common::packet::Packet::raw_packet(remainder);
+                let mut p2 = ItemUseData { p, packets: Vec::new() };
                 if let Some(r) = self.char_ref {
                     self.world
-                        .with_player_mut_do(r, &mut packets, async move |fc, packets, map| {
+                        .with_player_mut_do(r, &mut p2, async move |fc, p2, map| {
+                            // Can't use items whe you are dead
+                            if fc.curr_hp() == 0 {
+                                return None;
+                            }
                             if let Some(item) = fc.items_mut().unwrap().get_mut(&id) {
                                 if crate::world::item::ItemUsage::None == item.usage() {
-                                    packets.push(
+                                    p2.packets.push(
                                         ServerPacket::Message {
                                             ty: 74,
                                             msgs: vec![item.name()],
@@ -370,13 +379,9 @@ impl Client {
                                     );
                                     return None;
                                 }
-                                // Can't use items whe you are dead
-                                if fc.curr_hp() == 0 {
-                                    return None;
-                                }
                                 // Or when the map you are on disallows item usage
                                 if !map.can_use_items() {
-                                    packets.push(
+                                    p2.packets.push(
                                         ServerPacket::Message {
                                             ty: 563,
                                             msgs: vec![],
@@ -387,15 +392,14 @@ impl Client {
                                 }
                                 let mut poly_name = None;
                                 if item.usage() == ItemUsage::Polymorph {
-                                    poly_name = Some(p.pull_string());
+                                    poly_name = Some(p2.p.pull_string());
                                 }
-                                
                             }
                             Some(42)
                         })
                         .await;
                 }
-                for p in packets {
+                for p in p2.packets {
                     self.packet_writer.send_packet(p).await?;
                 }
             }
@@ -830,6 +834,7 @@ impl Client {
         mut receiver: tokio::sync::mpsc::Receiver<ServerMessage>,
         sender: tokio::sync::mpsc::Sender<ServerMessage>,
         config: &std::sync::Arc<crate::ServerConfiguration>,
+        mut end_rx: tokio::sync::mpsc::Receiver<u32>,
     ) -> Result<u8, ClientError> {
         let encryption_key: u32 = rand::thread_rng().gen();
         let peer = reader.peer_addr()?;
@@ -850,6 +855,9 @@ impl Client {
                 msg = receiver.recv().fuse() => {
                     let p = msg.unwrap();
                     self.process_server_message(p).await?;
+                }
+                _ = end_rx.recv().fuse() => {
+                    log::info!("Received message to kill connection to client");
                 }
             }
         }
