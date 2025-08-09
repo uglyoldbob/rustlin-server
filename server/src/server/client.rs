@@ -30,6 +30,12 @@ pub struct Client {
 
 impl Drop for Client {
     fn drop(&mut self) {
+        
+    }
+}
+
+impl std::future::AsyncDrop for Client {
+    async fn drop(self: std::pin::Pin<&mut Self>) {
         //TODO send disconnect packet if applicable (needs async drop support first)
         self.world.unregister_user(self.id);
     }

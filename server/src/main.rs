@@ -1,6 +1,8 @@
 #![deny(missing_docs)]
 #![deny(clippy::missing_docs_in_private_items)]
 
+#![feature(async_drop)]
+
 //! The server for the game
 
 mod client_message;
