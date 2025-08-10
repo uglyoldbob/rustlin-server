@@ -28,8 +28,6 @@ async fn main() -> Result<(), String> {
     common::do_stuff();
     log::info!("server: Game server is starting");
 
-    let (broadcast, _) = tokio::sync::broadcast::channel::<ServerMessage>(100);
-
     let settings = load_config().unwrap();
     let mysql_pool = open_mysql(&settings).unwrap();
     log::info!("Trying to connect to database");
@@ -40,7 +38,7 @@ async fn main() -> Result<(), String> {
 
     let mut tasks: tokio::task::JoinSet<Result<(), u32>> = tokio::task::JoinSet::new();
 
-    let world = std::sync::Arc::new(world::World::new(broadcast, mysql_pool));
+    let world = std::sync::Arc::new(world::World::new(mysql_pool));
     world.load_maps_data().await?;
     world.load_item_data().await?;
 

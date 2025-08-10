@@ -16,6 +16,7 @@ impl From<std::io::Error> for PacketError {
 }
 
 /// The 'ClientPacket' type. Represents packets sent by the client
+#[derive(Debug)]
 pub enum ClientPacket {
     Version(u16, u32, u8, u32),
     Login(String, String, u32, u32, u32, u32, u32, u32, u32),
@@ -739,6 +740,7 @@ pub fn key_init(k: u32) -> u64 {
 }
 
 /// A packet of data that can be sent or received over a network connection
+#[derive(Debug)]
 pub struct Packet {
     data: Vec<u8>,
     read: usize,
@@ -1143,7 +1145,8 @@ impl ServerPacketSender {
 
     /// Send a packet
     pub async fn send_packet(&mut self, mut data: Packet) -> Result<(), PacketError> {
-        log::debug!("Sending packet {:x?}", data.buf());
+        log::info!("Sending packet {:x?}", data.buf());
+        self.writer.writable().await?;
         while data.buf().len() < 4 {
             data.add_u8(0);
         }

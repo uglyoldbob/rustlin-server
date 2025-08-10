@@ -30,13 +30,14 @@ pub struct Client {
 
 impl Drop for Client {
     fn drop(&mut self) {
-        
+        log::info!("Running sync drop on client");
     }
 }
 
 impl std::future::AsyncDrop for Client {
-    async fn drop(self: std::pin::Pin<&mut Self>) {
-        //TODO send disconnect packet if applicable (needs async drop support first)
+    async fn drop(mut self: std::pin::Pin<&mut Self>) {
+        log::info!("Running async drop on client");
+        let _ = self.packet_writer.send_packet(ServerPacket::Disconnect.build()).await;
         self.world.unregister_user(self.id);
     }
 }
@@ -356,7 +357,10 @@ impl Client {
         config: &std::sync::Arc<crate::ServerConfiguration>,
         sender: &tokio::sync::mpsc::Sender<ServerMessage>,
     ) -> Result<(), ClientError> {
+        log::info!("Processing a packet");
+        log::info!("Stack remaining: {:?}", stacker::remaining_stack());
         let c = p.convert();
+        log::info!("Processing a packet: {:?}", c);
         match c {
             ClientPacket::UseItem { id, remainder } => {
                 struct ItemUseData {
@@ -842,6 +846,7 @@ impl Client {
         config: &std::sync::Arc<crate::ServerConfiguration>,
         mut end_rx: tokio::sync::mpsc::Receiver<u32>,
     ) -> Result<u8, ClientError> {
+        log::info!("Starting event loop for client");
         let encryption_key: u32 = rand::thread_rng().gen();
         let peer = reader.peer_addr()?;
         let mut packet_reader = ServerPacketReceiver::new(reader, encryption_key);
@@ -851,14 +856,19 @@ impl Client {
         self.packet_writer.send_packet(key_packet).await?;
         self.packet_writer
             .set_encryption_key(packet_reader.get_key());
-
+        log::info!("Starting future poll loop in client");
         loop {
+            log::info!("One poll for client");
             futures::select! {
                 packet = packet_reader.read_packet().fuse() => {
+                    log::info!("Got a packet {:x?}", packet);
                     let p = packet?;
+                    log::info!("Packet is now {:x?}", p);
+                    log::info!("Stack remaining: {:?}", stacker::remaining_stack());
                     self.process_packet(p, peer, config, &sender).await?;
                 }
                 msg = receiver.recv().fuse() => {
+                    log::info!("Got a message {:?}", msg);
                     let p = msg.unwrap();
                     self.process_server_message(p).await?;
                 }

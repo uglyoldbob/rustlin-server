@@ -135,7 +135,6 @@ pub struct World {
 impl World {
     /// Construct a new server world
     pub fn new(
-        global_tx: tokio::sync::broadcast::Sender<crate::ServerMessage>,
         mysql: mysql_async::Pool,
     ) -> Self {
         Self {
@@ -467,9 +466,9 @@ impl World {
     ) -> Result<Option<u32>, mysql_async::Error> {
         use mysql_async::prelude::Queryable;
         let query = "select max(id)+1 as nextid from (select id from character_items union all select id from character_teleport union all select id from character_warehouse union all select id from character_elf_warehouse union all select objid as id from characters union all select clan_id as id from clan_data union all select id from clan_warehouse union all select objid as id from pets) t";
-        let a: Vec<u32> = t.exec(query, ()).await?;
+        let a: Vec<Option<u32>> = t.exec(query, ()).await?;
         let r = if let Some(a) = a.first() {
-            Ok(Some(*a))
+            Ok(*a)
         } else {
             Ok(None)
         };

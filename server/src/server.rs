@@ -20,8 +20,6 @@ pub enum ClientError {
     PacketError(common::packet::PacketError),
     /// An io error occurred
     IoError(std::io::Error),
-    /// Error receiving a broadcast
-    ErrorReceivingBroadcast(tokio::sync::broadcast::error::RecvError),
     /// Error sending a ClientMessage
     ErrorSendingClientMessage(tokio::sync::mpsc::error::SendError<ClientMessage>),
     /// A mysql error occurred
@@ -39,12 +37,6 @@ impl From<PacketError> for ClientError {
 impl From<std::io::Error> for ClientError {
     fn from(a: std::io::Error) -> ClientError {
         ClientError::IoError(a)
-    }
-}
-
-impl From<tokio::sync::broadcast::error::RecvError> for ClientError {
-    fn from(a: tokio::sync::broadcast::error::RecvError) -> ClientError {
-        ClientError::ErrorReceivingBroadcast(a)
     }
 }
 
@@ -67,6 +59,7 @@ async fn process_client(
     config: std::sync::Arc<crate::ServerConfiguration>,
     end_rx: tokio::sync::mpsc::Receiver<u32>,
 ) -> Result<u8, ClientError> {
+    log::info!("Processing a client");
     let (reader, writer) = socket.into_split();
     let packet_writer = ServerPacketSender::new(writer);
 
@@ -95,19 +88,18 @@ impl Drop for GameServer {
 impl GameServer {
     /// Run the server
     async fn run(mut self) -> Result<(), u32> {
-        let mut f = futures::stream::FuturesUnordered::new();
+        let mut j = tokio::task::JoinSet::new();
         let kills = Arc::new(Mutex::new(HashMap::new()));
         loop {
             use futures::stream::StreamExt;
             tokio::select! {
-                Ok(res) = self.listener.accept() => {
-                    let (socket, addr) = res;
+                Ok((socket, addr)) = self.listener.accept() => {
                     log::info!("Received a client from {}", addr);
                     let world2 = self.world.clone();
                     let config3 = self.config.clone();
                     let (kill_s, kill_r) = tokio::sync::mpsc::channel(5);
                     let kills2 = kills.clone();
-                    f.push(async move {
+                    j.spawn(async move {
                         {
                             let mut k = kills2.lock().unwrap();
                             k.insert(addr, kill_s);
@@ -120,9 +112,6 @@ impl GameServer {
                             k.remove(&addr);
                         }
                     });
-                }
-                Ok(Some(_)) = AssertUnwindSafe(f.next()).catch_unwind() => {
-                    log::info!("User disconnected");
                 }
                 Ok(a) = (&mut self.update_rx) => {
                     log::error!("Received a message {a} to shut down");
@@ -137,7 +126,8 @@ impl GameServer {
                 let _ = k.send(0);
             }
         }
-        f.clear();
+        log::info!("Waiting for all clients to finish");
+        j.join_all().await;
         log::info!("Ending the server thread!");
         Ok(())
     }
