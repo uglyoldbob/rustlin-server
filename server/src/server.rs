@@ -89,9 +89,8 @@ impl GameServer {
     /// Run the server
     async fn run(mut self) -> Result<(), u32> {
         let mut j = tokio::task::JoinSet::new();
-        let kills = Arc::new(Mutex::new(HashMap::new()));
+        let kills = Arc::new(tokio::sync::Mutex::new(HashMap::new()));
         loop {
-            use futures::stream::StreamExt;
             tokio::select! {
                 Ok((socket, addr)) = self.listener.accept() => {
                     log::info!("Received a client from {}", addr);
@@ -101,16 +100,17 @@ impl GameServer {
                     let kills2 = kills.clone();
                     j.spawn(async move {
                         {
-                            let mut k = kills2.lock().unwrap();
+                            let mut k = kills2.lock().await;
                             k.insert(addr, kill_s);
                         }
                         if let Err(e) = process_client(socket, world2, config3, kill_r).await {
                             log::warn!("Client {} errored {:?}", addr, e);
                         }
                         {
-                            let mut k = kills2.lock().unwrap();
+                            let mut k = kills2.lock().await;
                             k.remove(&addr);
                         }
+                        log::info!("Exiting client task");
                     });
                 }
                 Ok(a) = (&mut self.update_rx) => {
@@ -120,10 +120,10 @@ impl GameServer {
             }
         }
         {
-            let k = kills.lock().unwrap();
+            let k = kills.lock().await;
             for (addr, k) in k.iter() {
                 log::info!("Sending kill to {:?}", addr);
-                let _ = k.send(0);
+                let _ = k.send(0).await;
             }
         }
         log::info!("Waiting for all clients to finish");
