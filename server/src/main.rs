@@ -73,6 +73,7 @@ async fn main() -> Result<(), String> {
             }
         }
     }
+    log::info!("Waiting for main tasks to finish");
     tasks.join_all().await;
 
     log::info!("server: Server will now close");
