@@ -56,9 +56,18 @@ async fn main() -> Result<(), String> {
     loop {
         tokio::select! {
             Some(r) = tasks.join_next() => {
-                log::info!("A task exited {:?}, closing server in 5 seconds", r);
-                error = Err(format!("A task exited {:?}, closing server in 5 seconds", r));
-                tokio::time::sleep(tokio::time::Duration::from_millis(5000)).await;
+                if let Ok(r2) = r {
+                    if r.is_ok() {
+                        log::info!("A task exited {:?}, closing server in 5 seconds", r2);
+                    }
+                    else {
+                        log::error!("A task exited {:?}, closing server in 5 seconds", r2);
+                    }
+                }
+                else {
+                    log::error!("A task exited {:?}, closing server in 5 seconds", r);
+                }
+                error = Err(format!("A task exited {:?}, closing server now", r));
                 break;
             }
             _ = tokio::signal::ctrl_c() => {

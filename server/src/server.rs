@@ -1,6 +1,7 @@
 use futures::FutureExt;
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
+use std::net::SocketAddr;
 use std::panic::AssertUnwindSafe;
 use std::sync::{Arc, Mutex};
 use tokio::net::TcpListener;
@@ -79,17 +80,36 @@ struct GameServer {
     config: std::sync::Arc<crate::ServerConfiguration>,
     /// Used to receive a message to end the server
     update_rx: tokio::sync::oneshot::Receiver<u32>,
+    /// kill triggers
+    kill: Arc<tokio::sync::Mutex<HashMap<SocketAddr,tokio::sync::mpsc::Sender<u32>>>>,
+    /// task list of all clients
+    clients: Option<tokio::task::JoinSet<()>>,
 }
 
 impl Drop for GameServer {
     fn drop(&mut self) {}
 }
 
+impl std::future::AsyncDrop for GameServer {
+    async fn drop(mut self: std::pin::Pin<&mut Self>) {
+        {
+            let k = self.kill.lock().await;
+            for (addr, k) in k.iter() {
+                log::info!("Sending kill to {:?}", addr);
+                let _ = k.send(0).await;
+            }
+        }
+        log::info!("Waiting for all clients to finish");
+        if let Some(t) = self.clients.take() {
+            t.join_all().await;
+        }
+        log::info!("Ending the server thread!");
+    }
+}
+
 impl GameServer {
     /// Run the server
     async fn run(mut self) -> Result<(), u32> {
-        let mut j = tokio::task::JoinSet::new();
-        let kills = Arc::new(tokio::sync::Mutex::new(HashMap::new()));
         loop {
             tokio::select! {
                 Ok((socket, addr)) = self.listener.accept() => {
@@ -97,21 +117,23 @@ impl GameServer {
                     let world2 = self.world.clone();
                     let config3 = self.config.clone();
                     let (kill_s, kill_r) = tokio::sync::mpsc::channel(5);
-                    let kills2 = kills.clone();
-                    j.spawn(async move {
-                        {
-                            let mut k = kills2.lock().await;
-                            k.insert(addr, kill_s);
-                        }
-                        if let Err(e) = process_client(socket, world2, config3, kill_r).await {
-                            log::warn!("Client {} errored {:?}", addr, e);
-                        }
-                        {
-                            let mut k = kills2.lock().await;
-                            k.remove(&addr);
-                        }
-                        log::info!("Exiting client task");
-                    });
+                    let kills2 = self.kill.clone();
+                    if let Some(c) = &mut self.clients {
+                        c.spawn(async move {
+                            {
+                                let mut k = kills2.lock().await;
+                                k.insert(addr, kill_s);
+                            }
+                            if let Err(e) = process_client(socket, world2, config3, kill_r).await {
+                                log::warn!("Client {} errored {:?}", addr, e);
+                            }
+                            {
+                                let mut k = kills2.lock().await;
+                                k.remove(&addr);
+                            }
+                            log::info!("Exiting client task");
+                        });
+                    }
                 }
                 Ok(a) = (&mut self.update_rx) => {
                     log::error!("Received a message {a} to shut down");
@@ -119,16 +141,6 @@ impl GameServer {
                 }
             }
         }
-        {
-            let k = kills.lock().await;
-            for (addr, k) in k.iter() {
-                log::info!("Sending kill to {:?}", addr);
-                let _ = k.send(0).await;
-            }
-        }
-        log::info!("Waiting for all clients to finish");
-        j.join_all().await;
-        log::info!("Ending the server thread!");
         Ok(())
     }
 }
@@ -150,6 +162,8 @@ pub async fn setup_game_server(
         world,
         config,
         update_rx,
+        clients: Some(tokio::task::JoinSet::new()),
+        kill: Arc::new(tokio::sync::Mutex::new(HashMap::new())),
     };
     tasks.spawn(server.run());
 
