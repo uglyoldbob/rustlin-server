@@ -134,9 +134,7 @@ pub struct World {
 
 impl World {
     /// Construct a new server world
-    pub fn new(
-        mysql: mysql_async::Pool,
-    ) -> Self {
+    pub fn new(mysql: mysql_async::Pool) -> Self {
         Self {
             users: Arc::new(Mutex::new(HashMap::new())),
             client_ids: Arc::new(Mutex::new(crate::ClientList::new())),

@@ -37,9 +37,17 @@ impl Drop for Client {
 impl std::future::AsyncDrop for Client {
     async fn drop(mut self: std::pin::Pin<&mut Self>) {
         log::info!("Running async drop on client");
-        let _ = self.packet_writer.send_packet(ServerPacket::Disconnect.build()).await;
+        let _ = self
+            .packet_writer
+            .send_packet(ServerPacket::Disconnect.build())
+            .await;
         self.world.unregister_user(self.id);
     }
+}
+
+pub struct ItemUseData {
+    pub p: Packet,
+    pub packets: Vec<Packet>,
 }
 
 impl Client {
@@ -363,14 +371,12 @@ impl Client {
         log::info!("Processing a packet: {:?}", c);
         match c {
             ClientPacket::UseItem { id, remainder } => {
-                struct ItemUseData {
-                    p: Packet,
-                    packets: Vec<Packet>,
-                }
-
                 log::info!("User wants to use item {}: {:X?}", id, remainder);
                 let p = common::packet::Packet::raw_packet(remainder);
-                let mut p2 = ItemUseData { p, packets: Vec::new() };
+                let mut p2 = ItemUseData {
+                    p,
+                    packets: Vec::new(),
+                };
                 if let Some(r) = self.char_ref {
                     self.world
                         .with_player_mut_do(r, &mut p2, async move |fc, p2, map| {
@@ -378,33 +384,7 @@ impl Client {
                             if fc.curr_hp() == 0 {
                                 return None;
                             }
-                            if let Some(item) = fc.items_mut().unwrap().get_mut(&id) {
-                                if crate::world::item::ItemUsage::None == item.usage() {
-                                    p2.packets.push(
-                                        ServerPacket::Message {
-                                            ty: 74,
-                                            msgs: vec![item.name()],
-                                        }
-                                        .build(),
-                                    );
-                                    return None;
-                                }
-                                // Or when the map you are on disallows item usage
-                                if !map.can_use_items() {
-                                    p2.packets.push(
-                                        ServerPacket::Message {
-                                            ty: 563,
-                                            msgs: vec![],
-                                        }
-                                        .build(),
-                                    );
-                                    return None;
-                                }
-                                let mut poly_name = None;
-                                if item.usage() == ItemUsage::Polymorph {
-                                    poly_name = Some(p2.p.pull_string());
-                                }
-                            }
+                            fc.use_item(&id, p2, map).await.ok()?;
                             Some(42)
                         })
                         .await;

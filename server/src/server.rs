@@ -81,7 +81,7 @@ struct GameServer {
     /// Used to receive a message to end the server
     update_rx: tokio::sync::oneshot::Receiver<u32>,
     /// kill triggers
-    kill: Arc<tokio::sync::Mutex<HashMap<SocketAddr,tokio::sync::mpsc::Sender<u32>>>>,
+    kill: Arc<tokio::sync::Mutex<HashMap<SocketAddr, tokio::sync::mpsc::Sender<u32>>>>,
     /// task list of all clients
     clients: Option<tokio::task::JoinSet<()>>,
 }

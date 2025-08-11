@@ -9,6 +9,8 @@ pub trait ItemTrait {
     fn id(&self) -> u32;
     /// Get the inventory packet
     fn inventory_element(&self, stuff: &ItemStuff) -> common::packet::InventoryElement;
+    /// Get the packet for updating the item
+    fn update_packet(&self, stuff: &ItemStuff) -> common::packet::InventoryUpdate;
     /// Get the item name
     fn name(&self, stuff: &ItemStuff) -> String;
     /// Get the item usage
@@ -182,8 +184,17 @@ impl ItemTrait for Weapon {
         ItemUsage::Weapon
     }
 
+    fn update_packet(&self, stuff: &ItemStuff) -> common::packet::InventoryUpdate {
+        common::packet::InventoryUpdate {
+            id: stuff.item_id,
+            description: self.name(stuff),
+            count: stuff.count,
+            ed: Vec::new(),
+        }
+    }
+
     fn name(&self, stuff: &ItemStuff) -> String {
-        let mut description = " ".to_string();
+        let mut description = String::new();
         if stuff.identified {
             if let Some((t, l)) = &stuff.elemental_enchant {
                 match t {
@@ -231,17 +242,19 @@ impl ItemTrait for Weapon {
         if stuff.count > 1 {
             description.push_str(&format!("({}) ", stuff.count));
         }
+
+        if stuff.equipped {
+            description.push_str(" ($9)");
+        }
+
         description
     }
 
     fn inventory_element(&self, stuff: &ItemStuff) -> common::packet::InventoryElement {
         log::info!("Sending inventory packet for {:?}", self);
 
-        let mut description = self.name(stuff);
-
-        if stuff.equipped {
-            description.push_str("($9)");
-        }
+        let mut description = " ".to_string();
+        description.push_str(&self.name(stuff));
 
         common::packet::InventoryElement {
             id: stuff.item_id,
@@ -302,8 +315,18 @@ impl ItemTrait for Armor {
         ItemUsage::Armor
     }
 
+    fn update_packet(&self, stuff: &ItemStuff) -> common::packet::InventoryUpdate {
+        log::info!("Item: {:?}, {:?}", self, stuff);
+        common::packet::InventoryUpdate {
+            id: stuff.item_id,
+            description: self.name(stuff),
+            count: stuff.count,
+            ed: Vec::new(),
+        }
+    }
+
     fn name(&self, stuff: &ItemStuff) -> String {
-        let mut description = " ".to_string();
+        let mut description = String::new();
 
         if stuff.identified {
             if stuff.enchanted_level > 0 {
@@ -323,21 +346,23 @@ impl ItemTrait for Armor {
         if stuff.count > 1 {
             description.push_str(&format!("({}) ", stuff.count));
         }
+
+        if stuff.equipped {
+            description.push_str(" ($117)");
+        }
+
         description
     }
 
     fn inventory_element(&self, stuff: &ItemStuff) -> common::packet::InventoryElement {
         log::info!("Sending armor inventory packet for {:?}", self);
 
-        let mut description = self.name(stuff);
-
-        if stuff.equipped {
-            description.push_str("($17)");
-        }
+        let mut description = " ".to_string();
+        description.push_str(&self.name(stuff));
 
         common::packet::InventoryElement {
             id: stuff.item_id,
-            i_type: 1,
+            i_type: 2,
             n_use: ItemUsage::Armor as u8,
             icon: self.inventory_graphic,
             blessing: common::packet::ItemBlessing::Normal,
@@ -482,8 +507,17 @@ impl ItemTrait for EtcItem {
         self.usage
     }
 
+    fn update_packet(&self, stuff: &ItemStuff) -> common::packet::InventoryUpdate {
+        common::packet::InventoryUpdate {
+            id: stuff.item_id,
+            description: self.name(stuff),
+            count: stuff.count,
+            ed: Vec::new(),
+        }
+    }
+
     fn name(&self, stuff: &ItemStuff) -> String {
-        let mut description = " ".to_string();
+        let mut description = String::new();
 
         description.push_str(if stuff.identified {
             &self.identified
@@ -518,18 +552,20 @@ impl ItemTrait for EtcItem {
                 _ => {}
             }
         }
+
+        if stuff.equipped {
+            if self.itype == EtcItemType::PetItem {
+                description.push_str(" ($117)");
+            }
+        }
+
         description
     }
 
     fn inventory_element(&self, stuff: &ItemStuff) -> common::packet::InventoryElement {
         log::info!("Sending etc inventory element for {:?}", self);
-        let mut description = self.name(stuff);
-
-        if stuff.equipped {
-            if self.itype == EtcItemType::PetItem {
-                description.push_str("($117)");
-            }
-        }
+        let mut description = " ".to_string();
+        description.push_str(&self.name(stuff));
 
         common::packet::InventoryElement {
             id: stuff.item_id,
@@ -599,6 +635,8 @@ pub struct ItemInstanceWithoutDefinition {
 pub struct ItemInstance {
     /// The item definition
     definition: Item,
+    /// The item definition id
+    id: u32,
     stuff: ItemStuff,
 }
 
@@ -608,19 +646,46 @@ impl ItemInstance {
         self.stuff.item_id
     }
 
+    /// Toggle if the item is equipped or not
+    pub fn toggle_equip(&mut self) {
+        self.stuff.equipped = !self.stuff.equipped;
+    }
+
+    /// Get the item definition
+    pub fn definition(&self) -> &Item {
+        &self.definition
+    }
+
     /// Get the item name
-    pub fn name(&mut self) -> String {
+    pub fn name(&self) -> String {
         self.definition.name(&self.stuff)
     }
 
     /// Get item usage
-    pub fn usage(&mut self) -> ItemUsage {
+    pub fn usage(&self) -> ItemUsage {
         self.definition.usage()
     }
 
     /// Get the inventory packet for this item instance, retrieving the item details if needed
     pub fn inventory_element(&self) -> common::packet::InventoryElement {
         self.definition.inventory_element(&self.stuff)
+    }
+
+    /// Get the inventory modification data
+    pub fn update_packet(&self) -> common::packet::InventoryUpdate {
+        let i = self.definition.update_packet(&self.stuff);
+        log::info!("Item update details {:?}", i);
+        i
+    }
+
+    /// Get the inventory description update packet
+    pub fn update_description_packet(&self) -> common::packet::Packet {
+        let a = common::packet::ServerPacket::InventoryDescriptionUpdate {
+            id: self.stuff.item_id,
+            description: self.name(),
+        };
+        log::info!("Description packet: {:?}", a);
+        a.build()
     }
 }
 
@@ -630,6 +695,7 @@ impl ItemInstanceWithoutDefinition {
         if let Some(item) = item_table.get(&self.id) {
             Some(ItemInstance {
                 definition: item.to_owned(),
+                id: self.id,
                 stuff: self.stuff,
             })
         } else {

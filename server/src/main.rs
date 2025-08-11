@@ -1,6 +1,5 @@
 #![deny(missing_docs)]
 #![deny(clippy::missing_docs_in_private_items)]
-
 #![feature(async_drop)]
 
 //! The server for the game
@@ -42,9 +41,11 @@ async fn main() -> Result<(), String> {
     world.load_maps_data().await?;
     world.load_item_data().await?;
 
-    let mut update_tx = Some(update::setup_update_server(&mut tasks, world.clone())
-        .await
-        .expect("Failed to setup update server"));
+    let mut update_tx = Some(
+        update::setup_update_server(&mut tasks, world.clone())
+            .await
+            .expect("Failed to setup update server"),
+    );
     let mut server_tx = Some(
         server::setup_game_server(&mut tasks, world.clone(), &settings.config)
             .await

@@ -4,8 +4,12 @@ use common::packet::{ServerPacket, ServerPacketSender};
 use mysql_async::{prelude::Queryable, Params};
 
 use crate::{
+    server::ClientError,
     server_message::ServerMessage,
-    world::item::{ItemInstance, ItemInstanceWithoutDefinition},
+    world::{
+        item::{ItemInstance, ItemInstanceWithoutDefinition, ItemUsage},
+        Map,
+    },
 };
 
 /// Represents a complete playable character in the game
@@ -192,6 +196,114 @@ impl FullCharacter {
     /// Get a reference to the location of the character
     pub fn location_ref(&self) -> &Location {
         &self.details.location
+    }
+
+    /// Use the specified item
+    pub async fn use_item(
+        &mut self,
+        id: &u32,
+        p2: &mut crate::server::client::ItemUseData,
+        map: &Map,
+    ) -> Result<(), ClientError> {
+        if let Some(item) = self.items.get_mut(&id) {
+            ////TODO check to see if item delay in effect for the item being used, return None if it is
+            ////TODO Check to see if there is a delay timer in effect for the item being used
+            if crate::world::item::ItemUsage::None == item.usage() {
+                p2.packets.push(
+                    ServerPacket::Message {
+                        ty: 74,
+                        msgs: vec![item.name()],
+                    }
+                    .build(),
+                );
+                return Ok(());
+            }
+            // Or when the map you are on disallows item usage
+            if !map.can_use_items() {
+                p2.packets.push(
+                    ServerPacket::Message {
+                        ty: 563,
+                        msgs: vec![],
+                    }
+                    .build(),
+                );
+                return Ok(());
+            }
+            let mut poly_name = None;
+            let mut item_target = None;
+            match item.usage() {
+                ItemUsage::Polymorph => {
+                    poly_name = Some(p2.p.pull_string());
+                }
+                ItemUsage::EnchantArmorScroll
+                | ItemUsage::EnchantWeaponScroll
+                | ItemUsage::IdentifyScroll
+                | ItemUsage::WithTarget => {
+                    item_target = Some(p2.p.pull_u32());
+                }
+                ItemUsage::Normal => {
+                    //item 41048..=41057 glued logbook page is a pull u32
+                }
+                ItemUsage::None => {
+                    //item 40956,40957 probably need to be fixed in db to item_type choice, it is a pull_u32
+                    //items 41255..=41259 probably need to be fixed in db, they are a pull_u8, pull_u8
+                }
+                ItemUsage::TeleportScroll1 | ItemUsage::BlessedTeleport => {
+                    item_target = Some(p2.p.pull_u32());
+                }
+                ItemUsage::BlankScroll => {
+                    let spell_id = p2.p.pull_u8();
+                }
+                ItemUsage::SpellBuff => {
+                    //item 40870 and 40879 change to choice in db?
+                    let spell_id = p2.p.pull_u32();
+                }
+                ItemUsage::WandNearbyTarget | ItemUsage::WandWithTarget => {
+                    let spell_id = p2.p.pull_u32();
+                    let spell_x = p2.p.pull_u16();
+                    let spell_y = p2.p.pull_u16();
+                }
+                ItemUsage::ResurrectScroll => {
+                    let id = p2.p.pull_u32();
+                }
+                ItemUsage::Letter
+                | ItemUsage::Letter2
+                | ItemUsage::ChristmasCard
+                | ItemUsage::ChristmasCard
+                | ItemUsage::ValentinesCard
+                | ItemUsage::ValentinesCard2
+                | ItemUsage::WhiteDayCard
+                | ItemUsage::WhiteDayCard2 => {
+                    let code = p2.p.pull_u16();
+                    let receiver = p2.p.pull_string();
+                    let body = p2.p.pull_u8();
+                }
+                ItemUsage::FishingRod => {
+                    let fishx = p2.p.pull_u16();
+                    let fishy = p2.p.pull_u16();
+                }
+                ItemUsage::Armor => {
+                    log::info!("Need to check armor equipping");
+                    item.toggle_equip();
+                    {
+                        let packet: ServerPacket = ServerPacket::InventoryMod(item.update_packet());
+                        p2.packets.push(packet.build());
+                        p2.packets.push(item.update_description_packet());
+                    }
+                }
+                ItemUsage::Weapon => {
+                    log::info!("Need to check weapon equipping");
+                    item.toggle_equip();
+                    {
+                        let packet: ServerPacket = ServerPacket::InventoryMod(item.update_packet());
+                        p2.packets.push(packet.build());
+                        p2.packets.push(item.update_description_packet());
+                    }
+                }
+                _ => {}
+            }
+        }
+        Ok(())
     }
 
     /// Get the current hp of the player

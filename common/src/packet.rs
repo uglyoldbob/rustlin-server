@@ -84,6 +84,7 @@ pub enum ClientPacket {
     Unknown(Vec<u8>),
 }
 
+#[derive(Debug)]
 pub struct InventoryElement {
     /// Item id
     pub id: u32,
@@ -186,9 +187,23 @@ impl InventoryElement {
     }
 }
 
+/// USed to create a inventory update packet
+#[derive(Debug)]
+pub struct InventoryUpdate {
+    /// Item id
+    pub id: u32,
+    /// description
+    pub description: String,
+    /// count
+    pub count: u32,
+    /// See ed from InventoryElement
+    pub ed: Vec<u8>,
+}
+
 //TODO create enums for the option values
 
 /// Represents packets sent to the client, from the server
+#[derive(Debug)]
 pub enum ServerPacket {
     ServerVersion {
         id: u8,
@@ -332,6 +347,15 @@ pub enum ServerPacket {
     InventoryVec(Vec<InventoryElement>),
     /// Add an inventory item
     Inventory(InventoryElement),
+    /// Modify an existing inventory item
+    InventoryMod(InventoryUpdate),
+    /// Update item description
+    InventoryDescriptionUpdate {
+        /// The item id to update
+        id: u32,
+        /// The new item description
+        description: String,
+    },
     /// change direction packet
     ChangeDirection {
         /// The id of the userobject
@@ -376,7 +400,7 @@ pub enum ServerPacket {
 
 /// Potential bless status for an item
 #[repr(u8)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub enum ItemBlessing {
     /// The item is blessed
     Blessed = 0,
@@ -705,6 +729,19 @@ impl ServerPacket {
             }
             ServerPacket::ChangeDirection { id, direction } => {
                 p.add_u32(id).add_u8(direction);
+            }
+            ServerPacket::InventoryMod(m) => {
+                p.add_u8(43)
+                    .add_u32(m.id)
+                    .add_string(&m.description)
+                    .add_u32(m.count)
+                    .add_u8(m.ed.len() as u8);
+                if !m.ed.is_empty() {
+                    p.add_vec(&m.ed);
+                }
+            }
+            ServerPacket::InventoryDescriptionUpdate { id, description } => {
+                p.add_u8(29).add_u32(id).add_string(&description);
             }
         }
         p
