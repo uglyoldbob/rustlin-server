@@ -111,7 +111,24 @@ impl MonsterSpawn {
     }
 }
 
-use crate::{character::Location, server_message::ServerMessage};
+/// The holder of a reference to a monster
+#[derive(Debug)]
+pub struct MonsterRef {
+    /// A reference to the monster on the world
+    reference: ObjectRef,
+    /// The world object
+    world: std::sync::Arc<crate::world::World>,
+}
+
+impl MonsterRef {
+    /// Run the ai for the monster
+    pub async fn run_ai(&mut self) {
+        log::info!("Running with {:?}", self.reference);
+        log::info!("Exiting monster {:?}", self.reference);
+    }
+}
+
+use crate::{character::Location, server_message::ServerMessage, world::ObjectRef};
 #[derive(Debug)]
 pub struct Monster {
     /// The object id for the npc
@@ -130,13 +147,19 @@ pub struct Monster {
     spawn: MonsterSpawn,
 }
 
+impl Monster {
+    /// Get a reference to the monster
+    pub fn reference(&self, world: std::sync::Arc<crate::world::World>) -> MonsterRef {
+        MonsterRef {
+            reference: ObjectRef { map: self.location.map, id: self.id },
+            world,
+        }
+    }
+}
+
 impl super::ObjectTrait for Monster {
     fn get_location(&self) -> crate::character::Location {
         self.location
-    }
-
-    async fn run_ai(&mut self) {
-        todo!();
     }
 
     fn set_location(&mut self, l: crate::character::Location) {

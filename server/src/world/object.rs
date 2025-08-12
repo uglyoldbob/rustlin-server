@@ -120,9 +120,6 @@ pub trait ObjectTrait {
 
     /// Remove an object from the list of known objects, if applicable
     async fn remove_object(&mut self, o: WorldObjectId) {}
-
-    /// Run any ai, if applicable
-    async fn run_ai(&mut self) {}
 }
 
 /// The things that an object can be

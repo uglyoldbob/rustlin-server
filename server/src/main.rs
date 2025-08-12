@@ -49,6 +49,7 @@ async fn smain() -> Result<(), String> {
             .await
             .map_err(|e| format!("{:?}", e))?,
     );
+    world.spawn_monsters().await;
 
     let mut update_tx = Some(
         update::setup_update_server(&mut tasks, world.clone())

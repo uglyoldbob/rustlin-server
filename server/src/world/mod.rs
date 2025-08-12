@@ -80,7 +80,7 @@ impl Map {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct ObjectRef {
     map: u16,
     id: WorldObjectId,
@@ -198,6 +198,7 @@ impl mysql_async::prelude::FromRow for Map {
 }
 
 /// Represents the world for a server
+#[derive(Debug)]
 pub struct World {
     /// The users logged into the world
     users: Arc<Mutex<HashMap<u32, String>>>,
@@ -256,14 +257,15 @@ impl World {
                 map.add_new_object(o).await;
             }
         }
-        w.spawn_monsters().await;
         Ok(w)
     }
 
     /// Spawn all monsters
-    pub async fn spawn_monsters(&self) {
+    pub async fn spawn_monsters(self: &Arc<Self>) {
         for ms in &self.monster_spawn_table {
             if let Some(m) = ms.make_monster(self.new_object_id(), &self.npc_table) {
+                let mut monref = m.reference(self.clone());
+                monref.run_ai().await;
                 let mut mi = self.map_info.lock().await;
                 if let Some(map) = mi.get_mut(&ms.map()) {
                     map.add_new_object(m.into()).await;
