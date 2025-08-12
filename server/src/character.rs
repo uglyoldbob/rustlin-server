@@ -21,6 +21,8 @@ pub struct FullCharacter {
     pub name: String,
     /// The id of the character in the database
     id: u32,
+    /// The world id of the character
+    world_id: super::world::WorldObjectId,
     /// The alignment of the character
     alignment: i16,
     /// The level of the character
@@ -64,6 +66,8 @@ pub struct PartialCharacter {
     account_name: String,
     /// The name of the character
     pub name: String,
+    /// The world id of the character
+    world_id: super::world::WorldObjectId,
     /// The id of the character in the database
     id: u32,
     /// The alignment of the character
@@ -117,6 +121,7 @@ impl PartialCharacter {
             account_name: self.account_name,
             name: self.name,
             id: self.id,
+            world_id: self.world_id,
             alignment: self.alignment,
             level: self.level,
             pledge: self.pledge,
@@ -143,8 +148,8 @@ impl crate::world::object::ObjectTrait for FullCharacter {
         self.details.location
     }
 
-    fn id(&self) -> u32 {
-        self.id
+    fn id(&self) -> super::world::WorldObjectId {
+        self.world_id
     }
 
     fn player_name(&self) -> Option<String> {
@@ -683,6 +688,7 @@ impl Character {
     /// Retrieve all gameplay details of the character from the database, some of the elements need to be looked up to finish the character.
     pub async fn get_partial_details(
         &self,
+        new_id: super::world::WorldObjectId,
         mysql: &mut mysql_async::Conn,
     ) -> Result<PartialCharacter, crate::server::ClientError> {
         use mysql_async::prelude::Queryable;
@@ -710,6 +716,7 @@ impl Character {
             account_name: self.account_name.clone(),
             name: self.name.clone(),
             id: self.id,
+            world_id: new_id,
             alignment: self.alignment,
             level: self.level,
             pledge: self.pledge.clone(),

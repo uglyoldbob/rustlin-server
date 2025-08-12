@@ -14,6 +14,16 @@ use crate::{
     world::{item::ItemTrait, object::ObjectTrait},
 };
 
+/// The id for an object that exists in the world
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub struct WorldObjectId(u32);
+
+impl Into<u32> for WorldObjectId {
+    fn into(self) -> u32 {
+        self.0
+    }
+}
+
 /// Represents a single map of the world
 #[derive(Clone, Debug)]
 pub struct Map {
@@ -67,13 +77,13 @@ impl Map {
 #[derive(Clone, Copy)]
 pub struct PlayerRef {
     map: u16,
-    id: u32,
+    id: WorldObjectId,
 }
 
 /// Represents the dynamic information of a map
 #[derive(Debug)]
 pub struct MapInfo {
-    objects: HashMap<u32, object::Object>,
+    objects: HashMap<WorldObjectId, object::Object>,
 }
 
 impl MapInfo {
@@ -132,6 +142,8 @@ pub struct World {
     pub npc_table: HashMap<u32, npc::NpcDefinition>,
     /// The npc spawn table
     npc_spawn_table: Vec<npc::NpcSpawn>,
+    /// The object for generating object ids
+    next_object_id: Arc<Mutex<WorldObjectId>>,
 }
 
 impl World {
@@ -153,9 +165,11 @@ impl World {
             item_table: Arc::new(Mutex::new(items)),
             npc_table: npc,
             npc_spawn_table,
+            next_object_id: Arc::new(Mutex::new(WorldObjectId(1))),
         };
         for s in &w.npc_spawn_table {
-            let npc = s.make_npc();
+            let new_id = w.new_object_id();
+            let npc = s.make_npc(new_id);
             let o : object::Object = npc.into();
             let mapid = o.get_location().map;
             let mut mi = w.map_info.lock().await;
@@ -164,6 +178,14 @@ impl World {
             }
         }
         Ok(w)
+    }
+
+    /// Get a new object id for an object that will live in the world somewhere
+    pub fn new_object_id(&self) -> WorldObjectId {
+        let mut w = self.next_object_id.lock().unwrap();
+        let r = w.clone();
+        w.0 += 1;
+        r
     }
 
     async fn load_npc_spawn_table(
@@ -436,21 +458,6 @@ impl World {
                 hdata.insert(m.id, MapInfo::new());
             }
             hmaps.insert(m.id, m);
-        }
-        if let Some(m) = hdata.get_mut(&4) {
-            m.objects.insert(
-                3,
-                npc::Npc::new(
-                    3,
-                    crate::character::Location {
-                        x: 33430,
-                        y: 32820,
-                        direction: 7,
-                        map: 4,
-                    },
-                )
-                .into(),
-            );
         }
         Ok((hmaps, hdata))
     }

@@ -11,7 +11,7 @@ pub trait ObjectTrait {
     fn get_location(&self) -> crate::character::Location;
 
     /// Get the object id for this object
-    fn id(&self) -> u32;
+    fn id(&self) -> super::WorldObjectId;
 
     /// Get the linear distance from this object to another object (as the crow flies).
     /// This assumes the objects are already on the same map

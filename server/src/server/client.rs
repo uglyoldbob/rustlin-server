@@ -536,7 +536,7 @@ impl Client {
                     .send_packet(ServerPacket::StartGame(0).build())
                     .await?;
                 let mut mysql = self.world.get_mysql_conn().await?;
-                let c = self.chars[c].get_partial_details(&mut mysql).await?;
+                let c = self.chars[c].get_partial_details(self.world.new_object_id(), &mut mysql).await?;
                 self.char_ref = {
                     let c = {
                         let item_table = self.world.item_table.lock().unwrap();

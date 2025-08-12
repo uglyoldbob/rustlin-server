@@ -94,9 +94,9 @@ impl NpcSpawn {
     }
 
     /// Create an npc object
-    pub fn make_npc(&self) -> Npc {
+    pub fn make_npc(&self, id: super::WorldObjectId) -> Npc {
         Npc {
-            id: 42,
+            id,
             location: self.location,
         }
     }
@@ -105,14 +105,14 @@ impl NpcSpawn {
 #[derive(Debug)]
 pub struct Npc {
     /// The object id for the npc
-    id: u32,
+    id: super::WorldObjectId,
     /// Where the npc currently exists
     location: crate::character::Location,
 }
 
 impl Npc {
     /// Build a new Npc, this is a temporary function for testing
-    pub fn new(id: u32, location: crate::character::Location) -> Self {
+    pub fn new(id: super::WorldObjectId, location: crate::character::Location) -> Self {
         Self { id, location }
     }
 }
@@ -122,7 +122,7 @@ impl super::object::ObjectTrait for Npc {
         self.location
     }
 
-    fn id(&self) -> u32 {
+    fn id(&self) -> super::WorldObjectId {
         self.id
     }
 
@@ -149,7 +149,7 @@ impl super::object::ObjectTrait for Npc {
         common::packet::ServerPacket::PutObject {
             x: self.location.x,
             y: self.location.y,
-            id: self.id,
+            id: self.id.into(),
             icon: 29,
             status: 0,
             direction: self.location.direction,
