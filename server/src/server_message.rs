@@ -1,3 +1,5 @@
+use crate::{character::Location, world::WorldObjectId};
+
 /// Represents messages sent by the server to player clients
 #[derive(Clone, Debug)]
 pub enum ServerMessage {
@@ -20,4 +22,16 @@ pub enum ServerMessage {
     PartyChat(String),
     ///name message
     WhisperChat(String, String),
+    /// Add an object to the players known object list
+    AddObject {
+        /// The id of the object
+        id: WorldObjectId,
+        /// The location of the object
+        location: Location,
+    },
+    /// Remove an object from the players known object list
+    RemoveObject {
+        /// The id of the object
+        id: WorldObjectId,
+    },
 }

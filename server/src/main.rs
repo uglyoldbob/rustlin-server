@@ -19,8 +19,16 @@ mod user;
 mod world;
 use crate::clients::ClientList;
 
-#[tokio::main]
-async fn main() -> Result<(), String> {
+fn main() -> Result<(), String> {
+    tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .thread_stack_size(32 * 1024 * 1024)
+        .build()
+        .unwrap()
+        .block_on(smain())
+}
+
+async fn smain() -> Result<(), String> {
     simple_logger::init_with_level(log::Level::Info).unwrap();
 
     common::do_stuff();

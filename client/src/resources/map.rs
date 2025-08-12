@@ -515,7 +515,7 @@ impl<'a> MapSegmentGui<'a> {
                     _ => {}
                 }
                 let t = self.tiles[(index + 1) as usize];
-                let current_tile = (t >> 8) as u32;
+                let current_tile = t >> 8;
                 let current_subtile = (t & 0xFF) as u8;
                 match self.tile_ref.get(&current_tile) {
                     Some(ts) => {

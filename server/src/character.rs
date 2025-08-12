@@ -7,8 +7,7 @@ use crate::{
     server::ClientError,
     server_message::ServerMessage,
     world::{
-        item::{ItemInstanceWithoutDefinition, ItemUsage},
-        Map,
+        item::{ItemInstanceWithoutDefinition, ItemUsage}, object::ObjectList, Map
     },
 };
 
@@ -57,6 +56,8 @@ pub struct FullCharacter {
     items: HashMap<u32, crate::world::item::ItemInstance>,
     /// Used to send messages to the user when needed
     sender: tokio::sync::mpsc::Sender<crate::server_message::ServerMessage>,
+    /// The known objects for the character
+    known_objects: ObjectList,
 }
 
 /// Represents a partial playable character in the game
@@ -139,6 +140,7 @@ impl PartialCharacter {
             details: self.details,
             items,
             sender: sender,
+            known_objects: ObjectList::new(),
         }
     }
 }
@@ -150,6 +152,23 @@ impl crate::world::object::ObjectTrait for FullCharacter {
 
     fn id(&self) -> super::world::WorldObjectId {
         self.world_id
+    }
+
+    async fn add_object(&mut self, o: &crate::world::object::Object) {
+        if self.linear_distance_to(o) < 30.0 {
+            let _ = self.sender.send(ServerMessage::AddObject { id: o.id(), location: o.get_location(), }).await;
+            self.known_objects.add_object(o.id());
+        }
+    }
+
+    async fn remove_object(&mut self, o: crate::world::WorldObjectId) {
+        let _ = self.sender.send(ServerMessage::RemoveObject { id: o });
+        self.known_objects.remove_object(o);
+    }
+
+    fn get_known_objects(&self) -> Option<Vec<crate::world::object::Object>> {
+        let mut v = Vec::new();
+        Some(v)
     }
 
     fn player_name(&self) -> Option<String> {
@@ -409,6 +428,32 @@ pub struct Location {
     pub map: u16,
     /// The direction that is being faced
     pub direction: u8,
+}
+
+impl Location {
+    /// Get the linear distance between the location of this object and the specified location (as the crow flies).
+    /// This assumes the objects are already on the same map
+    pub fn linear_distance(&self, l2: &Self) -> f32 {
+        let deltax = if self.x > l2.x {
+            self.x - l2.x
+        } else {
+            l2.x - self.x
+        };
+        let deltay = if self.y > l2.y {
+            self.y - l2.y
+        } else {
+            l2.y - self.y
+        };
+        let sum = ((deltax as u32) * (deltax as u32) + (deltay as u32) * (deltay as u32)) as f32;
+        sum.sqrt()
+    }
+
+    /// Calculates the manhattan distance between two map points
+    pub fn manhattan_distance(&self, l2: &Self) -> u16 {
+        let d1 = u16::abs_diff(self.x, l2.x);
+        let d2 = u16::abs_diff(self.y, l2.y);
+        d1 + d2
+    }
 }
 
 /// The extra details for a character to go from Character to FullCharacter

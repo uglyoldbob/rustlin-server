@@ -777,7 +777,7 @@ pub fn key_init(k: u32) -> u64 {
 }
 
 /// A packet of data that can be sent or received over a network connection
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Packet {
     data: Vec<u8>,
     read: usize,

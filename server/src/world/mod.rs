@@ -75,7 +75,7 @@ impl Map {
 }
 
 #[derive(Clone, Copy)]
-pub struct PlayerRef {
+pub struct ObjectRef {
     map: u16,
     id: WorldObjectId,
 }
@@ -91,6 +91,25 @@ impl MapInfo {
     pub fn new() -> Self {
         Self {
             objects: HashMap::new(),
+        }
+    }
+
+    /// Add an object to the map
+    pub async fn add_new_object(&mut self, mut new_o: object::Object) {
+        for o in &mut self.objects {
+            new_o.add_object(&o.1).await;
+        }
+        for o in &mut self.objects {
+            o.1.add_object(&new_o).await;
+        }
+        self.objects.insert(new_o.id(), new_o);
+    }
+
+    /// Remove an object from the map
+    pub async fn remove_object(&mut self, id: WorldObjectId) {
+        self.objects.remove(&id);
+        for o in &mut self.objects {
+            o.1.remove_object(id).await;
         }
     }
 }
@@ -170,11 +189,11 @@ impl World {
         for s in &w.npc_spawn_table {
             let new_id = w.new_object_id();
             let npc = s.make_npc(new_id, &w.npc_table);
-            let o : object::Object = npc.into();
+            let o: object::Object = npc.into();
             let mapid = o.get_location().map;
             let mut mi = w.map_info.lock().await;
             if let Some(map) = mi.get_mut(&mapid) {
-                map.objects.insert(o.id(), o);
+                map.add_new_object(o).await;
             }
         }
         Ok(w)
@@ -194,16 +213,29 @@ impl World {
         Ok(npc::NpcSpawn::load_table(conn).await?)
     }
 
+    /// Send a new object packet with the given packet writer and object id
+    pub async fn send_new_object(&self, location: crate::character::Location, id: WorldObjectId, pw: &mut common::packet::ServerPacketSender) -> Result<(), ClientError> {
+        let mut mi = self.map_info.lock().await;
+        let map = mi.get_mut(&location.map);
+        if let Some(map) = map {
+            if let Some(obj) = map.objects.get(&id) {
+                let p = obj.build_put_object_packet();
+                pw.send_packet(p).await?;
+            }
+        }
+        Ok(())
+    }
+
     /// Add a player to the world
-    pub async fn add_player(&self, p: crate::character::FullCharacter) -> Option<PlayerRef> {
+    pub async fn add_player(&self, p: crate::character::FullCharacter) -> Option<ObjectRef> {
         let location = p.location_ref().clone();
         let obj: object::Object = p.into();
         let id = obj.id();
         let mut m = self.map_info.lock().await;
         let m2 = m.get_mut(&location.map);
         if let Some(map) = m2 {
-            map.objects.insert(id, obj);
-            Some(PlayerRef {
+            map.add_new_object(obj).await;
+            Some(ObjectRef {
                 map: location.map,
                 id,
             })
@@ -213,19 +245,36 @@ impl World {
     }
 
     /// Remove a player from the world
-    pub async fn remove_player(&self, r: &mut Option<PlayerRef>) {
+    pub async fn remove_player(&self, r: &mut Option<ObjectRef>) {
         if let Some(r) = &r {
             let mut mi = self.map_info.lock().await;
             let map = mi.get_mut(&r.map);
             if let Some(map) = map {
-                map.objects.remove_entry(&r.id);
+                map.remove_object(r.id).await;
             }
         }
         *r = None;
     }
 
+    /// Get the list of all object ids that should be known to the player
+    pub async fn get_player_known_objects(&self, refo: ObjectRef) -> object::ObjectList {
+        const distance : f32 = 30.0;
+        let mut o = object::ObjectList::new();
+        let mut mi = self.map_info.lock().await;
+        let map = mi.get_mut(&refo.map);
+        if let Some(map) = map {
+            let my_location = map.objects.get(&refo.id).unwrap().get_location();
+            for obj in map.objects.values() {
+                if obj.linear_distance(&my_location) < distance && refo.id != obj.id() {
+                    o.add_object(obj.id());
+                }
+            }
+        }
+        o
+    }
+
     /// Run an asynchronous closure on the player object
-    pub async fn with_player_ref_do<F, T, E>(&self, refo: PlayerRef, gen: &mut T, f: F) -> Option<E>
+    pub async fn with_player_ref_do<F, T, E>(&self, refo: ObjectRef, gen: &mut T, f: F) -> Option<E>
     where
         F: AsyncFn(&crate::character::FullCharacter, &mut T, &Map) -> Option<E>,
     {
@@ -243,7 +292,7 @@ impl World {
     }
 
     /// Run an asynchronous closure on the player object
-    pub async fn with_player_mut_do<F, T, E>(&self, refo: PlayerRef, gen: &mut T, f: F) -> Option<E>
+    pub async fn with_player_mut_do<F, T, E>(&self, refo: ObjectRef, gen: &mut T, f: F) -> Option<E>
     where
         F: AsyncFn(&mut crate::character::FullCharacter, &mut T, &Map) -> Option<E>,
     {
@@ -260,10 +309,37 @@ impl World {
         None
     }
 
-    /// Run an asynchronous closure on objects close enough to the specified object
+    /// Run an asynchronous closure on objects on the same screen as the specified player ref
+    pub async fn with_objects_on_screen_do<F, T, E>(
+        &self,
+        refo: &ObjectRef,
+        distance: f32,
+        gen: &mut T,
+        f: F,
+    ) -> Result<(), E>
+    where
+        F: AsyncFn(&object::Object, &mut T, &Map) -> Result<(), E>,
+    {
+        let mut mi = self.map_info.lock().await;
+        let map = mi.get_mut(&refo.map);
+        if let Some(map) = map {
+            let my_location = map.objects.get(&refo.id).unwrap().get_location();
+            let themap = self.maps.get(&refo.map).unwrap().clone();
+            for obj in map.objects.values() {
+                let d = obj.manhattan_distance(&my_location);
+                // TODO a better algorithm for on screen calculation
+                if d < 17 && refo.id != obj.id() {
+                    f(obj, gen, &themap).await?;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Run an asynchronous closure on objects close enough to the specified player ref
     pub async fn with_objects_near_me_do<F, T, E>(
         &self,
-        refo: &PlayerRef,
+        refo: &ObjectRef,
         distance: f32,
         gen: &mut T,
         f: F,
@@ -322,7 +398,7 @@ impl World {
     /// Run an asynchronous closure on objects close enough to the specified object
     pub async fn with_mut_objects_near_me_do<F, T, E>(
         &self,
-        refo: &PlayerRef,
+        refo: &ObjectRef,
         distance: f32,
         include_self: bool,
         gen: &mut T,
@@ -349,7 +425,7 @@ impl World {
     /// Run an asynchronous closure on objects close enough to the specified object
     pub async fn with_objects_nearby_do<F, T, E>(
         &self,
-        refo: PlayerRef,
+        refo: ObjectRef,
         distance: f32,
         gen: &mut T,
         f: F,

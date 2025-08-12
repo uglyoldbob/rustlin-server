@@ -5,7 +5,7 @@ use crate::server::ClientError;
 use crate::server_message::ServerMessage;
 use crate::user::*;
 use crate::world::object::ObjectTrait;
-use crate::world::PlayerRef;
+use crate::world::ObjectRef;
 use common::packet::*;
 
 use futures::FutureExt;
@@ -22,7 +22,7 @@ pub struct Client {
     /// The possible characters for the client
     chars: Vec<crate::character::Character>,
     /// The player reference
-    char_ref: Option<PlayerRef>,
+    char_ref: Option<ObjectRef>,
     /// The world object
     world: std::sync::Arc<crate::world::World>,
 }
@@ -533,7 +533,9 @@ impl Client {
                     .send_packet(ServerPacket::StartGame(0).build())
                     .await?;
                 let mut mysql = self.world.get_mysql_conn().await?;
-                let c = self.chars[c].get_partial_details(self.world.new_object_id(), &mut mysql).await?;
+                let c = self.chars[c]
+                    .get_partial_details(self.world.new_object_id(), &mut mysql)
+                    .await?;
                 self.char_ref = {
                     let c = {
                         let item_table = self.world.item_table.lock().unwrap();
@@ -541,6 +543,7 @@ impl Client {
                     };
                     self.world.add_player(c).await
                 };
+
 
                 if let Some(r) = self.char_ref {
                     self.world
@@ -552,20 +555,6 @@ impl Client {
                             Some(42)
                         })
                         .await;
-                }
-
-                if let Some(r) = self.char_ref {
-                    self.world
-                        .with_objects_nearby_do::<_, _, PacketError>(
-                            r,
-                            30.0,
-                            &mut self.packet_writer,
-                            async |o, pw| {
-                                pw.send_packet(o.build_put_object_packet()).await?;
-                                Ok(())
-                            },
-                        )
-                        .await?;
                 }
 
                 self.packet_writer
@@ -599,11 +588,22 @@ impl Client {
                 };
                 if let Some(r) = self.char_ref {
                     self.world
-                        .with_player_mut_do(r, &mut 42, async move |fc, _, _| {
+                        .with_player_mut_do(r, &mut self.packet_writer, async move |fc, pw, _| {
                             let l = fc.location_mut();
                             l.x = x2;
                             l.y = y2;
                             l.direction = heading;
+                            pw.send_packet(
+                                ServerPacket::MoveObject {
+                                    id: fc.id().into(),
+                                    x: x2,
+                                    y: y2,
+                                    direction: heading,
+                                }
+                                .build(),
+                            )
+                            .await
+                            .ok()?;
                             Some(42)
                         })
                         .await;
@@ -777,6 +777,13 @@ impl Client {
     /// Process a message received from the server
     async fn process_server_message(&mut self, p: ServerMessage) -> Result<(), ClientError> {
         match p {
+            ServerMessage::AddObject { id, location } => {
+                log::info!("Adding object {:?} at {:?}", id, location);
+                self.world.send_new_object(location, id, &mut self.packet_writer).await?;
+            }
+            ServerMessage::RemoveObject { id } => {
+                self.packet_writer.send_packet(ServerPacket::RemoveObject(id.into()).build()).await?;
+            }
             ServerMessage::Disconnect => {
                 self.packet_writer
                     .send_packet(ServerPacket::Disconnect.build())

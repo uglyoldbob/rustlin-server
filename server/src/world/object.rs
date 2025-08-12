@@ -1,8 +1,55 @@
 //! This holds code generally used for all objects in the game
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
-use crate::{character::FullCharacter, server_message::ServerMessage};
+use crate::{character::FullCharacter, server_message::ServerMessage, world::WorldObjectId};
+
+/// A helper struct for managin a list of objects known to a player
+#[derive(Debug)]
+pub struct ObjectList {
+    /// The items
+    items: HashSet<WorldObjectId>,
+}
+
+impl ObjectList {
+    /// Construct a blank list
+    pub fn new() -> Self {
+        Self {
+            items: HashSet::new(),
+        }
+    }
+
+    /// Add an object to the list
+    pub fn add_object(&mut self, i: WorldObjectId) {
+        self.items.insert(i);
+    }
+
+    /// Remove an object from the list
+    pub fn remove_object(&mut self, i: WorldObjectId) {
+        self.items.remove(&i);
+    }
+
+    /// Get list of changes required for this list, for adding items and deleting items as needed. Also apply the changes to self
+    pub fn make_changes(&mut self, old_objects: &mut Vec<WorldObjectId>, new_objects: &mut Vec<WorldObjectId>, o: &Self) {
+        // delete objects that are no longer present
+        for obj in self.items.iter() {
+            if !o.items.contains(obj) {
+                old_objects.push(obj.clone());
+            }
+        }
+        for obj in &o.items {
+            if !self.items.contains(&obj) {
+                new_objects.push(obj.clone());
+            }
+        }
+        for o in old_objects {
+            self.items.remove(o);
+        }
+        for o in new_objects {
+            self.items.insert(o.clone());
+        }
+    }
+}
 
 /// The generic object trait for the server
 #[enum_dispatch::enum_dispatch]
@@ -23,18 +70,14 @@ pub trait ObjectTrait {
     /// This assumes the objects are already on the same map
     fn linear_distance(&self, l2: &crate::character::Location) -> f32 {
         let l1 = self.get_location();
-        let deltax = if l1.x > l2.x {
-            l1.x - l2.x
-        } else {
-            l2.x - l1.x
-        };
-        let deltay = if l1.y > l2.y {
-            l1.y - l2.y
-        } else {
-            l2.y - l1.y
-        };
-        let sum = ((deltax as u32) * (deltax as u32) + (deltay as u32) * (deltay as u32)) as f32;
-        sum.sqrt()
+        l1.linear_distance(l2)
+    }
+
+    /// Get the manhattan distance between the location of this object and the specified location.
+    /// This assumes the objects are already on the same map
+    fn manhattan_distance(&self, l2: &crate::character::Location) -> u16 {
+        let l1 = self.get_location();
+        l1.manhattan_distance(l2)
     }
 
     /// Build a packet for placing the object on the map for a user
@@ -51,6 +94,15 @@ pub trait ObjectTrait {
 
     /// Returns the name of the character if it is a player
     fn player_name(&self) -> Option<String>;
+
+    /// Get the list of objects known to this object, if it matters for this object
+    fn get_known_objects(&self) -> Option<Vec<Object>> { None }
+
+    /// Add an object to the list of known objects, if applicable
+    async fn add_object(&mut self, o: &Object) {}
+
+    /// Remove an object from the list of known objects, if applicable
+    async fn remove_object(&mut self, o: WorldObjectId) {}
 }
 
 /// The things that an object can be
