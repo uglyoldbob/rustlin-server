@@ -4,6 +4,7 @@ use std::{
 };
 
 pub mod item;
+pub mod monster;
 pub mod npc;
 pub mod object;
 
@@ -13,7 +14,10 @@ use crate::{
     character::{Character, Location},
     server::ClientError,
     server_message::ServerMessage,
-    world::{item::ItemTrait, object::{ObjectList, ObjectTrait}},
+    world::{
+        item::ItemTrait,
+        object::{ObjectList, ObjectTrait},
+    },
 };
 
 /// The id for an object that exists in the world
@@ -109,7 +113,12 @@ impl MapInfo {
     }
 
     /// Move an object on the map
-    pub async fn move_object(&mut self, r: ObjectRef, new_loc: Location, pw: &mut ServerPacketSender) -> Result<(), ClientError> {
+    pub async fn move_object(
+        &mut self,
+        r: ObjectRef,
+        new_loc: Location,
+        pw: &mut ServerPacketSender,
+    ) -> Result<(), ClientError> {
         let mut object_list = ObjectList::new();
         if let Some(myobj) = self.objects.get_mut(&r.id) {
             myobj.set_location(new_loc);
@@ -130,9 +139,11 @@ impl MapInfo {
                 }
             }
             for objid in old_objects {
-                pw.send_packet(ServerPacket::RemoveObject(objid.into()).build()).await?;
+                pw.send_packet(ServerPacket::RemoveObject(objid.into()).build())
+                    .await?;
                 if let Some(obj) = self.objects.get_mut(&r.id) {
-                    pw.send_packet(ServerPacket::RemoveObject(objid.into()).build()).await?;
+                    pw.send_packet(ServerPacket::RemoveObject(objid.into()).build())
+                        .await?;
                     obj.remove_object(objid).await;
                 }
             }
@@ -204,6 +215,8 @@ pub struct World {
     pub npc_table: HashMap<u32, npc::NpcDefinition>,
     /// The npc spawn table
     npc_spawn_table: Vec<npc::NpcSpawn>,
+    /// The monster spawn table
+    monster_spawn_table: Vec<monster::MonsterSpawn>,
     /// The object for generating object ids
     next_object_id: Arc<Mutex<WorldObjectId>>,
 }
@@ -213,6 +226,9 @@ impl World {
     pub async fn new(mysql: mysql_async::Pool) -> Result<Self, String> {
         let mut conn = mysql.get_conn().await.map_err(|e| format!("{:?}", e))?;
         let npc_spawn_table = Self::load_npc_spawn_table(&mut conn)
+            .await
+            .map_err(|e| format!("{:?}", e))?;
+        let monster_spawn_table = Self::load_monster_spawn_table(&mut conn)
             .await
             .map_err(|e| format!("{:?}", e))?;
         let (mapd, mapi) = Self::load_maps_data(&mut conn).await?;
@@ -227,6 +243,7 @@ impl World {
             item_table: Arc::new(Mutex::new(items)),
             npc_table: npc,
             npc_spawn_table,
+            monster_spawn_table,
             next_object_id: Arc::new(Mutex::new(WorldObjectId(1))),
         };
         for s in &w.npc_spawn_table {
@@ -239,11 +256,29 @@ impl World {
                 map.add_new_object(o).await;
             }
         }
+        w.spawn_monsters().await;
         Ok(w)
     }
 
+    /// Spawn all monsters
+    pub async fn spawn_monsters(&self) {
+        for ms in &self.monster_spawn_table {
+            if let Some(m) = ms.make_monster(self.new_object_id(), &self.npc_table) {
+                let mut mi = self.map_info.lock().await;
+                if let Some(map) = mi.get_mut(&ms.map()) {
+                    map.add_new_object(m.into()).await;
+                }
+            }
+        }
+    }
+
     /// Move an object on the world to a new location
-    pub async fn move_object(&self, r: ObjectRef, new_loc: Location, pw: &mut ServerPacketSender) -> Result<(), ClientError> {
+    pub async fn move_object(
+        &self,
+        r: ObjectRef,
+        new_loc: Location,
+        pw: &mut ServerPacketSender,
+    ) -> Result<(), ClientError> {
         let mut mi = self.map_info.lock().await;
         let map = mi.get_mut(&new_loc.map);
         if let Some(map) = map {
@@ -266,6 +301,12 @@ impl World {
         Ok(npc::NpcSpawn::load_table(conn).await?)
     }
 
+    async fn load_monster_spawn_table(
+        conn: &mut mysql_async::Conn,
+    ) -> Result<Vec<monster::MonsterSpawn>, ClientError> {
+        Ok(monster::MonsterSpawn::load_table(conn).await?)
+    }
+
     /// Send a new object packet with the given packet writer and object id
     pub async fn send_new_object(
         &self,
@@ -285,7 +326,11 @@ impl World {
     }
 
     /// Add a player to the world
-    pub async fn add_player(&self, p: crate::character::FullCharacter, pw: &mut ServerPacketSender) -> Option<ObjectRef> {
+    pub async fn add_player(
+        &self,
+        p: crate::character::FullCharacter,
+        pw: &mut ServerPacketSender,
+    ) -> Option<ObjectRef> {
         let location = p.location_ref().clone();
         let obj: object::Object = p.into();
         let id = obj.id();

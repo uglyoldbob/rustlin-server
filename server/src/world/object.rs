@@ -89,7 +89,13 @@ pub trait ObjectTrait {
     fn build_move_object_packet(&self) -> common::packet::Packet {
         let id = self.id();
         let location = self.get_location();
-        common::packet::ServerPacket::MoveObject { id: id.into(), x: location.x, y: location.y, direction: location.direction }.build()
+        common::packet::ServerPacket::MoveObject {
+            id: id.into(),
+            x: location.x,
+            y: location.y,
+            direction: location.direction,
+        }
+        .build()
     }
 
     /// Get the list of items the object is posessing
@@ -114,6 +120,9 @@ pub trait ObjectTrait {
 
     /// Remove an object from the list of known objects, if applicable
     async fn remove_object(&mut self, o: WorldObjectId) {}
+
+    /// Run any ai, if applicable
+    async fn run_ai(&mut self) {}
 }
 
 /// The things that an object can be
@@ -124,4 +133,6 @@ pub enum Object {
     Player(FullCharacter),
     /// A generic npc
     GenericNpc(super::npc::Npc),
+    /// A generic monster
+    Monster(super::monster::Monster),
 }

@@ -6,11 +6,11 @@ use crate::character::Location;
 
 #[derive(Debug)]
 pub struct NpcDefinition {
-    id: u32,
-    name: String,
-    graphics_id: u16,
-    light_size: u8,
-    alignment: i16,
+    pub id: u32,
+    pub name: String,
+    pub graphics_id: u16,
+    pub light_size: u8,
+    pub alignment: i16,
 }
 
 impl NpcDefinition {
