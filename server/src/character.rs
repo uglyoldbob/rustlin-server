@@ -7,7 +7,9 @@ use crate::{
     server::ClientError,
     server_message::ServerMessage,
     world::{
-        item::{ItemInstanceWithoutDefinition, ItemUsage}, object::ObjectList, Map
+        item::{ItemInstanceWithoutDefinition, ItemUsage},
+        object::ObjectList,
+        Map, WorldObjectId,
     },
 };
 
@@ -150,25 +152,24 @@ impl crate::world::object::ObjectTrait for FullCharacter {
         self.details.location
     }
 
+    fn set_location(&mut self, l: crate::character::Location) {
+        self.details.location = l;
+    }
+
     fn id(&self) -> super::world::WorldObjectId {
         self.world_id
     }
 
-    async fn add_object(&mut self, o: &crate::world::object::Object) {
-        if self.linear_distance_to(o) < 30.0 {
-            let _ = self.sender.send(ServerMessage::AddObject { id: o.id(), location: o.get_location(), }).await;
-            self.known_objects.add_object(o.id());
-        }
+    async fn add_object(&mut self, o: WorldObjectId) {
+        self.known_objects.add_object(o);
     }
 
     async fn remove_object(&mut self, o: crate::world::WorldObjectId) {
-        let _ = self.sender.send(ServerMessage::RemoveObject { id: o });
         self.known_objects.remove_object(o);
     }
 
-    fn get_known_objects(&self) -> Option<Vec<crate::world::object::Object>> {
-        let mut v = Vec::new();
-        Some(v)
+    fn get_known_objects(&self) -> Option<&ObjectList> {
+        Some(&self.known_objects)
     }
 
     fn player_name(&self) -> Option<String> {

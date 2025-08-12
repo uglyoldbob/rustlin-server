@@ -7,11 +7,13 @@ pub mod item;
 pub mod npc;
 pub mod object;
 
+use common::packet::{ServerPacket, ServerPacketSender};
+
 use crate::{
-    character::Character,
+    character::{Character, Location},
     server::ClientError,
     server_message::ServerMessage,
-    world::{item::ItemTrait, object::ObjectTrait},
+    world::{item::ItemTrait, object::{ObjectList, ObjectTrait}},
 };
 
 /// The id for an object that exists in the world
@@ -80,6 +82,13 @@ pub struct ObjectRef {
     id: WorldObjectId,
 }
 
+impl ObjectRef {
+    /// Get the map id
+    pub fn map(&self) -> u16 {
+        self.map
+    }
+}
+
 /// Represents the dynamic information of a map
 #[derive(Debug)]
 pub struct MapInfo {
@@ -95,14 +104,48 @@ impl MapInfo {
     }
 
     /// Add an object to the map
-    pub async fn add_new_object(&mut self, mut new_o: object::Object) {
-        for o in &mut self.objects {
-            new_o.add_object(&o.1).await;
-        }
-        for o in &mut self.objects {
-            o.1.add_object(&new_o).await;
-        }
+    pub async fn add_new_object(&mut self, new_o: object::Object) {
         self.objects.insert(new_o.id(), new_o);
+    }
+
+    /// Move an object on the map
+    pub async fn move_object(&mut self, r: ObjectRef, new_loc: Location, pw: &mut ServerPacketSender) -> Result<(), ClientError> {
+        let mut object_list = ObjectList::new();
+        if let Some(myobj) = self.objects.get_mut(&r.id) {
+            myobj.set_location(new_loc);
+        }
+        for (id, o) in &mut self.objects {
+            if *id != r.id {
+                if o.linear_distance(&new_loc) < 7.0 {
+                    object_list.add_object(*id);
+                }
+            }
+        }
+        {
+            let mut old_objects = Vec::new();
+            let mut new_objects = Vec::new();
+            if let Some(myobj) = self.objects.get_mut(&r.id) {
+                if let Some(ol) = myobj.get_known_objects() {
+                    ol.find_changes(&mut old_objects, &mut new_objects, &object_list);
+                }
+            }
+            for objid in old_objects {
+                pw.send_packet(ServerPacket::RemoveObject(objid.into()).build()).await?;
+                if let Some(obj) = self.objects.get_mut(&r.id) {
+                    pw.send_packet(ServerPacket::RemoveObject(objid.into()).build()).await?;
+                    obj.remove_object(objid).await;
+                }
+            }
+            for objid in new_objects {
+                if let Some(obj) = self.objects.get_mut(&objid) {
+                    pw.send_packet(obj.build_put_object_packet()).await?;
+                }
+                if let Some(obj) = self.objects.get_mut(&r.id) {
+                    obj.add_object(objid).await;
+                }
+            }
+        }
+        Ok(())
     }
 
     /// Remove an object from the map
@@ -199,6 +242,16 @@ impl World {
         Ok(w)
     }
 
+    /// Move an object on the world to a new location
+    pub async fn move_object(&self, r: ObjectRef, new_loc: Location, pw: &mut ServerPacketSender) -> Result<(), ClientError> {
+        let mut mi = self.map_info.lock().await;
+        let map = mi.get_mut(&new_loc.map);
+        if let Some(map) = map {
+            map.move_object(r, new_loc, pw).await?;
+        }
+        Ok(())
+    }
+
     /// Get a new object id for an object that will live in the world somewhere
     pub fn new_object_id(&self) -> WorldObjectId {
         let mut w = self.next_object_id.lock().unwrap();
@@ -214,7 +267,12 @@ impl World {
     }
 
     /// Send a new object packet with the given packet writer and object id
-    pub async fn send_new_object(&self, location: crate::character::Location, id: WorldObjectId, pw: &mut common::packet::ServerPacketSender) -> Result<(), ClientError> {
+    pub async fn send_new_object(
+        &self,
+        location: crate::character::Location,
+        id: WorldObjectId,
+        pw: &mut common::packet::ServerPacketSender,
+    ) -> Result<(), ClientError> {
         let mut mi = self.map_info.lock().await;
         let map = mi.get_mut(&location.map);
         if let Some(map) = map {
@@ -227,18 +285,21 @@ impl World {
     }
 
     /// Add a player to the world
-    pub async fn add_player(&self, p: crate::character::FullCharacter) -> Option<ObjectRef> {
+    pub async fn add_player(&self, p: crate::character::FullCharacter, pw: &mut ServerPacketSender) -> Option<ObjectRef> {
         let location = p.location_ref().clone();
         let obj: object::Object = p.into();
         let id = obj.id();
         let mut m = self.map_info.lock().await;
         let m2 = m.get_mut(&location.map);
         if let Some(map) = m2 {
+            let location = obj.get_location();
             map.add_new_object(obj).await;
-            Some(ObjectRef {
+            let or = ObjectRef {
                 map: location.map,
                 id,
-            })
+            };
+            map.move_object(or, location, pw).await.ok()?;
+            Some(or)
         } else {
             None
         }
@@ -254,23 +315,6 @@ impl World {
             }
         }
         *r = None;
-    }
-
-    /// Get the list of all object ids that should be known to the player
-    pub async fn get_player_known_objects(&self, refo: ObjectRef) -> object::ObjectList {
-        const distance : f32 = 30.0;
-        let mut o = object::ObjectList::new();
-        let mut mi = self.map_info.lock().await;
-        let map = mi.get_mut(&refo.map);
-        if let Some(map) = map {
-            let my_location = map.objects.get(&refo.id).unwrap().get_location();
-            for obj in map.objects.values() {
-                if obj.linear_distance(&my_location) < distance && refo.id != obj.id() {
-                    o.add_object(obj.id());
-                }
-            }
-        }
-        o
     }
 
     /// Run an asynchronous closure on the player object

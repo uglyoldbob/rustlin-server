@@ -541,9 +541,8 @@ impl Client {
                         let item_table = self.world.item_table.lock().unwrap();
                         c.to_full(&item_table, sender.clone())
                     };
-                    self.world.add_player(c).await
+                    self.world.add_player(c, &mut self.packet_writer).await
                 };
-
 
                 if let Some(r) = self.char_ref {
                     self.world
@@ -574,7 +573,7 @@ impl Client {
                 log::info!("Client window activate {}", v2);
             }
             ClientPacket::Save => {}
-            ClientPacket::Move { x, y, heading } => {
+            ClientPacket::MoveFrom { x, y, heading } => {
                 let (x2, y2) = match heading {
                     0 => (x, y - 1),
                     1 => (x + 1, y - 1),
@@ -588,25 +587,17 @@ impl Client {
                 };
                 if let Some(r) = self.char_ref {
                     self.world
-                        .with_player_mut_do(r, &mut self.packet_writer, async move |fc, pw, _| {
-                            let l = fc.location_mut();
-                            l.x = x2;
-                            l.y = y2;
-                            l.direction = heading;
-                            pw.send_packet(
-                                ServerPacket::MoveObject {
-                                    id: fc.id().into(),
-                                    x: x2,
-                                    y: y2,
-                                    direction: heading,
-                                }
-                                .build(),
-                            )
-                            .await
-                            .ok()?;
-                            Some(42)
-                        })
-                        .await;
+                        .move_object(
+                            r,
+                            crate::character::Location {
+                                map: r.map(),
+                                x: x2,
+                                y: y2,
+                                direction: heading,
+                            },
+                            &mut self.packet_writer,
+                        )
+                        .await?;
                 }
             }
             ClientPacket::ChangeDirection(d) => {
@@ -779,10 +770,14 @@ impl Client {
         match p {
             ServerMessage::AddObject { id, location } => {
                 log::info!("Adding object {:?} at {:?}", id, location);
-                self.world.send_new_object(location, id, &mut self.packet_writer).await?;
+                self.world
+                    .send_new_object(location, id, &mut self.packet_writer)
+                    .await?;
             }
             ServerMessage::RemoveObject { id } => {
-                self.packet_writer.send_packet(ServerPacket::RemoveObject(id.into()).build()).await?;
+                self.packet_writer
+                    .send_packet(ServerPacket::RemoveObject(id.into()).build())
+                    .await?;
             }
             ServerMessage::Disconnect => {
                 self.packet_writer

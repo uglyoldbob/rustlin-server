@@ -29,7 +29,7 @@ pub enum ClientPacket {
     GameInitDone,
     WindowActivate(u8),
     Save,
-    Move {
+    MoveFrom {
         x: u16,
         y: u16,
         heading: u8,
@@ -863,7 +863,7 @@ impl Packet {
             83 => ClientPacket::CharacterSelect {
                 name: self.pull_string(),
             },
-            88 => ClientPacket::Move {
+            88 => ClientPacket::MoveFrom {
                 x: self.pull_u16(),
                 y: self.pull_u16(),
                 heading: self.pull_u8(),

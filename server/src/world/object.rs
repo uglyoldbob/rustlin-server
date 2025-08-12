@@ -29,8 +29,13 @@ impl ObjectList {
         self.items.remove(&i);
     }
 
-    /// Get list of changes required for this list, for adding items and deleting items as needed. Also apply the changes to self
-    pub fn make_changes(&mut self, old_objects: &mut Vec<WorldObjectId>, new_objects: &mut Vec<WorldObjectId>, o: &Self) {
+    /// Get list of changes required for this list, for adding items and deleting items as needed.
+    pub fn find_changes(
+        &self,
+        old_objects: &mut Vec<WorldObjectId>,
+        new_objects: &mut Vec<WorldObjectId>,
+        o: &Self,
+    ) {
         // delete objects that are no longer present
         for obj in self.items.iter() {
             if !o.items.contains(obj) {
@@ -42,12 +47,6 @@ impl ObjectList {
                 new_objects.push(obj.clone());
             }
         }
-        for o in old_objects {
-            self.items.remove(o);
-        }
-        for o in new_objects {
-            self.items.insert(o.clone());
-        }
     }
 }
 
@@ -56,6 +55,9 @@ impl ObjectList {
 pub trait ObjectTrait {
     /// Get the location of the object
     fn get_location(&self) -> crate::character::Location;
+
+    /// Set the location of the object
+    fn set_location(&mut self, l: crate::character::Location);
 
     /// Get the object id for this object
     fn id(&self) -> super::WorldObjectId;
@@ -83,6 +85,13 @@ pub trait ObjectTrait {
     /// Build a packet for placing the object on the map for a user
     fn build_put_object_packet(&self) -> common::packet::Packet;
 
+    /// Build a packet for moving the object on the map
+    fn build_move_object_packet(&self) -> common::packet::Packet {
+        let id = self.id();
+        let location = self.get_location();
+        common::packet::ServerPacket::MoveObject { id: id.into(), x: location.x, y: location.y, direction: location.direction }.build()
+    }
+
     /// Get the list of items the object is posessing
     fn get_items(&self) -> Option<&HashMap<u32, super::item::ItemInstance>>;
 
@@ -96,10 +105,12 @@ pub trait ObjectTrait {
     fn player_name(&self) -> Option<String>;
 
     /// Get the list of objects known to this object, if it matters for this object
-    fn get_known_objects(&self) -> Option<Vec<Object>> { None }
+    fn get_known_objects(&self) -> Option<&ObjectList> {
+        None
+    }
 
     /// Add an object to the list of known objects, if applicable
-    async fn add_object(&mut self, o: &Object) {}
+    async fn add_object(&mut self, o: WorldObjectId) {}
 
     /// Remove an object from the list of known objects, if applicable
     async fn remove_object(&mut self, o: WorldObjectId) {}

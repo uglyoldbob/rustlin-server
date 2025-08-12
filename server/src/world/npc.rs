@@ -130,6 +130,10 @@ impl super::object::ObjectTrait for Npc {
         self.location
     }
 
+    fn set_location(&mut self, l: crate::character::Location) {
+        self.location = l;
+    }
+
     fn id(&self) -> super::WorldObjectId {
         self.id
     }
