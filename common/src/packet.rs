@@ -1182,7 +1182,6 @@ impl ServerPacketSender {
 
     /// Send a packet
     pub async fn send_packet(&mut self, mut data: Packet) -> Result<(), PacketError> {
-        log::info!("Sending packet {:x?}", data.buf());
         self.writer.writable().await?;
         while data.buf().len() < 4 {
             data.add_u8(0);

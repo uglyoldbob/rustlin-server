@@ -364,10 +364,7 @@ impl Client {
         config: &std::sync::Arc<crate::ServerConfiguration>,
         sender: &tokio::sync::mpsc::Sender<ServerMessage>,
     ) -> Result<(), ClientError> {
-        log::info!("Processing a packet");
-        log::info!("Stack remaining: {:?}", stacker::remaining_stack());
         let c = p.convert();
-        log::info!("Processing a packet: {:?}", c);
         match c {
             ClientPacket::UseItem { id, remainder } => {
                 log::info!("User wants to use item {}: {:X?}", id, remainder);
@@ -589,7 +586,6 @@ impl Client {
             }
             ClientPacket::Save => {}
             ClientPacket::Move { x, y, heading } => {
-                log::info!("moving from {} {} {}", x, y, heading);
                 let (x2, y2) = match heading {
                     0 => (x, y - 1),
                     1 => (x + 1, y - 1),
@@ -614,7 +610,15 @@ impl Client {
                 }
             }
             ClientPacket::ChangeDirection(d) => {
-                log::info!("change direction to {}", d);
+                if let Some(r) = self.char_ref {
+                    self.world
+                        .with_player_mut_do(r, &mut 42, async move |fc, _, _| {
+                            let l = fc.location_mut();
+                            l.direction = d;
+                            Some(42)
+                        })
+                        .await;
+                }
             }
             ClientPacket::Chat(m) => {
                 self.send_message(ClientMessage::RegularChat {
@@ -650,7 +654,6 @@ impl Client {
                     .await?;
             }
             ClientPacket::CommandChat(m) => {
-                log::info!("command chat {}", m);
                 let mut words = m.split_whitespace();
                 let first_word = words.next();
                 if let Some(m) = first_word {
@@ -744,10 +747,8 @@ impl Client {
                 let user = get_user_details(account.clone(), &mut mysql).await;
                 match user {
                     Some(us) => {
-                        log::info!("User {} exists: {:?}", account, us);
                         let password_success =
                             us.check_login(&config.account_creation_salt, &oldpass);
-                        log::info!("User login check is {}", password_success);
                         if password_success {
                             log::info!("User wants to change password and entered correct details");
                             self.packet_writer
@@ -775,7 +776,6 @@ impl Client {
 
     /// Process a message received from the server
     async fn process_server_message(&mut self, p: ServerMessage) -> Result<(), ClientError> {
-        log::info!("Processing a message: {:?}", p);
         match p {
             ServerMessage::Disconnect => {
                 self.packet_writer
@@ -825,7 +825,6 @@ impl Client {
         config: &std::sync::Arc<crate::ServerConfiguration>,
         mut end_rx: tokio::sync::mpsc::Receiver<u32>,
     ) -> Result<u8, ClientError> {
-        log::info!("Starting event loop for client");
         let encryption_key: u32 = rand::thread_rng().gen();
         let peer = reader.peer_addr()?;
         let mut packet_reader = ServerPacketReceiver::new(reader, encryption_key);
@@ -835,29 +834,17 @@ impl Client {
         self.packet_writer.send_packet(key_packet).await?;
         self.packet_writer
             .set_encryption_key(packet_reader.get_key());
-        log::info!("Starting future poll loop in client");
         loop {
-            log::info!("One poll for client");
             futures::select! {
                 packet = packet_reader.read_packet().fuse() => {
-                    log::info!("Got a packet {:x?}", packet);
                     let p = packet?;
-                    log::info!("Packet is now {:x?}", p);
-                    log::info!("Stack remaining: {:?}", stacker::remaining_stack());
                     self.process_packet(p, peer, config, &sender).await?;
                 }
                 msg = receiver.recv().fuse() => {
-                    log::info!("Got a message {:?}", msg);
                     let p = msg.unwrap();
                     self.process_server_message(p).await?;
                 }
-                end = end_rx.recv().fuse() => {
-                    if let Some(end) = end {
-                        log::info!("Received message {} to kill connection to client", end);
-                    }
-                    else {
-                        log::info!("Received implicit message to kill connection to client");
-                    }
+                _ = end_rx.recv().fuse() => {
                     break;
                 }
             }

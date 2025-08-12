@@ -8,8 +8,9 @@ use crate::character::Location;
 pub struct NpcDefinition {
     id: u32,
     name: String,
-    graphics_id: u32,
+    graphics_id: u16,
     light_size: u8,
+    alignment: i16,
 }
 
 impl NpcDefinition {
@@ -39,6 +40,7 @@ impl mysql_async::prelude::FromRow for NpcDefinition {
             name: row.get(2).ok_or(mysql_async::FromRowError(row.clone()))?,
             graphics_id: row.get(5).ok_or(mysql_async::FromRowError(row.clone()))?,
             light_size: row.get(60).ok_or(mysql_async::FromRowError(row.clone()))?,
+            alignment: row.get(17).ok_or(mysql_async::FromRowError(row.clone()))?,
         })
     }
 }
@@ -94,10 +96,15 @@ impl NpcSpawn {
     }
 
     /// Create an npc object
-    pub fn make_npc(&self, id: super::WorldObjectId) -> Npc {
+    pub fn make_npc(&self, id: super::WorldObjectId, npcs: &HashMap<u32, NpcDefinition>) -> Npc {
+        let npc = npcs.get(&self.npc_definition).unwrap();
         Npc {
             id,
             location: self.location,
+            alignment: npc.alignment,
+            icon: npc.graphics_id,
+            name: npc.name.clone(),
+            light_size: npc.light_size,
         }
     }
 }
@@ -108,13 +115,14 @@ pub struct Npc {
     id: super::WorldObjectId,
     /// Where the npc currently exists
     location: crate::character::Location,
-}
-
-impl Npc {
-    /// Build a new Npc, this is a temporary function for testing
-    pub fn new(id: super::WorldObjectId, location: crate::character::Location) -> Self {
-        Self { id, location }
-    }
+    /// The npc name
+    name: String,
+    /// the npc alignment
+    alignment: i16,
+    /// The size of light emitted by the npc
+    light_size: u8,
+    /// the icon for displaying the npc
+    icon: u16,
 }
 
 impl super::object::ObjectTrait for Npc {
@@ -145,19 +153,18 @@ impl super::object::ObjectTrait for Npc {
     }
 
     fn build_put_object_packet(&self) -> common::packet::Packet {
-        log::info!("Put object packet for an npc");
         common::packet::ServerPacket::PutObject {
             x: self.location.x,
             y: self.location.y,
             id: self.id.into(),
-            icon: 29,
+            icon: self.icon,
             status: 0,
             direction: self.location.direction,
-            light: 7,
+            light: self.light_size,
             speed: 50,
             xp: 1235,
-            alignment: -2767,
-            name: "steve".to_string(),
+            alignment: self.alignment,
+            name: self.name.clone(),
             title: "".to_string(),
             status2: 0,
             pledgeid: 0,

@@ -169,7 +169,7 @@ impl World {
         };
         for s in &w.npc_spawn_table {
             let new_id = w.new_object_id();
-            let npc = s.make_npc(new_id);
+            let npc = s.make_npc(new_id, &w.npc_table);
             let o : object::Object = npc.into();
             let mapid = o.get_location().map;
             let mut mi = w.map_info.lock().await;
