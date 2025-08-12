@@ -4,7 +4,6 @@ use crate::client_message::ClientMessage;
 use crate::server::ClientError;
 use crate::server_message::ServerMessage;
 use crate::user::*;
-use crate::world::item::ItemUsage;
 use crate::world::object::ObjectTrait;
 use crate::world::PlayerRef;
 use common::packet::*;

@@ -7,7 +7,7 @@ use crate::{
     server::ClientError,
     server_message::ServerMessage,
     world::{
-        item::{ItemInstance, ItemInstanceWithoutDefinition, ItemUsage},
+        item::{ItemInstanceWithoutDefinition, ItemUsage},
         Map,
     },
 };
@@ -297,7 +297,7 @@ impl FullCharacter {
                     {
                         let packet: ServerPacket = ServerPacket::InventoryMod(item.update_packet());
                         p2.packets.push(packet.build());
-                        p2.packets.push(item.update_description_packet());
+                        //p2.packets.push(item.update_description_packet());
                     }
                 }
                 _ => {}

@@ -7,8 +7,6 @@ pub mod item;
 pub mod npc;
 pub mod object;
 
-use common::packet::{ServerPacket, ServerPacketSender};
-
 use crate::{
     character::Character,
     server::ClientError,
@@ -125,24 +123,53 @@ pub struct World {
     /// The connection to the database
     mysql: mysql_async::Pool,
     /// maps of the world
-    maps: Arc<Mutex<HashMap<u16, Map>>>,
+    maps: HashMap<u16, Map>,
     /// dynamic information for all maps
     map_info: Arc<tokio::sync::Mutex<HashMap<u16, MapInfo>>>,
     /// The item lookup table
     pub item_table: Arc<Mutex<HashMap<u32, item::Item>>>,
+    /// The npc lookup table
+    pub npc_table: HashMap<u32, npc::NpcDefinition>,
+    /// The npc spawn table
+    npc_spawn_table: Vec<npc::NpcSpawn>,
 }
 
 impl World {
     /// Construct a new server world
-    pub fn new(mysql: mysql_async::Pool) -> Self {
-        Self {
+    pub async fn new(mysql: mysql_async::Pool) -> Result<Self, String> {
+        let mut conn = mysql.get_conn().await.map_err(|e| format!("{:?}", e))?;
+        let npc_spawn_table = Self::load_npc_spawn_table(&mut conn)
+            .await
+            .map_err(|e| format!("{:?}", e))?;
+        let (mapd, mapi) = Self::load_maps_data(&mut conn).await?;
+        let items = Self::load_item_data(&mut conn).await?;
+        let npc = npc::NpcDefinition::load_table(&mut conn).await?;
+        let w = Self {
             users: Arc::new(Mutex::new(HashMap::new())),
             client_ids: Arc::new(Mutex::new(crate::ClientList::new())),
             mysql,
-            maps: Arc::new(Mutex::new(HashMap::new())),
-            map_info: Arc::new(tokio::sync::Mutex::new(HashMap::new())),
-            item_table: Arc::new(Mutex::new(HashMap::new())),
+            maps: mapd,
+            map_info: Arc::new(tokio::sync::Mutex::new(mapi)),
+            item_table: Arc::new(Mutex::new(items)),
+            npc_table: npc,
+            npc_spawn_table,
+        };
+        for s in &w.npc_spawn_table {
+            let npc = s.make_npc();
+            let o : object::Object = npc.into();
+            let mapid = o.get_location().map;
+            let mut mi = w.map_info.lock().await;
+            if let Some(map) = mi.get_mut(&mapid) {
+                map.objects.insert(o.id(), o);
+            }
         }
+        Ok(w)
+    }
+
+    async fn load_npc_spawn_table(
+        conn: &mut mysql_async::Conn,
+    ) -> Result<Vec<npc::NpcSpawn>, ClientError> {
+        Ok(npc::NpcSpawn::load_table(conn).await?)
     }
 
     /// Add a player to the world
@@ -185,11 +212,7 @@ impl World {
         if let Some(map) = map {
             if let Some(obj) = map.objects.get(&refo.id) {
                 if let object::Object::Player(fc) = obj {
-                    let themap = {
-                        let themaps = self.maps.lock().unwrap();
-                        let themap = themaps.get(&refo.map).unwrap().clone();
-                        themap
-                    };
+                    let themap = self.maps.get(&refo.map).unwrap().clone();
                     return f(fc, gen, &themap).await;
                 }
             }
@@ -207,11 +230,7 @@ impl World {
         if let Some(map) = map {
             if let Some(obj) = map.objects.get_mut(&refo.id) {
                 if let object::Object::Player(fc) = obj {
-                    let themap = {
-                        let themaps = self.maps.lock().unwrap();
-                        let themap = themaps.get(&refo.map).unwrap().clone();
-                        themap
-                    };
+                    let themap = self.maps.get(&refo.map).unwrap().clone();
                     return f(fc, gen, &themap).await;
                 }
             }
@@ -234,11 +253,7 @@ impl World {
         let map = mi.get_mut(&refo.map);
         if let Some(map) = map {
             let my_location = map.objects.get(&refo.id).unwrap().get_location();
-            let themap = {
-                let themaps = self.maps.lock().unwrap();
-                let themap = themaps.get(&refo.map).unwrap().clone();
-                themap
-            };
+            let themap = self.maps.get(&refo.map).unwrap().clone();
             for obj in map.objects.values() {
                 if obj.linear_distance(&my_location) < distance && refo.id != obj.id() {
                     f(obj, gen, &themap).await?;
@@ -335,12 +350,11 @@ impl World {
 
     /// (Re)load the weapons table
     pub async fn load_weapons(
-        &self,
+        mysql: &mut mysql_async::Conn,
         item_table: &mut HashMap<u32, item::Item>,
     ) -> Result<(), String> {
         use mysql_async::prelude::Queryable;
         let query = "SELECT * from weapon";
-        let mut mysql = self.get_mysql_conn().await.map_err(|e| e.to_string())?;
         let s = mysql.prep(query).await.map_err(|e| e.to_string())?;
         let weapons = mysql
             .exec_map(s, (), |a: item::Weapon| a)
@@ -354,12 +368,11 @@ impl World {
 
     /// (Re)load the etc items table
     pub async fn load_etc_items(
-        &self,
+        mysql: &mut mysql_async::Conn,
         item_table: &mut HashMap<u32, item::Item>,
     ) -> Result<(), String> {
         use mysql_async::prelude::Queryable;
         let query = "SELECT * from etcitem";
-        let mut mysql = self.get_mysql_conn().await.map_err(|e| e.to_string())?;
         let s = mysql.prep(query).await.map_err(|e| e.to_string())?;
         let items = mysql
             .exec_map(s, (), |a: item::EtcItem| a)
@@ -373,12 +386,11 @@ impl World {
 
     /// (Re)load the armor table
     pub async fn load_armor(
-        &self,
+        mysql: &mut mysql_async::Conn,
         item_table: &mut HashMap<u32, item::Item>,
     ) -> Result<(), String> {
         use mysql_async::prelude::Queryable;
         let query = "SELECT * from armor";
-        let mut mysql = self.get_mysql_conn().await.map_err(|e| e.to_string())?;
         let s = mysql.prep(query).await.map_err(|e| e.to_string())?;
         let items = mysql
             .exec_map(s, (), |a: item::Armor| a)
@@ -391,32 +403,33 @@ impl World {
     }
 
     /// (Re)load all item data from database
-    pub async fn load_item_data(&self) -> Result<(), String> {
-        let mut item_table = self.item_table.lock().map_err(|e| e.to_string())?;
+    pub async fn load_item_data(
+        mysql: &mut mysql_async::Conn,
+    ) -> Result<HashMap<u32, item::Item>, String> {
+        let mut item_table = HashMap::new();
         log::info!("There are {} items", item_table.len());
-        self.load_weapons(&mut item_table).await?;
+        Self::load_weapons(mysql, &mut item_table).await?;
         log::info!("There are {} items", item_table.len());
-        self.load_etc_items(&mut item_table).await?;
+        Self::load_etc_items(mysql, &mut item_table).await?;
         log::info!("There are {} items", item_table.len());
-        self.load_armor(&mut item_table).await?;
+        Self::load_armor(mysql, &mut item_table).await?;
         log::info!("There are {} items", item_table.len());
-        Ok(())
+        Ok(item_table)
     }
 
     /// (Re)load all maps from the database
-    pub async fn load_maps_data(&self) -> Result<(), String> {
-        let mut hmaps = self.maps.lock().unwrap();
+    pub async fn load_maps_data(
+        mysql: &mut mysql_async::Conn,
+    ) -> Result<(HashMap<u16, Map>, HashMap<u16, MapInfo>), String> {
+        let mut hmaps = HashMap::new();
         use mysql_async::prelude::Queryable;
         let query = "SELECT mapid, locationname, startX, endX, startY, endY, monster_amount, drop_rate, underwater, markable, teleportable, escapable, resurrection, painwand, penalty, take_pets, recall_pets, usable_item, usable_skill from mapids";
-        let mut mysql = self.get_mysql_conn().await.map_err(|e| e.to_string())?;
         let s = mysql.prep(query).await.map_err(|e| e.to_string())?;
         let maps = mysql
             .exec_map(s, (), |a: Map| a)
             .await
             .map_err(|e| e.to_string())?;
-        let mut hdata = self.map_info.lock().await;
-        /// TODO do something when an object is on a map that no longer exists
-        hmaps.clear();
+        let mut hdata = HashMap::new();
         for m in maps {
             println!("Found map data {:?}", m);
             if !hdata.contains_key(&m.id) {
@@ -439,7 +452,7 @@ impl World {
                 .into(),
             );
         }
-        Ok(())
+        Ok((hmaps, hdata))
     }
 
     /// Insert a character id into the world

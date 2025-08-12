@@ -10,7 +10,6 @@ mod update;
 use client_message::*;
 
 mod server_message;
-use server_message::*;
 
 mod character;
 mod clients;
@@ -37,9 +36,11 @@ async fn main() -> Result<(), String> {
 
     let mut tasks: tokio::task::JoinSet<Result<(), u32>> = tokio::task::JoinSet::new();
 
-    let world = std::sync::Arc::new(world::World::new(mysql_pool));
-    world.load_maps_data().await?;
-    world.load_item_data().await?;
+    let world = std::sync::Arc::new(
+        world::World::new(mysql_pool)
+            .await
+            .map_err(|e| format!("{:?}", e))?,
+    );
 
     let mut update_tx = Some(
         update::setup_update_server(&mut tasks, world.clone())

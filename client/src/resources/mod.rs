@@ -292,7 +292,7 @@ impl<T, U> LoadableMap<T, U> {
         }
     }
 
-    pub fn iter_mut(&mut self) -> std::collections::hash_map::IterMut<T, LoadableReference<U>> {
+    pub fn iter_mut(&mut self) -> std::collections::hash_map::IterMut<'_, T, LoadableReference<U>> {
         self.map.iter_mut()
     }
 }
@@ -460,7 +460,7 @@ impl<'a, 'b, 'c> GameResources<'a, 'b, 'c> {
         }
     }
 
-    pub fn get_or_load_sprite(&mut self, a: u16, b: u16) -> Option<&SpriteGui> {
+    pub fn get_or_load_sprite(&mut self, a: u16, b: u16) -> Option<&SpriteGui<'_>> {
         let id = (a as u32) << 16 | (b as u32);
 
         if !self.sprites.contains_key(&id) {
