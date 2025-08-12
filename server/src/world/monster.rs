@@ -5,8 +5,8 @@ use std::collections::HashMap;
 #[derive(Clone, Copy, Debug, PartialEq)]
 #[repr(u8)]
 enum SpawnType {
-    Normal=0,
-    WhenPlayerNearby=1,
+    Normal = 0,
+    WhenPlayerNearby = 1,
 }
 
 impl std::convert::TryFrom<u8> for SpawnType {
@@ -68,7 +68,8 @@ impl mysql_async::prelude::FromRow for MonsterSpawn {
                 row.get(14).ok_or(mysql_async::FromRowError(row.clone()))?,
                 row.get(15).ok_or(mysql_async::FromRowError(row.clone()))?,
             ),
-            spawn_type: std::convert::TryInto::try_into(st).map_err(|_|mysql_async::FromRowError(row.clone()))?,
+            spawn_type: std::convert::TryInto::try_into(st)
+                .map_err(|_| mysql_async::FromRowError(row.clone()))?,
         })
     }
 }
@@ -151,7 +152,10 @@ impl Monster {
     /// Get a reference to the monster
     pub fn reference(&self, world: std::sync::Arc<crate::world::World>) -> MonsterRef {
         MonsterRef {
-            reference: ObjectRef { map: self.location.map, id: self.id },
+            reference: ObjectRef {
+                map: self.location.map,
+                id: self.id,
+            },
             world,
         }
     }
