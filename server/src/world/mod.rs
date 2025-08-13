@@ -397,7 +397,6 @@ impl World {
     pub fn new_object_id(&self) -> WorldObjectId {
         let mut w = self.next_object_id.lock().unwrap();
         let r = *w;
-        log::info!("Creating object with id {:?}", r);
         w.0 += 1;
         r
     }
@@ -709,7 +708,6 @@ impl World {
             .map_err(|e| e.to_string())?;
         let mut hdata = HashMap::new();
         for m in maps {
-            println!("Found map data {:?}", m);
             hdata.entry(m.id).or_insert_with(MapInfo::new);
             hmaps.insert(m.id, m);
         }
