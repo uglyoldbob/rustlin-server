@@ -434,7 +434,7 @@ impl FullCharacter {
 }
 
 /// The location on a specific map for an object
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Location {
     /// The x coordinate
     pub x: u16,
@@ -447,6 +447,61 @@ pub struct Location {
 }
 
 impl Location {
+    /// Compute the location for a move packet
+    pub fn compute_for_move(&self) -> Self {
+        match self.direction {
+            0 => Self {
+                x: self.x,
+                y: self.y+1,
+                map: self.map,
+                direction: self.direction,
+            },
+            1 => Self {
+                x: self.x-1,
+                y: self.y+1,
+                map: self.map,
+                direction: self.direction,
+            },
+            2 => Self {
+                x: self.x-1,
+                y: self.y,
+                map: self.map,
+                direction: self.direction,
+            },
+            3 => Self {
+                x: self.x-1,
+                y: self.y-1,
+                map: self.map,
+                direction: self.direction,
+            },
+            4 => Self {
+                x: self.x,
+                y: self.y-1,
+                map: self.map,
+                direction: self.direction,
+            },
+            5 => Self {
+                x: self.x+1,
+                y: self.y-1,
+                map: self.map,
+                direction: self.direction,
+            },
+            6 => Self {
+                x: self.x+1,
+                y: self.y,
+                map: self.map,
+                direction: self.direction,
+            },
+            7 => Self {
+                x: self.x+1,
+                y: self.y+1,
+                map: self.map,
+                direction: self.direction,
+            },
+            _ => *self,
+        }
+    }
+
     /// Get the linear distance between the location of this object and the specified location (as the crow flies).
     /// This assumes the objects are already on the same map
     pub fn linear_distance(&self, l2: &Self) -> f32 {

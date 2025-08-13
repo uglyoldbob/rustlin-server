@@ -90,15 +90,18 @@ pub trait ObjectTrait {
     fn build_put_object_packet(&self) -> common::packet::Packet;
 
     /// Build a packet for moving the object on the map
-    fn build_move_object_packet(&self) -> common::packet::ServerPacket {
+    fn build_move_object_packet(&self) -> Vec<common::packet::ServerPacket> {
         let id = self.id();
-        let olocation = self.get_prev_location();
-        common::packet::ServerPacket::MoveObject {
+        let olocation = self.get_location();
+        let mut v = Vec::new();
+        let location = olocation.compute_for_move();
+        v.push(common::packet::ServerPacket::MoveObject {
             id: id.get_u32(),
-            x: olocation.x,
-            y: olocation.y,
-            direction: olocation.direction,
-        }
+            x: location.x,
+            y: location.y,
+            direction: location.direction,
+        });
+        v
     }
 
     /// Get the list of items the object is posessing

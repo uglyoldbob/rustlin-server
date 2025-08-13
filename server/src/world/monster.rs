@@ -206,9 +206,6 @@ impl MonsterRef {
                     map: l.map,
                     direction,
                 };
-                if l.map == 69 {
-                    log::info!("Move {:?} from {:?} to {:?}", self.reference, l, new_loc);
-                }
                 let _ = self.world.move_object(self.reference, new_loc, None).await;
             }
         }
