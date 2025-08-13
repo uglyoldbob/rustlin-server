@@ -380,11 +380,11 @@ impl Client {
                     self.packet_writer
                         .send_packet(
                             ServerPacket::Attack {
-                                u1: 0,
+                                attack_type: 3,
                                 id: r.world_id().get_u32(),
                                 id2: id,
-                                u2: 0,
-                                direction: 5,
+                                impact: 1,
+                                direction: 2,
                                 effect: None,
                             }
                             .build(),

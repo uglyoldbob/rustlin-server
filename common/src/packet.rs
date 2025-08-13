@@ -407,14 +407,14 @@ pub enum ServerPacket {
     },
     /// The attack packet
     Attack {
-        ///unknown, value 3 starts a specific action
-        u1: u8,
-        /// id of attacked object?
+        ///the action to perform for the attack
+        attack_type: u8,
+        /// id of attacker
         id: u32,
-        /// other id of invovled object
+        /// attacked object id
         id2: u32,
-        /// something with victim info damages
-        u2: u16,
+        /// specifies how the attacked object is impacted
+        impact: u16,
         /// direction?
         direction: u8,
         /// effect?
@@ -465,10 +465,10 @@ impl ServerPacket {
         let mut p = Packet::new();
         match self {
             ServerPacket::Attack {
-                u1,
+                attack_type: u1,
                 id,
                 id2,
-                u2,
+                impact: u2,
                 direction,
                 effect,
             } => {
