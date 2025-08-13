@@ -17,12 +17,17 @@ pub trait ItemTrait {
     fn usage(&self) -> ItemUsage;
 }
 
+/// The elemental types that an item can be enchanted with
 #[derive(Clone, Debug)]
 #[repr(u8)]
 pub enum ElementalEnchantType {
+    /// Earth elemental
     Earth = 1,
+    /// Fire elemental
     Fire = 2,
+    /// Water elemental
     Water = 4,
+    /// Wind elemental
     Wind = 8,
 }
 
@@ -233,10 +238,8 @@ impl ItemTrait for Weapon {
         } else {
             &self.unidentified
         });
-        if stuff.identified {
-            if self.max_use_time > 0 {
-                description.push_str(&format!("({}) ", self.max_use_time));
-            }
+        if stuff.identified && self.max_use_time > 0 {
+            description.push_str(&format!("({}) ", self.max_use_time));
         }
 
         if stuff.count > 1 {
@@ -328,20 +331,16 @@ impl ItemTrait for Armor {
     fn name(&self, stuff: &ItemStuff) -> String {
         let mut description = String::new();
 
-        if stuff.identified {
-            if stuff.enchanted_level > 0 {
-                description.push_str(&format!("+{} ", stuff.enchanted_level));
-            }
+        if stuff.identified && stuff.enchanted_level > 0 {
+            description.push_str(&format!("+{} ", stuff.enchanted_level));
         }
         description.push_str(if stuff.identified {
             &self.identified
         } else {
             &self.unidentified
         });
-        if stuff.identified {
-            if self.max_use_time > 0 {
-                description.push_str(&format!("({}) ", self.max_use_time));
-            }
+        if stuff.identified && self.max_use_time > 0 {
+            description.push_str(&format!("({}) ", self.max_use_time));
         }
         if stuff.count > 1 {
             description.push_str(&format!("({}) ", stuff.count));
@@ -374,25 +373,43 @@ impl ItemTrait for Armor {
     }
 }
 
+/// The item type for etc items
 #[derive(Clone, Copy, Debug, PartialEq)]
 #[repr(u8)]
 pub enum EtcItemType {
+    /// An arrow to use in a bow
     Arrow = 0,
+    /// A wand of some sort
     Wand,
+    /// The item can be used to create light
     Light,
+    /// a gem of some variety
     Gem,
+    /// A totem
     Totem,
+    /// A firework that a player can use
     Firecracker,
+    /// Potions a player can use
     Potion,
+    /// Items that can be eaten
     Food,
+    /// scrolls that players can use
     Scroll,
+    /// ITems used for quests
     QuestItem,
+    /// Items for learning spells/skills
     SpellBook,
+    /// Items for pets
     PetItem,
+    /// Other item usage
     Other,
+    /// Items used for crafting somehow
     Material,
+    /// A special event item
     EventItem,
+    /// Unsure, includes throwing knives
     Sting,
+    /// An item that gives items
     TreasureBox,
 }
 
@@ -470,10 +487,15 @@ pub struct EtcItem {
 }
 
 impl EtcItem {
+    /// Item id for a horse riding helmet
     const HORSE_RIDING_HELMET: u32 = 20383;
+    /// Item id for a lamp
     const LAMP: u32 = 40001;
+    /// Item id for a lantern
     const LANTERN: u32 = 40002;
+    /// Item id for a regular pet collar
     const PET_COLLAR_ID: u32 = 40314;
+    /// Item id for a high quality pet collar
     const HIGH_QUALITY_PET_COLLAR: u32 = 40316;
 }
 
@@ -553,10 +575,8 @@ impl ItemTrait for EtcItem {
             }
         }
 
-        if stuff.equipped {
-            if self.itype == EtcItemType::PetItem {
-                description.push_str(" ($117)");
-            }
+        if stuff.equipped && self.itype == EtcItemType::PetItem {
+            description.push_str(" ($117)");
         }
 
         description
@@ -581,19 +601,16 @@ impl ItemTrait for EtcItem {
     }
 }
 
-// A generic item
+/// A generic item
 #[enum_dispatch::enum_dispatch(ItemTrait)]
 #[derive(Clone, Debug)]
 pub enum Item {
+    /// A player usable weapon
     Weapon(Weapon),
+    /// Some other kind of item
     Etc(EtcItem),
+    /// A piece of armor
     Armor(Armor),
-}
-
-#[derive(Clone, Debug)]
-pub enum ItemOrId {
-    Item(Item),
-    Id(u32),
 }
 
 /// The stuff for an item instance
@@ -627,6 +644,7 @@ pub struct ItemStuff {
 pub struct ItemInstanceWithoutDefinition {
     /// The item id
     id: u32,
+    /// The item configuration details
     stuff: ItemStuff,
 }
 
@@ -637,6 +655,7 @@ pub struct ItemInstance {
     definition: Item,
     /// The item definition id
     id: u32,
+    /// The item configuration details
     stuff: ItemStuff,
 }
 

@@ -53,34 +53,29 @@ async fn test_map_load() {
     let mut s32maps = HashSet::new();
 
     let entries = fs::read_dir(&d).unwrap();
-    for e in entries.into_iter() {
-        if let Ok(e) = e {
-            let path = e.path();
-            let meta = fs::metadata(&path).unwrap();
-            if meta.is_dir() {
-                let mapnum = path.file_name().unwrap().to_string_lossy();
-                let mapnum = mapnum.parse::<u16>().unwrap();
-                let map_segs = fs::read_dir(path).unwrap();
-                for e in map_segs.into_iter() {
-                    if let Ok(e) = e {
-                        let path = e.path();
-                        let meta = fs::metadata(&path).unwrap();
-                        if meta.is_file() {
-                            if path
-                                .file_name()
-                                .unwrap()
-                                .to_string_lossy()
-                                .ends_with(".s32")
-                            {
-                                let mapseg = path.file_stem().unwrap().to_string_lossy();
-                                let mapseg = u32::from_str_radix(&mapseg, 16);
-                                if let Ok(mapseg) = mapseg {
-                                    let totalmapseg = (mapnum as u64) << 32 | mapseg as u64;
-                                    s32maps.insert(totalmapseg);
-                                    maps.push(path);
-                                }
-                            }
-                        }
+    for e in entries.into_iter().flatten() {
+        let path = e.path();
+        let meta = fs::metadata(&path).unwrap();
+        if meta.is_dir() {
+            let mapnum = path.file_name().unwrap().to_string_lossy();
+            let mapnum = mapnum.parse::<u16>().unwrap();
+            let map_segs = fs::read_dir(path).unwrap();
+            for e in map_segs.into_iter().flatten() {
+                let path = e.path();
+                let meta = fs::metadata(&path).unwrap();
+                if meta.is_file()
+                    && path
+                        .file_name()
+                        .unwrap()
+                        .to_string_lossy()
+                        .ends_with(".s32")
+                {
+                    let mapseg = path.file_stem().unwrap().to_string_lossy();
+                    let mapseg = u32::from_str_radix(&mapseg, 16);
+                    if let Ok(mapseg) = mapseg {
+                        let totalmapseg = (mapnum as u64) << 32 | mapseg as u64;
+                        s32maps.insert(totalmapseg);
+                        maps.push(path);
                     }
                 }
             }
@@ -88,34 +83,29 @@ async fn test_map_load() {
     }
 
     let entries = fs::read_dir(d).unwrap();
-    for e in entries.into_iter() {
-        if let Ok(e) = e {
-            let path = e.path();
-            let meta = fs::metadata(&path).unwrap();
-            if meta.is_dir() {
-                let mapnum = path.file_name().unwrap().to_string_lossy();
-                let mapnum = mapnum.parse::<u16>().unwrap();
-                let map_segs = fs::read_dir(path).unwrap();
-                for e in map_segs.into_iter() {
-                    if let Ok(e) = e {
-                        let path = e.path();
-                        let meta = fs::metadata(&path).unwrap();
-                        if meta.is_file() {
-                            if path
-                                .file_name()
-                                .unwrap()
-                                .to_string_lossy()
-                                .ends_with(".seg")
-                            {
-                                let mapseg = path.file_stem().unwrap().to_string_lossy();
-                                let mapseg = u32::from_str_radix(&mapseg, 16);
-                                if let Ok(mapseg) = mapseg {
-                                    let totalmapseg = (mapnum as u64) << 32 | mapseg as u64;
-                                    if !s32maps.contains(&totalmapseg) {
-                                        seg_maps.push(path);
-                                    }
-                                }
-                            }
+    for e in (entries.into_iter()).flatten() {
+        let path = e.path();
+        let meta = fs::metadata(&path).unwrap();
+        if meta.is_dir() {
+            let mapnum = path.file_name().unwrap().to_string_lossy();
+            let mapnum = mapnum.parse::<u16>().unwrap();
+            let map_segs = fs::read_dir(path).unwrap();
+            for e in (map_segs.into_iter()).flatten() {
+                let path = e.path();
+                let meta = fs::metadata(&path).unwrap();
+                if meta.is_file()
+                    && path
+                        .file_name()
+                        .unwrap()
+                        .to_string_lossy()
+                        .ends_with(".seg")
+                {
+                    let mapseg = path.file_stem().unwrap().to_string_lossy();
+                    let mapseg = u32::from_str_radix(&mapseg, 16);
+                    if let Ok(mapseg) = mapseg {
+                        let totalmapseg = (mapnum as u64) << 32 | mapseg as u64;
+                        if !s32maps.contains(&totalmapseg) {
+                            seg_maps.push(path);
                         }
                     }
                 }

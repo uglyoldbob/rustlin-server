@@ -1,3 +1,5 @@
+//! Configuration items for the server
+
 use std::io::Read;
 
 /// The configuration needed to make a connection to a mysql server

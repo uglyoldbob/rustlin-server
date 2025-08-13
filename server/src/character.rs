@@ -1,3 +1,5 @@
+//! Code for representing characters played by users
+
 use std::{collections::HashMap, convert::TryInto};
 
 use common::packet::{ServerPacket, ServerPacketSender};
@@ -113,7 +115,7 @@ pub struct PartialCharacter {
 
 impl PartialCharacter {
     /// Convert into a full character, returning a FullCharacter and a receiver
-    pub fn to_full(
+    pub fn into_full(
         self,
         item_table: &HashMap<u32, crate::world::item::Item>,
         sender: tokio::sync::mpsc::Sender<ServerMessage>,
@@ -239,7 +241,7 @@ impl FullCharacter {
         p2: &mut crate::server::client::ItemUseData,
         map: &Map,
     ) -> Result<(), ClientError> {
-        if let Some(item) = self.items.get_mut(&id) {
+        if let Some(item) = self.items.get_mut(id) {
             ////TODO check to see if item delay in effect for the item being used, return None if it is
             ////TODO Check to see if there is a delay timer in effect for the item being used
             if crate::world::item::ItemUsage::None == item.usage() {
@@ -444,16 +446,8 @@ impl Location {
     /// Get the linear distance between the location of this object and the specified location (as the crow flies).
     /// This assumes the objects are already on the same map
     pub fn linear_distance(&self, l2: &Self) -> f32 {
-        let deltax = if self.x > l2.x {
-            self.x - l2.x
-        } else {
-            l2.x - self.x
-        };
-        let deltay = if self.y > l2.y {
-            self.y - l2.y
-        } else {
-            l2.y - self.y
-        };
+        let deltax = self.x.abs_diff(l2.x);
+        let deltay = self.y.abs_diff(l2.y);
         let sum = ((deltax as u32) * (deltax as u32) + (deltay as u32) * (deltay as u32)) as f32;
         sum.sqrt()
     }
@@ -664,6 +658,7 @@ impl std::convert::TryFrom<u8> for Class {
 }
 
 impl Character {
+    /// A query for selecting characters in a player account
     pub const QUERY: &str = "SELECT account_name, char_name, objid, Lawful, level, Clanname, Class, Sex, MaxHp, MaxMp, Ac, Str, Dex, Con, Wis, Cha, Intel, AccessLevel from characters WHERE account_name=?";
 
     /// Is the player name valid?
@@ -881,24 +876,25 @@ impl Character {
     }
 }
 
-impl Into<Params> for &mut Character {
-    fn into(self) -> Params {
-        let mut p = Vec::new();
-        p.push(self.account_name.clone().into());
-        p.push(self.id.into());
-        p.push(self.name.clone().into());
-        p.push(self.level.into());
-        p.push(self.hp_max.into());
-        p.push(self.mp_max.into());
-        p.push((self.class as u16).into());
-        p.push(self.gender.into());
-        p.push(self.ac.into());
-        p.push(self.strength.into());
-        p.push(self.dexterity.into());
-        p.push(self.constitution.into());
-        p.push(self.wisdom.into());
-        p.push(self.charisma.into());
-        p.push(self.intelligence.into());
+impl From<&mut Character> for Params {
+    fn from(value: &mut Character) -> Self {
+        let p = vec![
+            value.account_name.clone().into(),
+            value.id.into(),
+            value.name.clone().into(),
+            value.level.into(),
+            value.hp_max.into(),
+            value.mp_max.into(),
+            (value.class as u16).into(),
+            value.gender.into(),
+            value.ac.into(),
+            value.strength.into(),
+            value.dexterity.into(),
+            value.constitution.into(),
+            value.wisdom.into(),
+            value.charisma.into(),
+            value.intelligence.into(),
+        ];
         Params::Positional(p)
     }
 }

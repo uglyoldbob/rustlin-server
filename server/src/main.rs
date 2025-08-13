@@ -28,14 +28,20 @@ fn main() -> Result<(), String> {
         .block_on(smain())
 }
 
+/// The reasons to shutdown the server
 #[derive(Debug)]
 enum ShutdownMode {
+    /// A normal server shutdown
     Normal,
+    /// A fatal error occurred during server operation
     Error(String),
+    /// The server needs to be restarted, indicate this as an process exit code
     Restart,
+    /// An abnormal or unexpected shutdown of the server
     Abnormal,
 }
 
+/// The main function of the server.
 async fn smain() -> Result<(), String> {
     simple_logger::init_with_level(log::Level::Info).unwrap();
 
@@ -149,7 +155,10 @@ async fn smain() -> Result<(), String> {
     log::info!("Waiting for main tasks to finish");
     tasks.join_all().await;
 
-    log::info!("server: Server will now close with status: {:?}", shutdown_mode);
+    log::info!(
+        "server: Server will now close with status: {:?}",
+        shutdown_mode
+    );
     match shutdown_mode.unwrap() {
         ShutdownMode::Normal => Ok(()),
         ShutdownMode::Error(s) => Err(s),

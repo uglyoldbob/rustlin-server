@@ -39,12 +39,12 @@ impl ObjectList {
         // delete objects that are no longer present
         for obj in self.items.iter() {
             if !o.items.contains(obj) {
-                old_objects.push(obj.clone());
+                old_objects.push(*obj);
             }
         }
         for obj in &o.items {
-            if !self.items.contains(&obj) {
-                new_objects.push(obj.clone());
+            if !self.items.contains(obj) {
+                new_objects.push(*obj);
             }
         }
     }
@@ -61,12 +61,6 @@ pub trait ObjectTrait {
 
     /// Get the object id for this object
     fn id(&self) -> super::WorldObjectId;
-
-    /// Get the linear distance from this object to another object (as the crow flies).
-    /// This assumes the objects are already on the same map
-    fn linear_distance_to(&self, o: &Object) -> f32 {
-        self.linear_distance(&o.get_location())
-    }
 
     /// Get the linear distance between the location of this object and the specified location (as the crow flies).
     /// This assumes the objects are already on the same map
@@ -90,7 +84,7 @@ pub trait ObjectTrait {
         let id = self.id();
         let location = self.get_location();
         common::packet::ServerPacket::MoveObject {
-            id: id.into(),
+            id: id.get_u32(),
             x: location.x,
             y: location.y,
             direction: location.direction,
@@ -122,7 +116,9 @@ pub trait ObjectTrait {
     async fn remove_object(&mut self, o: WorldObjectId) {}
 
     /// Return true if the object can initiate a server shutdown
-    fn can_shutdown(&self) -> bool { false }
+    fn can_shutdown(&self) -> bool {
+        false
+    }
 }
 
 /// The things that an object can be

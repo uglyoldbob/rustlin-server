@@ -2,11 +2,14 @@
 
 use std::collections::HashMap;
 
+/// Defines how a monster location is determined when spawned
 #[derive(Clone, Copy, Debug, PartialEq)]
 #[repr(u8)]
 enum SpawnType {
+    /// Normal, possibly randomized spawn
     Normal = 0,
-    WhenPlayerNearby = 1,
+    /// The monster should spawn near a random player on the map it spawns on
+    NearPlayer = 1,
 }
 
 impl std::convert::TryFrom<u8> for SpawnType {
@@ -14,23 +17,34 @@ impl std::convert::TryFrom<u8> for SpawnType {
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
             0 => Ok(Self::Normal),
-            1 => Ok(Self::WhenPlayerNearby),
+            1 => Ok(Self::NearPlayer),
             _ => Err("Invalid monster spawn type".to_string()),
         }
     }
 }
 
+/// Defines how to spawn a monster
 #[derive(Clone, Debug)]
 pub struct MonsterSpawn {
+    /// The monster id from the database
     id: u32,
+    /// The number of monsters to spawn
     count: u16,
+    /// The npc id to refer to when spawning the monster
     npc_definition: u32,
+    /// Where to spawn the monster
     location: Location,
+    /// Used for randomizing spawn location x coordinate
     randomx: u16,
+    /// Used for randomizing spawn location y coordinate
     randomy: u16,
+    /// Used for randomizing spawn location x coordinate
     coord1: (u16, u16),
+    /// Used for randomizing spawn location y coordinate
     coord2: (u16, u16),
+    /// The minimum and maximum delay time for respawn
     respawn_delay: (u32, u32),
+    /// The type of spawn for the monster
     spawn_type: SpawnType,
 }
 
@@ -95,20 +109,64 @@ impl MonsterSpawn {
         &self,
         id: super::WorldObjectId,
         npcs: &HashMap<u32, super::npc::NpcDefinition>,
-    ) -> Option<Monster> {
+    ) -> Monster {
         let npc = npcs.get(&self.npc_definition).unwrap();
-        if self.spawn_type == SpawnType::WhenPlayerNearby {
-            return None;
+        let mut location;
+        //a loop to make sure that the random position is on the map in a valid fashion
+        let mut attempts_to_randomize = 0;
+        const ATTEMPTS_MAX: usize = 50;
+        let mut rng = rand::thread_rng();
+        use rand::Rng;
+        loop {
+            location = self.location;
+            /// TODO npc 45488 (Caspa randomly on Gludio floor 3 or 4)
+            /// TODO npc 45601 (Death Knight randomly on Gludio floor 5,6,7)
+            if self.spawn_type == SpawnType::NearPlayer {
+                // TODO spawn near a random player on the map it should spawn on?
+            }
+
+            if self.coord1.0 != self.coord1.1 && self.coord2.0 != self.coord2.1 {
+                //area spawning
+                let range = if self.coord1.0 < self.coord1.1 {
+                    self.coord1.0..self.coord1.1
+                } else {
+                    self.coord1.1..self.coord1.0
+                };
+                let x = rng.gen_range(range);
+                let range = if self.coord2.0 < self.coord2.1 {
+                    self.coord2.0..self.coord2.1
+                } else {
+                    self.coord2.1..self.coord2.0
+                };
+                let y = rng.gen_range(range);
+                location.x = x;
+                location.y = y;
+            } else if self.randomx != 0 && self.randomy != 0 {
+                location.x += rng.gen_range(0..self.randomx);
+                location.x -= rng.gen_range(0..self.randomx);
+                location.y += rng.gen_range(0..self.randomy);
+                location.y -= rng.gen_range(0..self.randomy);
+            }
+            attempts_to_randomize += 1;
+            //TODO Actually check to see if the random coordinate is valid on the map
+            if true {
+                break;
+            }
         }
-        Some(Monster {
+
+        if attempts_to_randomize == ATTEMPTS_MAX {
+            location = self.location;
+        }
+
+        Monster {
             id,
-            location: self.location,
+            location,
             alignment: npc.alignment,
             icon: npc.graphics_id,
             name: npc.name.clone(),
             light_size: npc.light_size,
             spawn: self.clone(),
-        })
+        }
     }
 }
 
@@ -122,20 +180,12 @@ pub struct MonsterRef {
 
 impl MonsterRef {
     /// Run the ai for the monster
-    pub async fn run_ai(&mut self) {
-        log::info!("Running with {:?}", self.reference);
-        let mut index = 0;
-        loop {
-            if index == 5 { break; }
-            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
-            log::info!("Monster {:?} is at {}", self.reference, index);
-            index += 1;
-        }
-        log::info!("Exiting monster {:?}", self.reference);
-    }
+    pub async fn run_ai(&mut self) {}
 }
 
 use crate::{character::Location, server_message::ServerMessage, world::ObjectRef};
+
+/// A monster on the world
 #[derive(Debug)]
 pub struct Monster {
     /// The object id for the npc
@@ -184,7 +234,7 @@ impl super::ObjectTrait for Monster {
         common::packet::ServerPacket::PutObject {
             x: self.location.x,
             y: self.location.y,
-            id: self.id.into(),
+            id: self.id.get_u32(),
             icon: self.icon,
             status: 0,
             direction: self.location.direction,

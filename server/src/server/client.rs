@@ -44,8 +44,11 @@ impl std::future::AsyncDrop for Client {
     }
 }
 
+/// Data to convey when the user wants to use an item
 pub struct ItemUseData {
+    /// the packet to process the item use command with
     pub p: Packet,
+    /// The packets to send
     pub packets: Vec<Packet>,
 }
 
@@ -65,7 +68,8 @@ impl Client {
         }
     }
 
-    pub async fn send_message(
+    /// Process a message from the client
+    pub async fn process_client_message(
         &mut self,
         message: crate::client_message::ClientMessage,
     ) -> Result<(), crate::server::ClientError> {
@@ -309,6 +313,8 @@ impl Client {
         Ok(())
     }
 
+    /// Send the client details that happens after the news (if there was any news at all)
+    /// This still should be called even if there was no news.
     async fn after_news(&mut self) -> Result<(), ClientError> {
         let response = ServerPacket::NumberCharacters(self.chars.len() as u8, 8).build();
         self.packet_writer.send_packet(response).await?;
@@ -320,6 +326,7 @@ impl Client {
         Ok(())
     }
 
+    /// Run the login process, delivering news if applicable
     async fn login_with_news(
         &mut self,
         config: &std::sync::Arc<crate::ServerConfiguration>,
@@ -336,7 +343,7 @@ impl Client {
                 .send_packet(ServerPacket::News(news).build())
                 .await?;
         }
-        self.send_message(ClientMessage::LoggedIn(self.id, username))
+        self.process_client_message(ClientMessage::LoggedIn(self.id, username))
             .await?;
         if let Some(account) = &self.account {
             let mut conn = self.world.get_mysql_conn().await?;
@@ -488,7 +495,7 @@ impl Client {
                 charisma,
                 intelligence,
             } => {
-                self.send_message(ClientMessage::NewCharacter {
+                self.process_client_message(ClientMessage::NewCharacter {
                     id: self.id,
                     name,
                     class,
@@ -512,7 +519,7 @@ impl Client {
                             .send_packet(ServerPacket::DeleteCharacterWait.build())
                             .await?;
                     } else {
-                        self.send_message(ClientMessage::DeleteCharacter {
+                        self.process_client_message(ClientMessage::DeleteCharacter {
                             id: self.id,
                             name: n,
                         })
@@ -539,7 +546,7 @@ impl Client {
                 self.char_ref = {
                     let c = {
                         let item_table = self.world.item_table.lock().unwrap();
-                        c.to_full(&item_table, sender.clone())
+                        c.into_full(&item_table, sender.clone())
                     };
                     self.world.add_player(c, &mut self.packet_writer).await
                 };
@@ -612,7 +619,7 @@ impl Client {
                 }
             }
             ClientPacket::Chat(m) => {
-                self.send_message(ClientMessage::RegularChat {
+                self.process_client_message(ClientMessage::RegularChat {
                     id: self.id,
                     msg: m,
                 })
@@ -620,7 +627,7 @@ impl Client {
             }
             ClientPacket::YellChat(m) => {
                 //TODO put in the correct coordinates for yelling
-                self.send_message(ClientMessage::YellChat {
+                self.process_client_message(ClientMessage::YellChat {
                     id: self.id,
                     msg: m,
                     x: 32768,
@@ -629,19 +636,19 @@ impl Client {
                 .await?;
             }
             ClientPacket::PartyChat(m) => {
-                self.send_message(ClientMessage::PartyChat(self.id, m))
+                self.process_client_message(ClientMessage::PartyChat(self.id, m))
                     .await?;
             }
             ClientPacket::PledgeChat(m) => {
-                self.send_message(ClientMessage::PledgeChat(self.id, m))
+                self.process_client_message(ClientMessage::PledgeChat(self.id, m))
                     .await?;
             }
             ClientPacket::WhisperChat(n, m) => {
-                self.send_message(ClientMessage::WhisperChat(self.id, n, m))
+                self.process_client_message(ClientMessage::WhisperChat(self.id, n, m))
                     .await?;
             }
             ClientPacket::GlobalChat(m) => {
-                self.send_message(ClientMessage::GlobalChat(self.id, m))
+                self.process_client_message(ClientMessage::GlobalChat(self.id, m))
                     .await?;
             }
             ClientPacket::CommandChat(m) => {
@@ -789,7 +796,7 @@ impl Client {
             }
             ServerMessage::RemoveObject { id } => {
                 self.packet_writer
-                    .send_packet(ServerPacket::RemoveObject(id.into()).build())
+                    .send_packet(ServerPacket::RemoveObject(id.get_u32()).build())
                     .await?;
             }
             ServerMessage::Disconnect => {

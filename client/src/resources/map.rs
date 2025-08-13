@@ -506,7 +506,7 @@ impl<'a> MapSegmentGui<'a> {
                 let starty: i32 = b * 12 - a * 12 + screen.y;
                 let index = b * 128 + 2 * a;
                 let t = self.tiles[index as usize];
-                let current_tile = (t >> 8) as u32;
+                let current_tile = t >> 8;
                 let current_subtile = (t & 0xFF) as u8;
                 match self.tile_ref.get(&current_tile) {
                     Some(ts) => {
@@ -569,8 +569,7 @@ impl MapSegment {
     pub fn get_map_combined(x: u16, y: u16) -> u32 {
         let modx = x & 0xFFC0;
         let mody = y & 0xFFC0;
-        let combined = (modx as u32) << 16 | (mody as u32);
-        combined
+        (modx as u32) << 16 | (mody as u32)
     }
 
     pub fn get_map_name(x: u16, y: u16) -> String {

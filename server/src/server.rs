@@ -1,3 +1,5 @@
+//! Code for the main point of the server. This handles the main game portion of the server.
+
 use std::collections::HashMap;
 use std::error::Error;
 use std::net::SocketAddr;
@@ -68,6 +70,7 @@ async fn process_client(
     Ok(0)
 }
 
+/// The main struct for the game server
 struct GameServer {
     /// Used to accept new connections from game clients
     listener: TcpListener,

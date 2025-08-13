@@ -4,12 +4,18 @@ use std::collections::HashMap;
 
 use crate::character::Location;
 
+/// A definition for an npc
 #[derive(Debug)]
 pub struct NpcDefinition {
+    /// The definition id of the npc from the database
     pub id: u32,
+    /// The name of the npc
     pub name: String,
+    /// Thra graphics to display the npc with
     pub graphics_id: u16,
+    /// How much light the npc emits
     pub light_size: u8,
+    /// The alignment of the npc
     pub alignment: i16,
 }
 
@@ -45,15 +51,24 @@ impl mysql_async::prelude::FromRow for NpcDefinition {
     }
 }
 
+/// Defines how to spawn an npc
 #[derive(Debug)]
 pub struct NpcSpawn {
+    /// The id of the spawn in the database
     id: u32,
+    /// The number of npc to spawn
     count: u8,
+    /// The definition to look at when spawning the npc
     npc_definition: u32,
+    /// Where to spawn the npc
     location: Location,
+    /// How to randomize the spawn x coordinate
     randomx: u16,
+    /// How to randomize the spawn y coordinate
     randomy: u16,
+    /// The amount of time to wait when respawning
     respawn_delay: u32,
+    /// The maximum travel distance
     distance: u32,
 }
 
@@ -109,6 +124,7 @@ impl NpcSpawn {
     }
 }
 
+/// An npc in the server (not a monster)
 #[derive(Debug)]
 pub struct Npc {
     /// The object id for the npc
@@ -160,7 +176,7 @@ impl super::object::ObjectTrait for Npc {
         common::packet::ServerPacket::PutObject {
             x: self.location.x,
             y: self.location.y,
-            id: self.id.into(),
+            id: self.id.get_u32(),
             icon: self.icon,
             status: 0,
             direction: self.location.direction,

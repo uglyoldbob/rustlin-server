@@ -458,12 +458,7 @@ impl<'a> WidgetTrait<'a> for CharacterSelectWidget<'a> {
             let _e = canvas.copy(
                 t,
                 None,
-                Rect::new(
-                    self.x as i32,
-                    self.y as i32,
-                    q.width.into(),
-                    q.height.into(),
-                ),
+                Rect::new(self.x as i32, self.y as i32, q.width, q.height),
             );
             Some(ImageBox {
                 x: self.x,

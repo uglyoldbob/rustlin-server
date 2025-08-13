@@ -1,5 +1,10 @@
+//! Represents the world in the server
+
 use std::{
-    collections::HashMap, future::AsyncDrop, pin::Pin, sync::{Arc, Mutex}
+    collections::HashMap,
+    future::AsyncDrop,
+    pin::Pin,
+    sync::{Arc, Mutex},
 };
 
 pub mod item;
@@ -23,8 +28,9 @@ use crate::{
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct WorldObjectId(u32);
 
-impl Into<u32> for WorldObjectId {
-    fn into(self) -> u32 {
+impl WorldObjectId {
+    /// Get the u32 that corresponds to the object id
+    pub fn get_u32(&self) -> u32 {
         self.0
     }
 }
@@ -79,9 +85,13 @@ impl Map {
     }
 }
 
+/// A reference to an object in the world.
+/// TODO: add a World instance to this struct
 #[derive(Clone, Copy, Debug)]
 pub struct ObjectRef {
+    /// The map where the object is located
     map: u16,
+    /// The id for the object in the world
     id: WorldObjectId,
 }
 
@@ -95,6 +105,7 @@ impl ObjectRef {
 /// Represents the dynamic information of a map
 #[derive(Debug)]
 pub struct MapInfo {
+    /// The objects on the map
     objects: HashMap<WorldObjectId, object::Object>,
 }
 
@@ -123,10 +134,8 @@ impl MapInfo {
             myobj.set_location(new_loc);
         }
         for (id, o) in &mut self.objects {
-            if *id != r.id {
-                if o.linear_distance(&new_loc) < 7.0 {
-                    object_list.add_object(*id);
-                }
+            if *id != r.id && o.linear_distance(&new_loc) < 7.0 {
+                object_list.add_object(*id);
             }
         }
         {
@@ -138,10 +147,10 @@ impl MapInfo {
                 }
             }
             for objid in old_objects {
-                pw.send_packet(ServerPacket::RemoveObject(objid.into()).build())
+                pw.send_packet(ServerPacket::RemoveObject(objid.get_u32()).build())
                     .await?;
                 if let Some(obj) = self.objects.get_mut(&r.id) {
-                    pw.send_packet(ServerPacket::RemoveObject(objid.into()).build())
+                    pw.send_packet(ServerPacket::RemoveObject(objid.get_u32()).build())
                         .await?;
                     obj.remove_object(objid).await;
                 }
@@ -221,13 +230,11 @@ pub struct World {
     /// Monster tasks
     monster_set: Option<Arc<Mutex<tokio::task::JoinSet<()>>>>,
     /// The sender for special messages to the server
-    server_s: tokio::sync::mpsc::Sender<crate::server_message::ServerShutdownMessage>
+    server_s: tokio::sync::mpsc::Sender<crate::server_message::ServerShutdownMessage>,
 }
 
 impl Drop for World {
-    fn drop(&mut self) {
-        
-    }
+    fn drop(&mut self) {}
 }
 
 impl AsyncDrop for World {
@@ -241,12 +248,15 @@ impl AsyncDrop for World {
 
 impl World {
     /// Construct a new server world
-    pub async fn new(mysql: mysql_async::Pool, server_s: tokio::sync::mpsc::Sender<crate::server_message::ServerShutdownMessage>) -> Result<Self, String> {
+    pub async fn new(
+        mysql: mysql_async::Pool,
+        server_s: tokio::sync::mpsc::Sender<crate::server_message::ServerShutdownMessage>,
+    ) -> Result<Self, String> {
         let mut conn = mysql.get_conn().await.map_err(|e| format!("{:?}", e))?;
-        let npc_spawn_table = Self::load_npc_spawn_table(&mut conn)
+        let npc_spawn_table = npc::NpcSpawn::load_table(&mut conn)
             .await
             .map_err(|e| format!("{:?}", e))?;
-        let monster_spawn_table = Self::load_monster_spawn_table(&mut conn)
+        let monster_spawn_table = monster::MonsterSpawn::load_table(&mut conn)
             .await
             .map_err(|e| format!("{:?}", e))?;
         let (mapd, mapi) = Self::load_maps_data(&mut conn).await?;
@@ -286,7 +296,10 @@ impl World {
         if let Some(map) = map {
             if let Some(obj) = map.objects.get(&r.id) {
                 if obj.can_shutdown() {
-                    let _ = self.server_s.send(crate::server_message::ServerShutdownMessage::Shutdown).await;
+                    let _ = self
+                        .server_s
+                        .send(crate::server_message::ServerShutdownMessage::Shutdown)
+                        .await;
                 }
             }
         }
@@ -299,7 +312,10 @@ impl World {
         if let Some(map) = map {
             if let Some(obj) = map.objects.get(&r.id) {
                 if obj.can_shutdown() {
-                    let _ = self.server_s.send(crate::server_message::ServerShutdownMessage::Restart).await;
+                    let _ = self
+                        .server_s
+                        .send(crate::server_message::ServerShutdownMessage::Restart)
+                        .await;
                 }
             }
         }
@@ -308,15 +324,22 @@ impl World {
     /// Spawn all monsters
     pub async fn spawn_monsters(self: &Arc<Self>) {
         if let Some(mset) = &self.monster_set {
-            let mut mset = mset.lock().unwrap();
+            let mut monsters = Vec::new();
             for ms in &self.monster_spawn_table {
-                if let Some(m) = ms.make_monster(self.new_object_id(), &self.npc_table) {
+                let m = ms.make_monster(self.new_object_id(), &self.npc_table);
+                monsters.push(m);
+            }
+            {
+                let mut mset = mset.lock().unwrap();
+                for m in &monsters {
                     let mut monref = m.reference(self.clone());
-                    mset.spawn(async move {
-                        monref.run_ai().await
-                    });
-                    let mut mi = self.map_info.lock().await;
-                    if let Some(map) = mi.get_mut(&ms.map()) {
+                    mset.spawn(async move { monref.run_ai().await });
+                }
+            }
+            {
+                let mut mi = self.map_info.lock().await;
+                for m in monsters {
+                    if let Some(map) = mi.get_mut(&m.get_location().map) {
                         map.add_new_object(m.into()).await;
                     }
                 }
@@ -342,21 +365,9 @@ impl World {
     /// Get a new object id for an object that will live in the world somewhere
     pub fn new_object_id(&self) -> WorldObjectId {
         let mut w = self.next_object_id.lock().unwrap();
-        let r = w.clone();
+        let r = *w;
         w.0 += 1;
         r
-    }
-
-    async fn load_npc_spawn_table(
-        conn: &mut mysql_async::Conn,
-    ) -> Result<Vec<npc::NpcSpawn>, ClientError> {
-        Ok(npc::NpcSpawn::load_table(conn).await?)
-    }
-
-    async fn load_monster_spawn_table(
-        conn: &mut mysql_async::Conn,
-    ) -> Result<Vec<monster::MonsterSpawn>, ClientError> {
-        Ok(monster::MonsterSpawn::load_table(conn).await?)
     }
 
     /// Send a new object packet with the given packet writer and object id
@@ -383,7 +394,7 @@ impl World {
         p: crate::character::FullCharacter,
         pw: &mut ServerPacketSender,
     ) -> Option<ObjectRef> {
-        let location = p.location_ref().clone();
+        let location = p.location_ref().to_owned();
         let obj: object::Object = p.into();
         let id = obj.id();
         let mut m = self.map_info.lock().await;
@@ -422,11 +433,9 @@ impl World {
         let mi = self.map_info.lock().await;
         let map = mi.get(&refo.map);
         if let Some(map) = map {
-            if let Some(obj) = map.objects.get(&refo.id) {
-                if let object::Object::Player(fc) = obj {
-                    let themap = self.maps.get(&refo.map).unwrap().clone();
-                    return f(fc, gen, &themap).await;
-                }
+            if let Some(object::Object::Player(fc)) = map.objects.get(&refo.id) {
+                let themap = self.maps.get(&refo.map).unwrap().clone();
+                return f(fc, gen, &themap).await;
             }
         }
         None
@@ -440,11 +449,9 @@ impl World {
         let mut mi = self.map_info.lock().await;
         let map = mi.get_mut(&refo.map);
         if let Some(map) = map {
-            if let Some(obj) = map.objects.get_mut(&refo.id) {
-                if let object::Object::Player(fc) = obj {
-                    let themap = self.maps.get(&refo.map).unwrap().clone();
-                    return f(fc, gen, &themap).await;
-                }
+            if let Some(object::Object::Player(fc)) = map.objects.get_mut(&refo.id) {
+                let themap = self.maps.get(&refo.map).unwrap().clone();
+                return f(fc, gen, &themap).await;
             }
         }
         None
@@ -530,7 +537,7 @@ impl World {
         for map in mi.values_mut() {
             for obj in &mut map.objects {
                 if let Some(sender) = obj.1.sender() {
-                    sender.send(m.clone()).await;
+                    let _ = sender.send(m.clone()).await;
                 }
             }
         }
@@ -671,9 +678,7 @@ impl World {
         let mut hdata = HashMap::new();
         for m in maps {
             println!("Found map data {:?}", m);
-            if !hdata.contains_key(&m.id) {
-                hdata.insert(m.id, MapInfo::new());
-            }
+            hdata.entry(m.id).or_insert_with(MapInfo::new);
             hmaps.insert(m.id, m);
         }
         Ok((hmaps, hdata))

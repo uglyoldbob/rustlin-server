@@ -1,19 +1,28 @@
+//! Code for managing user accounts on the server
+
 use mysql_async::prelude::Queryable;
 
 use chrono::{TimeZone, Utc};
 use crypto::digest::Digest;
 
+/// A user account on the server
 #[derive(Debug)]
 pub struct UserAccount {
     /// The name for the account in the database
     name: String,
     ///the hashed password, don't be a moron
     password: String,
+    /// Last time the account was active
     active: chrono::DateTime<chrono::Utc>,
+    /// The access level of the account
     access: u32,
+    /// The last login ip address
     ip: String,
+    /// The host the account logged in from
     host: String,
+    /// Is the account banned?
     banned: bool,
+    /// The number of characters slots the account has?
     slot: u32,
 }
 
@@ -28,6 +37,7 @@ pub fn hash_password(name: &str, salt: &str, pw: &str) -> String {
     sha.result_str()
 }
 
+/// Convert the mysql value to a usable date time
 fn convert_date(d: mysql_async::Value) -> chrono::DateTime<chrono::Utc> {
     let dt = match d {
         mysql_async::Value::Date(y, m, d, h, min, s, _micro) => {
@@ -38,6 +48,7 @@ fn convert_date(d: mysql_async::Value) -> chrono::DateTime<chrono::Utc> {
     dt.single().or(dt.latest()).unwrap()
 }
 
+/// Get a user account from the db, if it exists
 pub async fn get_user_details(user: String, mysql: &mut mysql_async::Conn) -> Option<UserAccount> {
     let query = "SELECT login, password, access_level, ip, host, banned, character_slot, lastactive from accounts WHERE login=? LIMIT 1";
     let usertest = mysql.exec_map(

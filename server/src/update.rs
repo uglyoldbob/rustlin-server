@@ -1,3 +1,6 @@
+//! Code specific to the update portion of the server
+//! This update server operates for the classic update client
+
 use futures::FutureExt;
 use std::collections::HashMap;
 use std::error::Error;
@@ -8,19 +11,26 @@ use std::fmt;
 use tokio::io::AsyncReadExt;
 use tokio::io::AsyncWriteExt;
 
+/// A list of files to send to the client
 #[derive(Debug)]
 struct UpdateFileSet {
+    /// The list of files to send
     files: Vec<String>,
+    /// The new cs field for the game client
     new_cs: u32,
 }
 
+/// The set of files to deliver for each possible version of client
 #[derive(Debug)]
 struct UpdateFiles {
+    /// The files to deliver for each version
     versions: HashMap<u32, UpdateFileSet>,
 }
 
+/// An error occurred in the update process
 #[derive(Debug, Clone)]
 struct UpdateError;
+
 impl fmt::Display for UpdateError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "Client failed to update")
@@ -33,6 +43,7 @@ impl From<std::io::Error> for UpdateError {
     }
 }
 
+/// Process a single client for the update server
 async fn process_update_client(
     mut socket: tokio::net::TcpStream,
     world: std::sync::Arc<crate::world::World>,
@@ -141,6 +152,7 @@ impl UpdateServer {
     }
 }
 
+/// Setup and start the update portion of the server
 pub async fn setup_update_server(
     tasks: &mut tokio::task::JoinSet<Result<(), u32>>,
     world: std::sync::Arc<crate::world::World>,
@@ -153,44 +165,40 @@ pub async fn setup_update_server(
         versions: HashMap::new(),
     };
 
-    for f in std::fs::read_dir("./update-files")? {
-        if let Ok(f) = f {
-            if f.path().is_dir() {
-                let name = f.file_name().into_string().unwrap();
-                let oldcs: u32 = name.parse().unwrap();
-                log::info!("Found a entry for checksum {}", oldcs);
-                let mut flist = Vec::new();
-                let mut cs = None;
-                for f2 in std::fs::read_dir(f.path())? {
-                    if let Ok(f2) = f2 {
-                        if f2.path().is_file() {
-                            let update_file = f2.file_name().into_string().unwrap();
-                            if update_file.ends_with(".gz") {
-                                let newname = update_file.trim_end_matches(".gz").to_string();
-                                log::info!("Found file {}", newname);
-                                flist.push(newname);
-                            }
-                            if update_file == "newcs" {
-                                let mut fcon = String::new();
-                                let mut f3 = tokio::fs::File::open(f2.path()).await.unwrap();
-                                f3.read_to_string(&mut fcon).await.unwrap();
-                                let newcs2: u32 = fcon.parse().unwrap();
-                                log::info!("Found a newcs file");
-                                cs = Some(newcs2);
-                            }
-                        }
+    for f in (std::fs::read_dir("./update-files")?).flatten() {
+        if f.path().is_dir() {
+            let name = f.file_name().into_string().unwrap();
+            let oldcs: u32 = name.parse().unwrap();
+            log::info!("Found a entry for checksum {}", oldcs);
+            let mut flist = Vec::new();
+            let mut cs = None;
+            for f2 in (std::fs::read_dir(f.path())?).flatten() {
+                if f2.path().is_file() {
+                    let update_file = f2.file_name().into_string().unwrap();
+                    if update_file.ends_with(".gz") {
+                        let newname = update_file.trim_end_matches(".gz").to_string();
+                        log::info!("Found file {}", newname);
+                        flist.push(newname);
+                    }
+                    if update_file == "newcs" {
+                        let mut fcon = String::new();
+                        let mut f3 = tokio::fs::File::open(f2.path()).await.unwrap();
+                        f3.read_to_string(&mut fcon).await.unwrap();
+                        let newcs2: u32 = fcon.parse().unwrap();
+                        log::info!("Found a newcs file");
+                        cs = Some(newcs2);
                     }
                 }
-                if let Some(newcs) = cs {
-                    log::info!("Inserting entry for cs {} -> {}", oldcs, newcs);
-                    updates.versions.insert(
-                        oldcs,
-                        UpdateFileSet {
-                            files: flist,
-                            new_cs: newcs,
-                        },
-                    );
-                }
+            }
+            if let Some(newcs) = cs {
+                log::info!("Inserting entry for cs {} -> {}", oldcs, newcs);
+                updates.versions.insert(
+                    oldcs,
+                    UpdateFileSet {
+                        files: flist,
+                        new_cs: newcs,
+                    },
+                );
             }
         }
     }
