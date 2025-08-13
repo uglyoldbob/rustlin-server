@@ -113,7 +113,6 @@ impl MonsterSpawn {
 }
 
 /// The holder of a reference to a monster
-#[derive(Debug)]
 pub struct MonsterRef {
     /// A reference to the monster on the world
     reference: ObjectRef,
@@ -125,6 +124,13 @@ impl MonsterRef {
     /// Run the ai for the monster
     pub async fn run_ai(&mut self) {
         log::info!("Running with {:?}", self.reference);
+        let mut index = 0;
+        loop {
+            if index == 5 { break; }
+            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+            log::info!("Monster {:?} is at {}", self.reference, index);
+            index += 1;
+        }
         log::info!("Exiting monster {:?}", self.reference);
     }
 }
