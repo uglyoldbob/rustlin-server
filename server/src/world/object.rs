@@ -2,7 +2,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use crate::{character::FullCharacter, server_message::ServerMessage, world::WorldObjectId};
+use crate::{character::FullCharacter, world::WorldObjectId};
 
 /// A helper struct for managin a list of objects known to a player
 #[derive(Debug)]
@@ -27,6 +27,11 @@ impl ObjectList {
     /// Remove an object from the list
     pub fn remove_object(&mut self, i: WorldObjectId) {
         self.items.remove(&i);
+    }
+
+    /// Get the list of objects
+    pub fn get_objects(&self) -> &HashSet<WorldObjectId> {
+        &self.items
     }
 
     /// Get list of changes required for this list, for adding items and deleting items as needed.
@@ -55,6 +60,9 @@ use crate::world::item::Item;
 /// The generic object trait for the server
 #[enum_dispatch::enum_dispatch]
 pub trait ObjectTrait {
+    /// Get the previous location of the object
+    fn get_prev_location(&self) -> crate::character::Location;
+
     /// Get the location of the object
     fn get_location(&self) -> crate::character::Location;
 
@@ -82,16 +90,15 @@ pub trait ObjectTrait {
     fn build_put_object_packet(&self) -> common::packet::Packet;
 
     /// Build a packet for moving the object on the map
-    fn build_move_object_packet(&self) -> common::packet::Packet {
+    fn build_move_object_packet(&self) -> common::packet::ServerPacket {
         let id = self.id();
-        let location = self.get_location();
+        let olocation = self.get_prev_location();
         common::packet::ServerPacket::MoveObject {
             id: id.get_u32(),
-            x: location.x,
-            y: location.y,
-            direction: location.direction,
+            x: olocation.x,
+            y: olocation.y,
+            direction: olocation.direction,
         }
-        .build()
     }
 
     /// Get the list of items the object is posessing
@@ -105,7 +112,7 @@ pub trait ObjectTrait {
     }
 
     /// If applicable (only for Player objects), get the object for sending messages to the user
-    fn sender(&mut self) -> Option<&mut tokio::sync::mpsc::Sender<ServerMessage>> {
+    fn sender(&mut self) -> Option<&mut tokio::sync::mpsc::Sender<common::packet::ServerPacket>> {
         None
     }
 

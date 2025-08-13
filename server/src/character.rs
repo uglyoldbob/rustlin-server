@@ -7,7 +7,6 @@ use mysql_async::{prelude::Queryable, Params};
 
 use crate::{
     server::ClientError,
-    server_message::ServerMessage,
     world::{
         item::{ItemInstanceWithoutDefinition, ItemUsage},
         object::ObjectList,
@@ -61,7 +60,7 @@ pub struct FullCharacter {
     /// All the items the character holds
     items: HashMap<u32, crate::world::item::ItemInstance>,
     /// Used to send messages to the user when needed
-    sender: tokio::sync::mpsc::Sender<crate::server_message::ServerMessage>,
+    sender: tokio::sync::mpsc::Sender<common::packet::ServerPacket>,
     /// The known objects for the character
     known_objects: ObjectList,
 }
@@ -118,7 +117,7 @@ impl PartialCharacter {
     pub fn into_full(
         self,
         item_table: &HashMap<u32, crate::world::item::Item>,
-        sender: tokio::sync::mpsc::Sender<ServerMessage>,
+        sender: tokio::sync::mpsc::Sender<common::packet::ServerPacket>,
     ) -> FullCharacter {
         let mut items = HashMap::new();
         for (k, i) in self.items.into_iter() {
@@ -158,12 +157,17 @@ impl crate::world::object::ObjectTrait for FullCharacter {
     fn get_location(&self) -> crate::character::Location {
         self.details.location
     }
+    
+    fn get_prev_location(&self) -> crate::character::Location {
+        self.details.old_location.unwrap_or(self.details.location)
+    }
 
     fn can_shutdown(&self) -> bool {
         self.access_level == 200
     }
 
     fn set_location(&mut self, l: crate::character::Location) {
+        self.details.old_location = Some(self.details.location);
         self.details.location = l;
     }
 
@@ -197,7 +201,7 @@ impl crate::world::object::ObjectTrait for FullCharacter {
 
     fn sender(
         &mut self,
-    ) -> Option<&mut tokio::sync::mpsc::Sender<crate::server_message::ServerMessage>> {
+    ) -> Option<&mut tokio::sync::mpsc::Sender<common::packet::ServerPacket>> {
         Some(&mut self.sender)
     }
 
@@ -205,7 +209,7 @@ impl crate::world::object::ObjectTrait for FullCharacter {
         ServerPacket::PutObject {
             x: self.details.location.x,
             y: self.details.location.y,
-            id: self.id,
+            id: self.world_id.get_u32(),
             icon: 29,
             status: 0,
             direction: 1,
@@ -372,7 +376,7 @@ impl FullCharacter {
     /// Get the details packet for sending to the user
     pub fn details_packet(&self) -> ServerPacket {
         ServerPacket::CharacterDetails {
-            id: self.id,
+            id: self.world_id.get_u32(),
             level: self.level,
             xp: self.details.exp,
             strength: self.strength,
@@ -402,7 +406,7 @@ impl FullCharacter {
         ServerPacket::PutObject {
             x: self.details.location.x,
             y: self.details.location.y,
-            id: self.id,
+            id: self.world_id.get_u32(),
             icon: 1,
             status: 0,
             direction: 0,
@@ -485,6 +489,8 @@ pub struct ExtraCharacterDetails {
     earth_resist: u8,
     /// Location
     location: Location,
+    /// The last place the npc was
+    old_location: Option<crate::character::Location>,
 }
 
 impl mysql_async::prelude::FromRow for ExtraCharacterDetails {
@@ -509,6 +515,7 @@ impl mysql_async::prelude::FromRow for ExtraCharacterDetails {
                 map: row.get(12).ok_or(mysql_async::FromRowError(row.clone()))?,
                 direction: 5,
             },
+            old_location: None,
         })
     }
 }

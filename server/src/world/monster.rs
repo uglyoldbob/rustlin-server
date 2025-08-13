@@ -166,6 +166,7 @@ impl MonsterSpawn {
             name: npc.name.clone(),
             light_size: npc.light_size,
             spawn: self.clone(),
+            old_location: None,
         }
     }
 }
@@ -180,10 +181,41 @@ pub struct MonsterRef {
 
 impl MonsterRef {
     /// Run the ai for the monster
-    pub async fn run_ai(&mut self) {}
+    pub async fn run_ai(&mut self) {
+        loop {
+            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+            use rand::Rng;
+            let direction = rand::thread_rng().gen_range(0..=7u8);
+            let myloc = self.world.get_location(self.reference).await;
+            if let Some(l) = myloc {
+                let (x,y) = (l.x, l.y);
+                let (x2, y2) = match direction {
+                    0 => (x, y - 1),
+                    1 => (x + 1, y - 1),
+                    2 => (x + 1, y),
+                    3 => (x + 1, y + 1),
+                    4 => (x, y + 1),
+                    5 => (x - 1, y + 1),
+                    6 => (x - 1, y),
+                    7 => (x - 1, y - 1),
+                    _ => (x, y),
+                };
+                let new_loc = Location {
+                    x: x2,
+                    y: y2,
+                    map: l.map,
+                    direction,
+                };
+                if l.map == 69 {
+                    log::info!("Move {:?} from {:?} to {:?}", self.reference, l, new_loc);
+                }
+                let _ = self.world.move_object(self.reference, new_loc, None).await;
+            }
+        }
+    }
 }
 
-use crate::{character::Location, server_message::ServerMessage, world::ObjectRef};
+use crate::{character::Location, world::ObjectRef};
 
 /// A monster on the world
 #[derive(Debug)]
@@ -192,6 +224,8 @@ pub struct Monster {
     id: super::WorldObjectId,
     /// Where the npc currently exists
     location: crate::character::Location,
+    /// The last place the object was
+    old_location: Option<crate::character::Location>,
     /// The npc name
     name: String,
     /// the npc alignment
@@ -222,7 +256,12 @@ impl super::ObjectTrait for Monster {
         self.location
     }
 
+    fn get_prev_location(&self) -> crate::character::Location {
+        self.old_location.unwrap_or(self.location)
+    }
+
     fn set_location(&mut self, l: crate::character::Location) {
+        self.old_location = Some(self.location);
         self.location = l;
     }
 
@@ -264,7 +303,7 @@ impl super::ObjectTrait for Monster {
         None
     }
 
-    fn sender(&mut self) -> Option<&mut tokio::sync::mpsc::Sender<ServerMessage>> {
+    fn sender(&mut self) -> Option<&mut tokio::sync::mpsc::Sender<common::packet::ServerPacket>> {
         None
     }
 

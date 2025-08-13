@@ -17,7 +17,6 @@ use common::packet::{ServerPacket, ServerPacketSender};
 use crate::{
     character::{Character, Location},
     server::ClientError,
-    server_message::ServerMessage,
     world::{
         item::ItemTrait,
         object::{ObjectList, ObjectTrait},
@@ -122,19 +121,27 @@ impl MapInfo {
         self.objects.insert(new_o.id(), new_o);
     }
 
+    /// Get a location of an object reference
+    pub async fn get_location(&self, r: ObjectRef) -> Option<Location> {
+        if let Some(o) = self.objects.get(&r.id) {
+            return Some(o.get_location())
+        }
+        None
+    }
+
     /// Move an object on the map
     pub async fn move_object(
         &mut self,
         r: ObjectRef,
         new_loc: Location,
-        pw: &mut ServerPacketSender,
+        mut pw: Option<&mut ServerPacketSender>,
     ) -> Result<(), ClientError> {
         let mut object_list = ObjectList::new();
         if let Some(myobj) = self.objects.get_mut(&r.id) {
             myobj.set_location(new_loc);
         }
         for (id, o) in &mut self.objects {
-            if *id != r.id && o.linear_distance(&new_loc) < 7.0 {
+            if *id != r.id && o.linear_distance(&new_loc) < 17.0 {
                 object_list.add_object(*id);
             }
         }
@@ -146,18 +153,32 @@ impl MapInfo {
                     ol.find_changes(&mut old_objects, &mut new_objects, &object_list);
                 }
             }
+            let monster_move_packet = self.objects.get(&r.id).unwrap().build_move_object_packet();
+            for o in object_list.get_objects() {
+                if let Some(o) = self.objects.get_mut(o) {
+                    if let Some(s) = o.sender() {
+                        let _ = s.send(monster_move_packet.clone()).await;
+                    }
+                }
+            }
             for objid in old_objects {
-                pw.send_packet(ServerPacket::RemoveObject(objid.get_u32()).build())
-                    .await?;
-                if let Some(obj) = self.objects.get_mut(&r.id) {
+                if let Some(pw) = &mut pw {
                     pw.send_packet(ServerPacket::RemoveObject(objid.get_u32()).build())
                         .await?;
+                }
+                if let Some(obj) = self.objects.get_mut(&r.id) {
+                    if let Some(pw) = &mut pw {
+                        pw.send_packet(ServerPacket::RemoveObject(objid.get_u32()).build())
+                            .await?;
+                    }
                     obj.remove_object(objid).await;
                 }
             }
             for objid in new_objects {
-                if let Some(obj) = self.objects.get_mut(&objid) {
-                    pw.send_packet(obj.build_put_object_packet()).await?;
+                if let Some(pw) = &mut pw {
+                    if let Some(obj) = self.objects.get_mut(&objid) {
+                        pw.send_packet(obj.build_put_object_packet()).await?;
+                    }
                 }
                 if let Some(obj) = self.objects.get_mut(&r.id) {
                     obj.add_object(objid).await;
@@ -289,6 +310,16 @@ impl World {
         Ok(w)
     }
 
+    /// Get a location of an object reference
+    pub async fn get_location(&self, r: ObjectRef) -> Option<Location> {
+        let mi = self.map_info.lock().await;
+        let map = mi.get(&r.map);
+        if let Some(map) = map {
+            return map.get_location(r).await;
+        }
+        None
+    }
+
     /// Shutdown the server if the player is authorized to do so
     pub async fn shutdown(&self, r: &ObjectRef) {
         let mut mi = self.map_info.lock().await;
@@ -352,7 +383,7 @@ impl World {
         &self,
         r: ObjectRef,
         new_loc: Location,
-        pw: &mut ServerPacketSender,
+        pw: Option<&mut ServerPacketSender>,
     ) -> Result<(), ClientError> {
         let mut mi = self.map_info.lock().await;
         let map = mi.get_mut(&new_loc.map);
@@ -366,6 +397,7 @@ impl World {
     pub fn new_object_id(&self) -> WorldObjectId {
         let mut w = self.next_object_id.lock().unwrap();
         let r = *w;
+        log::info!("Creating object with id {:?}", r);
         w.0 += 1;
         r
     }
@@ -406,7 +438,7 @@ impl World {
                 map: location.map,
                 id,
             };
-            map.move_object(or, location, pw).await.ok()?;
+            map.move_object(or, location, Some(pw)).await.ok()?;
             Some(or)
         } else {
             None
@@ -509,11 +541,11 @@ impl World {
         Ok(())
     }
 
-    /// Send a whisper message to the specified player
-    pub async fn send_whisper_to(
+    /// Send a packet to the specified player
+    pub async fn send_packet_to(
         &self,
         other_person: &str,
-        m: ServerMessage,
+        m: common::packet::ServerPacket,
     ) -> Result<(), String> {
         let mut mi = self.map_info.lock().await;
         for map in mi.values_mut() {
@@ -532,7 +564,7 @@ impl World {
     }
 
     /// Send a global chat message
-    pub async fn send_global_chat(&self, m: ServerMessage) {
+    pub async fn send_global_chat(&self, m: common::packet::ServerPacket) {
         let mut mi = self.map_info.lock().await;
         for map in mi.values_mut() {
             for obj in &mut map.objects {
@@ -607,7 +639,7 @@ impl World {
             .await
             .map_err(|e| e.to_string())?;
         for w in weapons {
-            item_table.insert(w.id().get_u32(), w.into());
+            item_table.insert(w.db_id(), w.into());
         }
         Ok(())
     }
@@ -625,7 +657,7 @@ impl World {
             .await
             .map_err(|e| e.to_string())?;
         for w in items {
-            item_table.insert(w.id().get_u32(), w.into());
+            item_table.insert(w.db_id(), w.into());
         }
         Ok(())
     }
@@ -643,7 +675,7 @@ impl World {
             .await
             .map_err(|e| e.to_string())?;
         for w in items {
-            item_table.insert(w.id().get_u32(), w.into());
+            item_table.insert(w.db_id(), w.into());
         }
         Ok(())
     }

@@ -8,7 +8,9 @@ use crate::world::{object::ObjectTrait, WorldObjectId};
 #[enum_dispatch::enum_dispatch]
 pub trait ItemTrait {
     /// Retrieve the item id
-    fn id(&self) -> super::WorldObjectId;
+    fn db_id(&self) -> u32;
+    /// Get the world id
+    fn world_id(&self) -> WorldObjectId;
     /// Get the inventory packet
     fn inventory_element(&self, stuff: &ItemStuff) -> common::packet::InventoryElement;
     /// Get the packet for updating the item
@@ -169,6 +171,12 @@ pub struct Weapon {
     max_use_time: u32,
 }
 
+impl Weapon {
+    pub fn set_world_id(&mut self, id: WorldObjectId) {
+        self.world_id = Some(id);
+    }
+}
+
 impl mysql_async::prelude::FromRow for Weapon {
     fn from_row_opt(row: mysql_async::Row) -> Result<Self, mysql_async::FromRowError>
     where
@@ -188,8 +196,12 @@ impl mysql_async::prelude::FromRow for Weapon {
 }
 
 impl ItemTrait for Weapon {
-    fn id(&self) -> WorldObjectId {
+    fn world_id(&self) -> WorldObjectId {
         self.world_id.unwrap()
+    }
+
+    fn db_id(&self) -> u32 {
+        self.id
     }
 
     fn ground_icon(&self) -> u16 {
@@ -324,8 +336,12 @@ impl mysql_async::prelude::FromRow for Armor {
 }
 
 impl ItemTrait for Armor {
-    fn id(&self) -> WorldObjectId {
+    fn world_id(&self) -> WorldObjectId {
         self.world_id.unwrap()
+    }
+
+    fn db_id(&self) -> u32 {
+        self.id
     }
 
     fn ground_icon(&self) -> u16 {
@@ -542,8 +558,12 @@ impl mysql_async::prelude::FromRow for EtcItem {
 }
 
 impl ItemTrait for EtcItem {
-    fn id(&self) -> WorldObjectId {
+    fn world_id(&self) -> WorldObjectId {
         self.world_id.unwrap()
+    }
+
+    fn db_id(&self) -> u32 {
+        self.id
     }
 
     fn ground_icon(&self) -> u16 {
@@ -819,19 +839,23 @@ impl ObjectTrait for ItemWithLocation {
         self.location
     }
 
+    fn get_prev_location(&self) -> crate::character::Location {
+        self.location
+    }
+
     fn set_location(&mut self, l: crate::character::Location) {
         self.location = l;
     }
 
     fn id(&self) -> super::WorldObjectId {
-        ItemTrait::id(&self.item)
+        ItemTrait::world_id(&self.item)
     }
 
     fn build_put_object_packet(&self) -> common::packet::Packet {
         common::packet::ServerPacket::PutObject {
             x: self.location.x,
             y: self.location.y,
-            id: ItemTrait::id(&self.item).get_u32(),
+            id: ItemTrait::world_id(&self.item).get_u32(),
             icon: self.item.ground_icon(),
             status: 0,
             direction: 0,

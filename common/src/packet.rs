@@ -84,7 +84,7 @@ pub enum ClientPacket {
     Unknown(Vec<u8>),
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct InventoryElement {
     /// Item id
     pub id: u32,
@@ -188,7 +188,7 @@ impl InventoryElement {
 }
 
 /// USed to create a inventory update packet
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct InventoryUpdate {
     /// Item id
     pub id: u32,
@@ -203,7 +203,7 @@ pub struct InventoryUpdate {
 //TODO create enums for the option values
 
 /// Represents packets sent to the client, from the server
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum ServerPacket {
     ServerVersion {
         id: u8,

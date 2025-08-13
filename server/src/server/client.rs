@@ -2,7 +2,6 @@
 
 use crate::client_message::ClientMessage;
 use crate::server::ClientError;
-use crate::server_message::ServerMessage;
 use crate::user::*;
 use crate::world::object::ObjectTrait;
 use crate::world::ObjectRef;
@@ -131,7 +130,7 @@ impl Client {
                         .world
                         .with_player_ref_do(r, &mut self.packet_writer, async move |fc, pw, _| {
                             let amsg = format!("[{}] {}", fc.name, msg);
-                            Some(ServerMessage::RegularChat { id: 0, msg: amsg })
+                            Some(ServerPacket::RegularChat { id: 0, msg: amsg })
                         })
                         .await;
                     if let Some(m) = m {
@@ -160,7 +159,7 @@ impl Client {
                         .world
                         .with_player_ref_do(r, &mut self.packet_writer, async move |fc, pw, _| {
                             let amsg = format!("[{}] {}", fc.name, msg);
-                            Some(ServerMessage::YellChat {
+                            Some(ServerPacket::YellChat {
                                 id: 0,
                                 msg: amsg,
                                 x,
@@ -193,7 +192,7 @@ impl Client {
                         .world
                         .with_player_ref_do(r, &mut self.packet_writer, async move |fc, pw, _| {
                             let amsg = format!("[{}] {}", fc.name, msg);
-                            Some(ServerMessage::GlobalChat(amsg))
+                            Some(ServerPacket::GlobalChat(amsg))
                         })
                         .await;
                     if let Some(m) = m {
@@ -207,7 +206,7 @@ impl Client {
                         .world
                         .with_player_ref_do(r, &mut self.packet_writer, async move |fc, pw, _| {
                             let amsg = format!("[{}] {}", fc.name, msg);
-                            Some(ServerMessage::PledgeChat(amsg))
+                            Some(ServerPacket::PledgeChat(amsg))
                         })
                         .await;
                     if let Some(m) = m {
@@ -221,7 +220,7 @@ impl Client {
                         .world
                         .with_player_ref_do(r, &mut self.packet_writer, async move |fc, pw, _| {
                             let amsg = format!("[{}] {}", fc.name, msg);
-                            Some(ServerMessage::PartyChat(amsg))
+                            Some(ServerPacket::PartyChat(amsg))
                         })
                         .await;
                     if let Some(m) = m {
@@ -234,11 +233,11 @@ impl Client {
                     let m = self
                         .world
                         .with_player_ref_do(r, &mut self.packet_writer, async move |fc, pw, _| {
-                            Some(ServerMessage::WhisperChat(fc.name.clone(), msg.clone()))
+                            Some(ServerPacket::WhisperChat { name: fc.name.clone(), msg: msg.clone()})
                         })
                         .await;
                     if let Some(m) = m {
-                        if let Err(e) = self.world.send_whisper_to(person.as_str(), m).await {
+                        if let Err(e) = self.world.send_packet_to(person.as_str(), m).await {
                             self.packet_writer
                                 .send_packet(
                                     ServerPacket::Message {
@@ -369,7 +368,7 @@ impl Client {
         p: Packet,
         peer: std::net::SocketAddr,
         config: &std::sync::Arc<crate::ServerConfiguration>,
-        sender: &tokio::sync::mpsc::Sender<ServerMessage>,
+        sender: &tokio::sync::mpsc::Sender<ServerPacket>,
     ) -> Result<(), ClientError> {
         let c = p.convert();
         match c {
@@ -602,7 +601,7 @@ impl Client {
                                 y: y2,
                                 direction: heading,
                             },
-                            &mut self.packet_writer,
+                            Some(&mut self.packet_writer),
                         )
                         .await?;
                 }
@@ -785,65 +784,12 @@ impl Client {
         Ok(())
     }
 
-    /// Process a message received from the server
-    async fn process_server_message(&mut self, p: ServerMessage) -> Result<(), ClientError> {
-        match p {
-            ServerMessage::AddObject { id, location } => {
-                log::info!("Adding object {:?} at {:?}", id, location);
-                self.world
-                    .send_new_object(location, id, &mut self.packet_writer)
-                    .await?;
-            }
-            ServerMessage::RemoveObject { id } => {
-                self.packet_writer
-                    .send_packet(ServerPacket::RemoveObject(id.get_u32()).build())
-                    .await?;
-            }
-            ServerMessage::Disconnect => {
-                self.packet_writer
-                    .send_packet(ServerPacket::Disconnect.build())
-                    .await?;
-            }
-            ServerMessage::RegularChat { id, msg } => {
-                self.packet_writer
-                    .send_packet(ServerPacket::RegularChat { id, msg }.build())
-                    .await?;
-            }
-            ServerMessage::YellChat { id, msg, x, y } => {
-                self.packet_writer
-                    .send_packet(ServerPacket::YellChat { id, msg, x, y }.build())
-                    .await?;
-            }
-            ServerMessage::GlobalChat(m) => {
-                self.packet_writer
-                    .send_packet(ServerPacket::GlobalChat(m).build())
-                    .await?;
-            }
-            ServerMessage::PledgeChat(m) => {
-                self.packet_writer
-                    .send_packet(ServerPacket::PledgeChat(m).build())
-                    .await?;
-            }
-            ServerMessage::PartyChat(m) => {
-                self.packet_writer
-                    .send_packet(ServerPacket::PartyChat(m).build())
-                    .await?;
-            }
-            ServerMessage::WhisperChat(u, m) => {
-                self.packet_writer
-                    .send_packet(ServerPacket::WhisperChat { name: u, msg: m }.build())
-                    .await?;
-            }
-        }
-        Ok(())
-    }
-
     /// The main event loop for a client in a server.
     pub async fn event_loop(
         mut self,
         reader: tokio::net::tcp::OwnedReadHalf,
-        mut receiver: tokio::sync::mpsc::Receiver<ServerMessage>,
-        sender: tokio::sync::mpsc::Sender<ServerMessage>,
+        mut receiver: tokio::sync::mpsc::Receiver<common::packet::ServerPacket>,
+        sender: tokio::sync::mpsc::Sender<common::packet::ServerPacket>,
         config: &std::sync::Arc<crate::ServerConfiguration>,
         mut end_rx: tokio::sync::mpsc::Receiver<u32>,
     ) -> Result<u8, ClientError> {
@@ -864,7 +810,7 @@ impl Client {
                 }
                 msg = receiver.recv().fuse() => {
                     let p = msg.unwrap();
-                    self.process_server_message(p).await?;
+                    self.packet_writer.send_packet(p.build()).await?;
                 }
                 _ = end_rx.recv().fuse() => {
                     break;
