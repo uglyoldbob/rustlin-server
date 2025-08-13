@@ -120,6 +120,9 @@ pub trait ObjectTrait {
 
     /// Remove an object from the list of known objects, if applicable
     async fn remove_object(&mut self, o: WorldObjectId) {}
+
+    /// Return true if the object can initiate a server shutdown
+    fn can_shutdown(&self) -> bool { false }
 }
 
 /// The things that an object can be

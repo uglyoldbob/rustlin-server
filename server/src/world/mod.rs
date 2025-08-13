@@ -1,6 +1,5 @@
 use std::{
-    collections::HashMap,
-    sync::{Arc, Mutex},
+    collections::HashMap, future::AsyncDrop, pin::Pin, sync::{Arc, Mutex}
 };
 
 pub mod item;
@@ -221,11 +220,28 @@ pub struct World {
     next_object_id: Arc<Mutex<WorldObjectId>>,
     /// Monster tasks
     monster_set: Option<Arc<Mutex<tokio::task::JoinSet<()>>>>,
+    /// The sender for special messages to the server
+    server_s: tokio::sync::mpsc::Sender<crate::server_message::ServerShutdownMessage>
+}
+
+impl Drop for World {
+    fn drop(&mut self) {
+        
+    }
+}
+
+impl AsyncDrop for World {
+    async fn drop(mut self: Pin<&mut Self>) {
+        if let Some(m) = self.monster_set.take() {
+            let mut m2 = m.lock().unwrap();
+            m2.abort_all();
+        }
+    }
 }
 
 impl World {
     /// Construct a new server world
-    pub async fn new(mysql: mysql_async::Pool) -> Result<Self, String> {
+    pub async fn new(mysql: mysql_async::Pool, server_s: tokio::sync::mpsc::Sender<crate::server_message::ServerShutdownMessage>) -> Result<Self, String> {
         let mut conn = mysql.get_conn().await.map_err(|e| format!("{:?}", e))?;
         let npc_spawn_table = Self::load_npc_spawn_table(&mut conn)
             .await
@@ -248,6 +264,7 @@ impl World {
             monster_spawn_table,
             next_object_id: Arc::new(Mutex::new(WorldObjectId(1))),
             monster_set: Some(Arc::new(Mutex::new(tokio::task::JoinSet::new()))),
+            server_s,
         };
         for s in &w.npc_spawn_table {
             let new_id = w.new_object_id();
@@ -260,6 +277,32 @@ impl World {
             }
         }
         Ok(w)
+    }
+
+    /// Shutdown the server if the player is authorized to do so
+    pub async fn shutdown(&self, r: &ObjectRef) {
+        let mut mi = self.map_info.lock().await;
+        let map = mi.get_mut(&r.map);
+        if let Some(map) = map {
+            if let Some(obj) = map.objects.get(&r.id) {
+                if obj.can_shutdown() {
+                    let _ = self.server_s.send(crate::server_message::ServerShutdownMessage::Shutdown).await;
+                }
+            }
+        }
+    }
+
+    /// Restart the server if the player is authorized to do so
+    pub async fn restart(&self, r: &ObjectRef) {
+        let mut mi = self.map_info.lock().await;
+        let map = mi.get_mut(&r.map);
+        if let Some(map) = map {
+            if let Some(obj) = map.objects.get(&r.id) {
+                if obj.can_shutdown() {
+                    let _ = self.server_s.send(crate::server_message::ServerShutdownMessage::Restart).await;
+                }
+            }
+        }
     }
 
     /// Spawn all monsters

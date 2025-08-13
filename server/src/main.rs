@@ -28,6 +28,14 @@ fn main() -> Result<(), String> {
         .block_on(smain())
 }
 
+#[derive(Debug)]
+enum ShutdownMode {
+    Normal,
+    Error(String),
+    Restart,
+    Abnormal,
+}
+
 async fn smain() -> Result<(), String> {
     simple_logger::init_with_level(log::Level::Info).unwrap();
 
@@ -44,8 +52,10 @@ async fn smain() -> Result<(), String> {
 
     let mut tasks: tokio::task::JoinSet<Result<(), u32>> = tokio::task::JoinSet::new();
 
+    let (iscs, mut iscr) = tokio::sync::mpsc::channel(5);
+
     let world = std::sync::Arc::new(
-        world::World::new(mysql_pool)
+        world::World::new(mysql_pool, iscs)
             .await
             .map_err(|e| format!("{:?}", e))?,
     );
@@ -62,33 +72,76 @@ async fn smain() -> Result<(), String> {
             .expect("Failed to setup legacy server"),
     );
 
-    let error;
+    let mut shutdown_mode = None;
 
     loop {
         tokio::select! {
             Some(r) = tasks.join_next() => {
                 if let Ok(r2) = r {
-                    if r.is_ok() {
-                        log::info!("A task exited {:?}, closing server in 5 seconds", r2);
+                    if let Ok(r3) = r2 {
+                        log::info!("A task exited {:?}, closing server in 5 seconds", r3);
+                        if shutdown_mode.is_none() {
+                            shutdown_mode = Some(ShutdownMode::Abnormal);
+                        }
                     }
                     else {
                         log::error!("A task exited {:?}, closing server in 5 seconds", r2);
+                        shutdown_mode = Some(ShutdownMode::Error(format!("A task exited {:?}, closing server now", r)));
                     }
                 }
                 else {
                     log::error!("A task exited {:?}, closing server in 5 seconds", r);
+                    shutdown_mode = Some(ShutdownMode::Error(format!("A task exited {:?}, closing server now", r)))
                 }
-                error = Err(format!("A task exited {:?}, closing server now", r));
                 break;
             }
+            m = iscr.recv() => {
+                if let Some(m) = m {
+                    match m {
+                        server_message::ServerShutdownMessage::Shutdown => {
+                            shutdown_mode = Some(ShutdownMode::Normal);
+                            if let Some(tx) = server_tx.take() {
+                                log::info!("Signal end of server");
+                                let _ = tx.send(0);
+                            }
+                            if let Some(tx) = update_tx.take() {
+                                log::info!("Signal end of update");
+                                let _ = tx.send(0);
+                            }
+                        }
+                        server_message::ServerShutdownMessage::Restart => {
+                            shutdown_mode = Some(ShutdownMode::Restart);
+                            if let Some(tx) = server_tx.take() {
+                                log::info!("Signal end of server");
+                                let _ = tx.send(0);
+                            }
+                            if let Some(tx) = update_tx.take() {
+                                log::info!("Signal end of update");
+                                let _ = tx.send(0);
+                            }
+                        }
+                    }
+                } else {
+                    log::error!("Internal channel for shutdown broken");
+                    if let Some(tx) = server_tx.take() {
+                        log::info!("Signal end of server");
+                        let _ = tx.send(0);
+                    }
+                    if let Some(tx) = update_tx.take() {
+                        log::info!("Signal end of update");
+                        let _ = tx.send(0);
+                    }
+                }
+            }
             _ = tokio::signal::ctrl_c() => {
+                shutdown_mode = Some(ShutdownMode::Normal);
                 if let Some(tx) = server_tx.take() {
                     log::info!("Signal end of server");
-                    tx.send(0);
+                    let _ = tx.send(0);
                 }
                 if let Some(tx) = update_tx.take() {
                     log::info!("Signal end of update");
-                    tx.send(0);
+                    let _ = tx.send(0);
                 }
             }
         }
@@ -96,6 +149,11 @@ async fn smain() -> Result<(), String> {
     log::info!("Waiting for main tasks to finish");
     tasks.join_all().await;
 
-    log::info!("server: Server will now close");
-    error
+    log::info!("server: Server will now close with status: {:?}", shutdown_mode);
+    match shutdown_mode.unwrap() {
+        ShutdownMode::Normal => Ok(()),
+        ShutdownMode::Error(s) => Err(s),
+        ShutdownMode::Restart => Err("Restarting".to_string()),
+        ShutdownMode::Abnormal => Err("Abnormal shutdown".to_string()),
+    }
 }

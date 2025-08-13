@@ -20,6 +20,8 @@ pub struct FullCharacter {
     account_name: String,
     /// The name of the character
     pub name: String,
+    /// The access level of the character, 200 = Admin, 100 = monitor
+    access_level: u16,
     /// The id of the character in the database
     id: u32,
     /// The world id of the character
@@ -69,6 +71,8 @@ pub struct PartialCharacter {
     account_name: String,
     /// The name of the character
     pub name: String,
+    /// The access level of the character, 200 = Admin, 100 = monitor
+    access_level: u16,
     /// The world id of the character
     world_id: super::world::WorldObjectId,
     /// The id of the character in the database
@@ -123,6 +127,7 @@ impl PartialCharacter {
         FullCharacter {
             account_name: self.account_name,
             name: self.name,
+            access_level: self.access_level,
             id: self.id,
             world_id: self.world_id,
             alignment: self.alignment,
@@ -150,6 +155,10 @@ impl PartialCharacter {
 impl crate::world::object::ObjectTrait for FullCharacter {
     fn get_location(&self) -> crate::character::Location {
         self.details.location
+    }
+
+    fn can_shutdown(&self) -> bool {
+        self.access_level == 200
     }
 
     fn set_location(&mut self, l: crate::character::Location) {
@@ -515,6 +524,8 @@ impl mysql_async::prelude::FromRow for ExtraCharacterDetails {
 pub struct Character {
     /// The account name for the character
     account_name: String,
+    /// The access level of the character, 200 = Admin, 100 = monitor
+    access_level: u16,
     /// The name of the character
     name: String,
     /// The id of the character in the database
@@ -653,7 +664,7 @@ impl std::convert::TryFrom<u8> for Class {
 }
 
 impl Character {
-    pub const QUERY: &str = "SELECT account_name, char_name, objid, Lawful, level, Clanname, Class, Sex, MaxHp, MaxMp, Ac, Str, Dex, Con, Wis, Cha, Intel from characters WHERE account_name=?";
+    pub const QUERY: &str = "SELECT account_name, char_name, objid, Lawful, level, Clanname, Class, Sex, MaxHp, MaxMp, Ac, Str, Dex, Con, Wis, Cha, Intel, AccessLevel from characters WHERE account_name=?";
 
     /// Is the player name valid?
     pub fn valid_name(n: &str) -> bool {
@@ -761,6 +772,7 @@ impl Character {
         Ok(PartialCharacter {
             account_name: self.account_name.clone(),
             name: self.name.clone(),
+            access_level: self.access_level,
             id: self.id,
             world_id: new_id,
             alignment: self.alignment,
@@ -849,6 +861,7 @@ impl Character {
         Some(Self {
             account_name,
             name,
+            access_level: 0,
             pledge: "".to_string(),
             id,
             alignment: 0,
@@ -916,6 +929,7 @@ impl mysql_async::prelude::FromRow for Character {
             wisdom: row.get(14).ok_or(mysql_async::FromRowError(row.clone()))?,
             charisma: row.get(15).ok_or(mysql_async::FromRowError(row.clone()))?,
             intelligence: row.get(16).ok_or(mysql_async::FromRowError(row.clone()))?,
+            access_level: row.get(17).ok_or(mysql_async::FromRowError(row.clone()))?,
         })
     }
 }

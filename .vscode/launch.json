@@ -7,12 +7,12 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug executable 'l1j-client'",
+            "name": "Debug executable 'l1j-server'",
             "cargo": {
                 "args": [
                     "build",
-                    "--bin=rustlin-client",
-                    "--package=rustlin-client"
+                    "--bin=rustlin-server",
+                    "--package=rustlin-server"
                 ]
             },
             "args": [],

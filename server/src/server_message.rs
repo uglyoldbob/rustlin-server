@@ -35,3 +35,9 @@ pub enum ServerMessage {
         id: WorldObjectId,
     },
 }
+
+/// Messages that can be passed back to the top level of the server
+pub enum ServerShutdownMessage {
+    Shutdown,
+    Restart,
+}

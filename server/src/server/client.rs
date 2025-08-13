@@ -648,9 +648,22 @@ impl Client {
                 let mut words = m.split_whitespace();
                 let first_word = words.next();
                 if let Some(m) = first_word {
+                    /// TODO replace with a hashmap converting strings to functions
                     match m {
                         "asdf" => {
                             log::info!("A command called asdf");
+                        }
+                        "shutdown" => {
+                            log::info!("A shutdown command was received");
+                            if let Some(r) = &self.char_ref {
+                                self.world.shutdown(r).await;
+                            }
+                        }
+                        "restart" => {
+                            log::info!("A restart command was received");
+                            if let Some(r) = &self.char_ref {
+                                self.world.restart(r).await;
+                            }
                         }
                         "quit" => {
                             self.packet_writer
