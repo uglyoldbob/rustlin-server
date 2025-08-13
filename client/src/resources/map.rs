@@ -87,10 +87,9 @@ impl ScreenCoordinate {
 
 #[cfg(test)]
 mod tests {
-    use super::MapCoordinate;
-
     #[test]
     fn coordinate_transform1() {
+        use super::MapCoordinate;
         let map = MapCoordinate::build(32768, 32768, 320, 240);
         let screen = map.to_screen();
         assert_eq!(screen.x, 296);
@@ -123,6 +122,7 @@ mod tests {
     }
     #[test]
     fn coordinate_transform2() {
+        use super::MapCoordinate;
         let map = MapCoordinate::build(0, 0, 320, 240);
         let screen = map.to_screen();
         assert_eq!(screen.x, 296);
@@ -132,6 +132,7 @@ mod tests {
     }
     #[test]
     fn coordinate_transform3() {
+        use super::MapCoordinate;
         let map = MapCoordinate::build(65535, 65535, 320, 240);
         let screen = map.to_screen();
         assert_eq!(screen.x, 296);
@@ -141,6 +142,7 @@ mod tests {
     }
     #[test]
     fn coordinate_transform4() {
+        use super::MapCoordinate;
         let map = MapCoordinate::build(65535, 0, 320, 240);
         let screen = map.to_screen();
         assert_eq!(screen.x, 296);
@@ -150,6 +152,7 @@ mod tests {
     }
     #[test]
     fn coordinate_transform5() {
+        use super::MapCoordinate;
         let map = MapCoordinate::build(0, 65535, 320, 240);
         let screen = map.to_screen();
         assert_eq!(screen.x, 296);

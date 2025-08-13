@@ -607,7 +607,7 @@ impl World {
             .await
             .map_err(|e| e.to_string())?;
         for w in weapons {
-            item_table.insert(w.id(), w.into());
+            item_table.insert(w.id().get_u32(), w.into());
         }
         Ok(())
     }
@@ -625,7 +625,7 @@ impl World {
             .await
             .map_err(|e| e.to_string())?;
         for w in items {
-            item_table.insert(w.id(), w.into());
+            item_table.insert(w.id().get_u32(), w.into());
         }
         Ok(())
     }
@@ -643,7 +643,7 @@ impl World {
             .await
             .map_err(|e| e.to_string())?;
         for w in items {
-            item_table.insert(w.id(), w.into());
+            item_table.insert(w.id().get_u32(), w.into());
         }
         Ok(())
     }

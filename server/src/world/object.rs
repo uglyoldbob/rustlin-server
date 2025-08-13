@@ -50,6 +50,8 @@ impl ObjectList {
     }
 }
 
+use crate::world::item::Item;
+
 /// The generic object trait for the server
 #[enum_dispatch::enum_dispatch]
 pub trait ObjectTrait {
@@ -93,16 +95,24 @@ pub trait ObjectTrait {
     }
 
     /// Get the list of items the object is posessing
-    fn get_items(&self) -> Option<&HashMap<u32, super::item::ItemInstance>>;
+    fn get_items(&self) -> Option<&HashMap<u32, super::item::ItemInstance>> {
+        None
+    }
 
     /// Get the list of items, mutable
-    fn items_mut(&mut self) -> Option<&mut HashMap<u32, super::item::ItemInstance>>;
+    fn items_mut(&mut self) -> Option<&mut HashMap<u32, super::item::ItemInstance>> {
+        None
+    }
 
     /// If applicable (only for Player objects), get the object for sending messages to the user
-    fn sender(&mut self) -> Option<&mut tokio::sync::mpsc::Sender<ServerMessage>>;
+    fn sender(&mut self) -> Option<&mut tokio::sync::mpsc::Sender<ServerMessage>> {
+        None
+    }
 
     /// Returns the name of the character if it is a player
-    fn player_name(&self) -> Option<String>;
+    fn player_name(&self) -> Option<String> {
+        None
+    }
 
     /// Get the list of objects known to this object, if it matters for this object
     fn get_known_objects(&self) -> Option<&ObjectList> {
@@ -131,4 +141,6 @@ pub enum Object {
     GenericNpc(super::npc::Npc),
     /// A generic monster
     Monster(super::monster::Monster),
+    /// An item on the ground
+    GroundItem(super::item::ItemWithLocation),
 }

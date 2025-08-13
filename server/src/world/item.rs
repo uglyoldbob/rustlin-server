@@ -2,11 +2,13 @@
 
 use std::collections::HashMap;
 
+use crate::world::{object::ObjectTrait, WorldObjectId};
+
 /// The trait for every item in the game
 #[enum_dispatch::enum_dispatch]
 pub trait ItemTrait {
     /// Retrieve the item id
-    fn id(&self) -> u32;
+    fn id(&self) -> super::WorldObjectId;
     /// Get the inventory packet
     fn inventory_element(&self, stuff: &ItemStuff) -> common::packet::InventoryElement;
     /// Get the packet for updating the item
@@ -15,6 +17,8 @@ pub trait ItemTrait {
     fn name(&self, stuff: &ItemStuff) -> String;
     /// Get the item usage
     fn usage(&self) -> ItemUsage;
+    /// Get the ground icon for this particular item
+    fn ground_icon(&self) -> u16;
 }
 
 /// The elemental types that an item can be enchanted with
@@ -149,6 +153,8 @@ impl From<&str> for ItemUsage {
 pub struct Weapon {
     /// Item definition id
     id: u32,
+    /// World object id
+    world_id: Option<WorldObjectId>,
     /// item weight
     weight: u32,
     /// Graphics for inventory
@@ -170,6 +176,7 @@ impl mysql_async::prelude::FromRow for Weapon {
     {
         Ok(Self {
             id: row.get(0).ok_or(mysql_async::FromRowError(row.clone()))?,
+            world_id: None,
             weight: row.get(6).ok_or(mysql_async::FromRowError(row.clone()))?,
             inventory_graphic: row.get(7).ok_or(mysql_async::FromRowError(row.clone()))?,
             ground_graphic: row.get(8).ok_or(mysql_async::FromRowError(row.clone()))?,
@@ -181,8 +188,12 @@ impl mysql_async::prelude::FromRow for Weapon {
 }
 
 impl ItemTrait for Weapon {
-    fn id(&self) -> u32 {
-        self.id
+    fn id(&self) -> WorldObjectId {
+        self.world_id.unwrap()
+    }
+
+    fn ground_icon(&self) -> u16 {
+        self.ground_graphic
     }
 
     fn usage(&self) -> ItemUsage {
@@ -278,6 +289,8 @@ impl ItemTrait for Weapon {
 pub struct Armor {
     /// Item definition id
     id: u32,
+    /// World object id
+    world_id: Option<WorldObjectId>,
     /// item weight
     weight: u32,
     /// Graphics for inventory
@@ -299,6 +312,7 @@ impl mysql_async::prelude::FromRow for Armor {
     {
         Ok(Self {
             id: row.get(0).ok_or(mysql_async::FromRowError(row.clone()))?,
+            world_id: None,
             weight: row.get(6).ok_or(mysql_async::FromRowError(row.clone()))?,
             inventory_graphic: row.get(7).ok_or(mysql_async::FromRowError(row.clone()))?,
             ground_graphic: row.get(8).ok_or(mysql_async::FromRowError(row.clone()))?,
@@ -310,8 +324,12 @@ impl mysql_async::prelude::FromRow for Armor {
 }
 
 impl ItemTrait for Armor {
-    fn id(&self) -> u32 {
-        self.id
+    fn id(&self) -> WorldObjectId {
+        self.world_id.unwrap()
+    }
+
+    fn ground_icon(&self) -> u16 {
+        self.ground_graphic
     }
 
     fn usage(&self) -> ItemUsage {
@@ -468,6 +486,8 @@ impl From<u8> for EtcItemType {
 pub struct EtcItem {
     /// Item definition id
     id: u32,
+    /// World object id
+    world_id: Option<WorldObjectId>,
     /// The etc item type
     itype: EtcItemType,
     /// item weight
@@ -508,6 +528,7 @@ impl mysql_async::prelude::FromRow for EtcItem {
         let usage: String = row.get(5).ok_or(mysql_async::FromRowError(row.clone()))?;
         Ok(Self {
             id: row.get(0).ok_or(mysql_async::FromRowError(row.clone()))?,
+            world_id: None,
             weight: row.get(7).ok_or(mysql_async::FromRowError(row.clone()))?,
             inventory_graphic: row.get(8).ok_or(mysql_async::FromRowError(row.clone()))?,
             ground_graphic: row.get(9).ok_or(mysql_async::FromRowError(row.clone()))?,
@@ -521,8 +542,12 @@ impl mysql_async::prelude::FromRow for EtcItem {
 }
 
 impl ItemTrait for EtcItem {
-    fn id(&self) -> u32 {
-        self.id
+    fn id(&self) -> WorldObjectId {
+        self.world_id.unwrap()
+    }
+
+    fn ground_icon(&self) -> u16 {
+        self.ground_graphic
     }
 
     fn usage(&self) -> ItemUsage {
@@ -777,5 +802,54 @@ impl mysql_async::prelude::FromRow for ItemInstanceWithoutDefinition {
             id: row.get(1).ok_or(mysql_async::FromRowError(row.clone()))?,
             stuff: mysql_async::prelude::FromRow::from_row_opt(row)?,
         })
+    }
+}
+
+/// An item that exists on the ground somewhere
+#[derive(Debug)]
+pub struct ItemWithLocation {
+    /// The map location of the item
+    location: crate::character::Location,
+    /// The item on that spot of the map
+    item: Item,
+}
+
+impl ObjectTrait for ItemWithLocation {
+    fn get_location(&self) -> crate::character::Location {
+        self.location
+    }
+
+    fn set_location(&mut self, l: crate::character::Location) {
+        self.location = l;
+    }
+
+    fn id(&self) -> super::WorldObjectId {
+        ItemTrait::id(&self.item)
+    }
+
+    fn build_put_object_packet(&self) -> common::packet::Packet {
+        common::packet::ServerPacket::PutObject {
+            x: self.location.x,
+            y: self.location.y,
+            id: ItemTrait::id(&self.item).get_u32(),
+            icon: self.item.ground_icon(),
+            status: 0,
+            direction: 0,
+            light: 1,
+            speed: 1,
+            xp: 0,
+            alignment: 0,
+            name: "TODO".to_string(),
+            title: String::new(),
+            status2: 0,
+            pledgeid: 0,
+            pledgename: String::new(),
+            owner_name: String::new(),
+            v1: 0,
+            hp_bar: 255,
+            v2: 0,
+            level: 1,
+        }
+        .build()
     }
 }
