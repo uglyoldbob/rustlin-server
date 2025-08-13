@@ -157,7 +157,7 @@ impl crate::world::object::ObjectTrait for FullCharacter {
     fn get_location(&self) -> crate::character::Location {
         self.details.location
     }
-    
+
     fn get_prev_location(&self) -> crate::character::Location {
         self.details.old_location.unwrap_or(self.details.location)
     }
@@ -199,9 +199,7 @@ impl crate::world::object::ObjectTrait for FullCharacter {
         Some(&mut self.items)
     }
 
-    fn sender(
-        &mut self,
-    ) -> Option<&mut tokio::sync::mpsc::Sender<common::packet::ServerPacket>> {
+    fn sender(&mut self) -> Option<&mut tokio::sync::mpsc::Sender<common::packet::ServerPacket>> {
         Some(&mut self.sender)
     }
 
@@ -452,49 +450,49 @@ impl Location {
         match self.direction {
             0 => Self {
                 x: self.x,
-                y: self.y+1,
+                y: self.y + 1,
                 map: self.map,
                 direction: self.direction,
             },
             1 => Self {
-                x: self.x-1,
-                y: self.y+1,
+                x: self.x - 1,
+                y: self.y + 1,
                 map: self.map,
                 direction: self.direction,
             },
             2 => Self {
-                x: self.x-1,
+                x: self.x - 1,
                 y: self.y,
                 map: self.map,
                 direction: self.direction,
             },
             3 => Self {
-                x: self.x-1,
-                y: self.y-1,
+                x: self.x - 1,
+                y: self.y - 1,
                 map: self.map,
                 direction: self.direction,
             },
             4 => Self {
                 x: self.x,
-                y: self.y-1,
+                y: self.y - 1,
                 map: self.map,
                 direction: self.direction,
             },
             5 => Self {
-                x: self.x+1,
-                y: self.y-1,
+                x: self.x + 1,
+                y: self.y - 1,
                 map: self.map,
                 direction: self.direction,
             },
             6 => Self {
-                x: self.x+1,
+                x: self.x + 1,
                 y: self.y,
                 map: self.map,
                 direction: self.direction,
             },
             7 => Self {
-                x: self.x+1,
-                y: self.y+1,
+                x: self.x + 1,
+                y: self.y + 1,
                 map: self.map,
                 direction: self.direction,
             },

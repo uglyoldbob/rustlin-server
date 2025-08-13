@@ -188,7 +188,7 @@ impl MonsterRef {
             let direction = rand::thread_rng().gen_range(0..=7u8);
             let myloc = self.world.get_location(self.reference).await;
             if let Some(l) = myloc {
-                let (x,y) = (l.x, l.y);
+                let (x, y) = (l.x, l.y);
                 let (x2, y2) = match direction {
                     0 => (x, y - 1),
                     1 => (x + 1, y - 1),

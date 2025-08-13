@@ -233,7 +233,10 @@ impl Client {
                     let m = self
                         .world
                         .with_player_ref_do(r, &mut self.packet_writer, async move |fc, pw, _| {
-                            Some(ServerPacket::WhisperChat { name: fc.name.clone(), msg: msg.clone()})
+                            Some(ServerPacket::WhisperChat {
+                                name: fc.name.clone(),
+                                msg: msg.clone(),
+                            })
                         })
                         .await;
                     if let Some(m) = m {
@@ -372,6 +375,23 @@ impl Client {
     ) -> Result<(), ClientError> {
         let c = p.convert();
         match c {
+            ClientPacket::AttackObject { id, x, y } => {
+                if let Some(r) = self.char_ref {
+                    self.packet_writer
+                        .send_packet(
+                            ServerPacket::Attack {
+                                u1: 0,
+                                id: r.world_id().get_u32(),
+                                id2: id,
+                                u2: 0,
+                                direction: 5,
+                                effect: None,
+                            }
+                            .build(),
+                        )
+                        .await?;
+                }
+            }
             ClientPacket::UseItem { id, remainder } => {
                 log::info!("User wants to use item {}: {:X?}", id, remainder);
                 let p = common::packet::Packet::raw_packet(remainder);

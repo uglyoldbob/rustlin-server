@@ -81,6 +81,15 @@ pub enum ClientPacket {
         /// The rest of the packet
         remainder: Vec<u8>,
     },
+    /// The player is attacking an object
+    AttackObject {
+        /// The id of the object to attack
+        id: u32,
+        /// x coordinate of object
+        x: u16,
+        /// y coordinate of object
+        y: u16,
+    },
     Unknown(Vec<u8>),
 }
 
@@ -396,6 +405,44 @@ pub enum ServerPacket {
         /// message strings
         msgs: Vec<String>,
     },
+    /// The attack packet
+    Attack {
+        ///unknown, value 3 starts a specific action
+        u1: u8,
+        /// id of attacked object?
+        id: u32,
+        /// other id of invovled object
+        id2: u32,
+        /// something with victim info damages
+        u2: u16,
+        /// direction?
+        direction: u8,
+        /// effect?
+        effect: Option<AttackEffect>,
+    },
+}
+
+/// The effect for an attack?
+#[derive(Clone, Debug)]
+pub struct AttackEffect {
+    /// The actual effect
+    id: u32,
+    /// TODO unknown
+    u1: u16,
+    /// TODO unknown
+    u2: u8,
+    /// coordinate 1 x
+    x1: u16,
+    /// coordinate 1 y
+    y1: u16,
+    /// coordinate 2 x
+    x2: u16,
+    /// coordinate 2 y
+    y2: u16,
+    /// TODO unknown
+    u7: u8,
+    /// description of unknown
+    desc: String,
 }
 
 /// Potential bless status for an item
@@ -417,6 +464,37 @@ impl ServerPacket {
     pub fn build(self) -> Packet {
         let mut p = Packet::new();
         match self {
+            ServerPacket::Attack {
+                u1,
+                id,
+                id2,
+                u2,
+                direction,
+                effect,
+            } => {
+                p.add_u8(22)
+                    .add_u8(u1)
+                    .add_u32(id)
+                    .add_u32(id2)
+                    .add_u16(u2)
+                    .add_u8(direction);
+                match effect {
+                    Some(e) => {
+                        p.add_u32(e.id)
+                            .add_u16(e.u1)
+                            .add_u8(e.u2)
+                            .add_u16(e.x1)
+                            .add_u16(e.y1)
+                            .add_u16(e.x2)
+                            .add_u16(e.y2)
+                            .add_u8(e.u7)
+                            .add_string(&e.desc);
+                    }
+                    None => {
+                        p.add_u32(0);
+                    }
+                }
+            }
             ServerPacket::Message { ty, msgs } => {
                 p.add_u8(87).add_u16(ty).add_u8(msgs.len() as u8);
                 for m in msgs {
@@ -837,6 +915,7 @@ impl Packet {
                 ClientPacket::GlobalChat(self.pull_string())
             }
             43 => ClientPacket::NewsDone,
+            45 => ClientPacket::AttackObject { id: self.pull_u32(), x: self.pull_u16(), y: self.pull_u16(), },
             47 => ClientPacket::Restart,
             57 => ClientPacket::KeepAlive,
             71 => {

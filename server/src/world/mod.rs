@@ -99,6 +99,11 @@ impl ObjectRef {
     pub fn map(&self) -> u16 {
         self.map
     }
+
+    /// get the world id
+    pub fn world_id(&self) -> WorldObjectId {
+        self.id
+    }
 }
 
 /// Represents the dynamic information of a map
@@ -124,7 +129,7 @@ impl MapInfo {
     /// Get a location of an object reference
     pub async fn get_location(&self, r: ObjectRef) -> Option<Location> {
         if let Some(o) = self.objects.get(&r.id) {
-            return Some(o.get_location())
+            return Some(o.get_location());
         }
         None
     }

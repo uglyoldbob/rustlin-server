@@ -174,9 +174,7 @@ impl super::object::ObjectTrait for Npc {
         None
     }
 
-    fn sender(
-        &mut self,
-    ) -> Option<&mut tokio::sync::mpsc::Sender<common::packet::ServerPacket>> {
+    fn sender(&mut self) -> Option<&mut tokio::sync::mpsc::Sender<common::packet::ServerPacket>> {
         None
     }
 
