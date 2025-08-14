@@ -231,6 +231,26 @@ impl mysql_async::prelude::FromRow for Map {
     }
 }
 
+pub struct WorldIdGenerator {
+    next: WorldObjectId,
+}
+
+impl WorldIdGenerator {
+    /// Build a new generator
+    pub fn new(start: u32) -> Self {
+        Self {
+            next: WorldObjectId(start),
+        }
+    }
+
+    /// Get a new object id
+    pub fn new_id(&mut self) -> WorldObjectId {
+        let r = self.next;
+        self.next.0 += 1;
+        r
+    }
+}
+
 /// Represents the world for a server
 pub struct World {
     /// The users logged into the world
@@ -252,7 +272,7 @@ pub struct World {
     /// The monster spawn table
     monster_spawn_table: Vec<monster::MonsterSpawn>,
     /// The object for generating object ids
-    next_object_id: Arc<Mutex<WorldObjectId>>,
+    id_generator: Arc<Mutex<WorldIdGenerator>>,
     /// Monster tasks
     monster_set: Option<Arc<Mutex<tokio::task::JoinSet<()>>>>,
     /// The sender for special messages to the server
@@ -286,7 +306,8 @@ impl World {
             .await
             .map_err(|e| format!("{:?}", e))?;
         let (mapd, mapi) = Self::load_maps_data(&mut conn).await?;
-        let items = Self::load_item_data(&mut conn).await?;
+        let id_generator = Arc::new(Mutex::new(WorldIdGenerator::new(1)));
+        let items = Self::load_item_data(&mut conn, &id_generator).await?;
         let npc = npc::NpcDefinition::load_table(&mut conn).await?;
         let w = Self {
             users: Arc::new(Mutex::new(HashMap::new())),
@@ -298,21 +319,30 @@ impl World {
             npc_table: npc,
             npc_spawn_table,
             monster_spawn_table,
-            next_object_id: Arc::new(Mutex::new(WorldObjectId(1))),
+            id_generator,
             monster_set: Some(Arc::new(Mutex::new(tokio::task::JoinSet::new()))),
             server_s,
         };
-        for s in &w.npc_spawn_table {
-            let new_id = w.new_object_id();
-            let npc = s.make_npc(new_id, &w.npc_table);
-            let o: object::Object = npc.into();
-            let mapid = o.get_location().map;
-            let mut mi = w.map_info.lock().await;
-            if let Some(map) = mi.get_mut(&mapid) {
-                map.add_new_object(o).await;
+        {
+            let mut idgen = w.id_generator.lock().unwrap();
+            for s in &w.npc_spawn_table {
+                let new_id = idgen.new_id();
+                let npc = s.make_npc(new_id, &w.npc_table);
+                let o: object::Object = npc.into();
+                let mapid = o.get_location().map;
+                let mut mi = w.map_info.lock().await;
+                if let Some(map) = mi.get_mut(&mapid) {
+                    map.add_new_object(o).await;
+                }
             }
         }
         Ok(w)
+    }
+
+    /// Get a new object id
+    pub fn new_object_id(&self) -> WorldObjectId {
+        let mut idgen = self.id_generator.lock().unwrap();
+        idgen.new_id()
     }
 
     /// Get a location of an object reference
@@ -361,8 +391,9 @@ impl World {
     pub async fn spawn_monsters(self: &Arc<Self>) {
         if let Some(mset) = &self.monster_set {
             let mut monsters = Vec::new();
+            let mut idgen = self.id_generator.lock().unwrap();
             for ms in &self.monster_spawn_table {
-                let m = ms.make_monster(self.new_object_id(), &self.npc_table);
+                let m = ms.make_monster(idgen.new_id(), &self.npc_table);
                 monsters.push(m);
             }
             {
@@ -396,14 +427,6 @@ impl World {
             map.move_object(r, new_loc, pw).await?;
         }
         Ok(())
-    }
-
-    /// Get a new object id for an object that will live in the world somewhere
-    pub fn new_object_id(&self) -> WorldObjectId {
-        let mut w = self.next_object_id.lock().unwrap();
-        let r = *w;
-        w.0 += 1;
-        r
     }
 
     /// Send a new object packet with the given packet writer and object id
@@ -634,6 +657,7 @@ impl World {
     pub async fn load_weapons(
         mysql: &mut mysql_async::Conn,
         item_table: &mut HashMap<u32, item::Item>,
+        next_object_id: &Arc<Mutex<WorldIdGenerator>>,
     ) -> Result<(), String> {
         use mysql_async::prelude::Queryable;
         let query = "SELECT * from weapon";
@@ -642,7 +666,9 @@ impl World {
             .exec_map(s, (), |a: item::Weapon| a)
             .await
             .map_err(|e| e.to_string())?;
+        let mut idgen = next_object_id.lock().unwrap();
         for w in weapons {
+            let w = w.get_instance(idgen.new_id());
             item_table.insert(w.db_id(), w.into());
         }
         Ok(())
@@ -652,6 +678,7 @@ impl World {
     pub async fn load_etc_items(
         mysql: &mut mysql_async::Conn,
         item_table: &mut HashMap<u32, item::Item>,
+        next_object_id: &Arc<Mutex<WorldIdGenerator>>,
     ) -> Result<(), String> {
         use mysql_async::prelude::Queryable;
         let query = "SELECT * from etcitem";
@@ -660,7 +687,9 @@ impl World {
             .exec_map(s, (), |a: item::EtcItem| a)
             .await
             .map_err(|e| e.to_string())?;
+        let mut idgen = next_object_id.lock().unwrap();
         for w in items {
+            let w = w.get_instance(idgen.new_id());
             item_table.insert(w.db_id(), w.into());
         }
         Ok(())
@@ -670,6 +699,7 @@ impl World {
     pub async fn load_armor(
         mysql: &mut mysql_async::Conn,
         item_table: &mut HashMap<u32, item::Item>,
+        next_object_id: &Arc<Mutex<WorldIdGenerator>>,
     ) -> Result<(), String> {
         use mysql_async::prelude::Queryable;
         let query = "SELECT * from armor";
@@ -678,7 +708,9 @@ impl World {
             .exec_map(s, (), |a: item::Armor| a)
             .await
             .map_err(|e| e.to_string())?;
+        let mut idgen = next_object_id.lock().unwrap();
         for w in items {
+            let w = w.get_instance(idgen.new_id());
             item_table.insert(w.db_id(), w.into());
         }
         Ok(())
@@ -687,14 +719,15 @@ impl World {
     /// (Re)load all item data from database
     pub async fn load_item_data(
         mysql: &mut mysql_async::Conn,
+        next_object_id: &Arc<Mutex<WorldIdGenerator>>,
     ) -> Result<HashMap<u32, item::Item>, String> {
         let mut item_table = HashMap::new();
         log::info!("There are {} items", item_table.len());
-        Self::load_weapons(mysql, &mut item_table).await?;
+        Self::load_weapons(mysql, &mut item_table, next_object_id).await?;
         log::info!("There are {} items", item_table.len());
-        Self::load_etc_items(mysql, &mut item_table).await?;
+        Self::load_etc_items(mysql, &mut item_table, next_object_id).await?;
         log::info!("There are {} items", item_table.len());
-        Self::load_armor(mysql, &mut item_table).await?;
+        Self::load_armor(mysql, &mut item_table, next_object_id).await?;
         log::info!("There are {} items", item_table.len());
         Ok(item_table)
     }

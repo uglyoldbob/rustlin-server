@@ -45,7 +45,6 @@ enum ShutdownMode {
 async fn smain() -> Result<(), String> {
     simple_logger::init_with_level(log::Level::Info).unwrap();
 
-    common::do_stuff();
     log::info!("server: Game server is starting");
 
     let settings = load_config().unwrap();

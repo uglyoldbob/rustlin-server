@@ -1,66 +1,104 @@
+//! This contains code for packet handling
+
 use tokio::io::AsyncReadExt;
 use tokio::io::AsyncWriteExt;
 
 use std::convert::TryInto;
 use std::vec::Vec;
 
+/// The types of errors that can occur sending or receiving packets
 #[derive(Debug)]
 pub enum PacketError {
-    IoError,
+    /// An io error occurred
+    IoError(std::io::Error),
 }
 
 impl From<std::io::Error> for PacketError {
-    fn from(_: std::io::Error) -> PacketError {
-        PacketError::IoError
+    fn from(a: std::io::Error) -> PacketError {
+        PacketError::IoError(a)
     }
 }
 
 /// The 'ClientPacket' type. Represents packets sent by the client
 #[derive(Debug)]
 pub enum ClientPacket {
+    /// The client specifies the version of itself
     Version(u16, u32, u8, u32),
+    /// The client attempts to log in with an account
     Login(String, String, u32, u32, u32, u32, u32, u32, u32),
+    /// The logged in user selects a character
     CharacterSelect {
+        /// The character name to use
         name: String,
     },
     /// The player is done "reading" the news
     NewsDone,
+    /// Like a ping packet, to keep the connection alive
     KeepAlive,
+    /// game initialization is done
     GameInitDone,
+    /// A window has been activated
     WindowActivate(u8),
+    /// Save
     Save,
+    /// Move an object to a new location
     MoveFrom {
+        /// map x coordinate
         x: u16,
+        /// map y coordinate
         y: u16,
+        /// direction to go
         heading: u8,
     },
+    /// Change direction to the specified direction
     ChangeDirection(u8),
+    /// a plain chat message
     Chat(String),
+    /// A YELLING MESSAGE FROM THE USER
     YellChat(String),
+    /// A party level chat message
     PartyChat(String),
+    /// A pledge level chat message
     PledgeChat(String),
+    /// A whisper message to another player
     WhisperChat(String, String),
+    /// A global level chat message
     GlobalChat(String),
     /// chat messages starting with - in the client
     CommandChat(String),
     /// chat message starting with . in the client
     SpecialCommandChat(String),
+    /// The user wants to change their password
     ChangePassword {
+        /// The account to modify
         account: String,
+        /// The old password
         oldpass: String,
+        /// The new password
         newpass: String,
     },
+    /// The user wants to create a new character
     NewCharacter {
+        /// Character name
         name: String,
+        /// Class of character
         class: u8,
+        /// gender
         gender: u8,
+        /// strength
         strength: u8,
+        /// dexterity
         dexterity: u8,
+        /// constitution
         constitution: u8,
+        /// wisdom
         wisdom: u8,
+        /// charisma
         charisma: u8,
+        /// intelligence
         intelligence: u8,
     },
+    /// Delete the specified character
     DeleteCharacter(String),
     /// The user wants to create a bookmark
     CreateBookmark(String),
@@ -90,9 +128,11 @@ pub enum ClientPacket {
         /// y coordinate of object
         y: u16,
     },
+    /// An unknown packet type with the raw packet data
     Unknown(Vec<u8>),
 }
 
+/// An item of inventory for a player
 #[derive(Clone, Debug)]
 pub struct InventoryElement {
     /// Item id
@@ -180,6 +220,7 @@ pub struct InventoryElement {
 }
 
 impl InventoryElement {
+    /// Adds an inventory element to a packet
     fn add(&self, p: &mut Packet) {
         p.add_u32(self.id)
             .add_i8(self.i_type)
@@ -214,101 +255,188 @@ pub struct InventoryUpdate {
 /// Represents packets sent to the client, from the server
 #[derive(Clone, Debug)]
 pub enum ServerPacket {
+    /// The version details of the server
     ServerVersion {
+        /// The server id
         id: u8,
+        /// The server version
         version: u32,
+        /// The server time?
         time: u32,
+        /// Can new accounts be created?
         new_accounts: u8,
+        /// Language?
         english: u8,
+        /// Country?
         country: u8,
     },
+    /// The player is being disconnected
     Disconnect,
+    /// The result of a login attempt
     LoginResult {
+        /// The actual result
         code: u8,
     },
+    /// The news to present to the user
     News(String),
+    /// The status of creating a new character
     CharacterCreationStatus(u8),
+    /// The details of a new chracter just created
     NewCharacterDetails {
+        /// character name
         name: String,
+        /// pledge name
         pledge: String,
+        /// class
         class: u8,
+        /// gender
         gender: u8,
+        /// the lawful (positive) / chaotic (negative) alignment
         alignment: i16,
+        /// max hp
         hp: u16,
+        /// max mp
         mp: u16,
+        /// armor class
         ac: i8,
+        /// level
         level: u8,
+        /// strength
         strength: u8,
+        /// dexterity
         dexterity: u8,
+        /// constitution
         constitution: u8,
+        /// wisdom
         wisdom: u8,
+        /// charisma
         charisma: u8,
+        /// intelligence
         intelligence: u8,
     },
+    /// Indicates a character was deleted successfully
     DeleteCharacterOk,
+    /// Indicates a character is in delete waiting status
     DeleteCharacterWait,
+    /// Number of characters the player has and the maximum number they can have
     NumberCharacters(u8, u8),
+    /// The details for a character the player has
     LoginCharacterDetails {
+        /// character name
         name: String,
+        /// name of pledge
         pledge: String,
         /// The character type
         ctype: u8,
+        /// gender
         gender: u8,
+        /// the lawful (positive) / chaotic (negative) alignment
         alignment: i16,
+        /// max hp
         hp: u16,
+        /// max mp
         mp: u16,
+        /// armor class
         ac: i8,
+        /// level
         level: u8,
+        /// strength
         strength: u8,
+        /// dexterity
         dexterity: u8,
+        /// constitution
         constitution: u8,
+        /// wisdom
         wisdom: u8,
+        /// charisma
         charisma: u8,
+        /// intelligence
         intelligence: u8,
     },
+    /// indicator for client to start game
     StartGame(u32),
+    /// The details for the player's own object in the game
     CharacterDetails {
+        /// character id
         id: u32,
+        /// character leve
         level: u8,
+        /// total experience
         xp: u32,
+        /// strength
         strength: u8,
+        /// dexterity
         dexterity: u8,
+        /// constitution
         constitution: u8,
+        /// wisdom
         wisdom: u8,
+        /// charisma
         charisma: u8,
+        /// intelligence
         intelligence: u8,
+        /// current hit points
         curr_hp: u16,
+        /// max hit points
         max_hp: u16,
+        /// current mana points
         curr_mp: u16,
+        /// max mana points
         max_mp: u16,
+        /// armor class
         ac: i8,
+        /// time?
         time: u32,
+        /// food value for player
         food: f32,
+        /// amount of weight the character is carrying
         weight: f32,
+        /// the lawful (positive) / chaotic (negative) alignment
         alignment: i16,
+        /// fire resistance percentage
         fire_resist: u8,
+        /// water resistance percentage
         water_resist: u8,
+        /// wid resistance percentage
         wind_resist: u8,
+        /// earth resistance percentage
         earth_resist: u8,
     },
+    /// Indicates what map the player is on and whether or not the map is underwater
     MapId(u16, u8),
     /// put a new object on the user map
     PutObject {
+        /// map x coordinate
         x: u16,
+        /// map y coordinate
         y: u16,
+        /// object id
         id: u32,
+        /// graphic icon id for the object
         icon: u16,
+        /// the object status
         status: u8,
+        /// the direction the object is facing
         direction: u8,
+        /// the radius of light the object emits
         light: u8,
+        /// the speed of the object
         speed: u8,
+        /// the experience of the object
         xp: u32,
+        /// the lawful (positive) / chaotic (negative) alignment
         alignment: i16,
+        /// object name
         name: String,
+        /// object title
         title: String,
+        /// another status?
         status2: u8,
+        /// the id of the pledge it belongs to
         pledgeid: u32,
+        /// the name of the pledge it belongs to
         pledgename: String,
+        /// the owner name (if applicable)
         owner_name: String,
         /// Upper 4 bits is pledge rank, lower 4 bits is altitude
         v1: u8,
@@ -316,41 +444,63 @@ pub enum ServerPacket {
         hp_bar: u8,
         /// 8 = drunken, not 8 = speed becomes 2
         v2: u8,
+        /// level of object
         level: u8,
     },
     /// Move an object
     MoveObject {
+        /// object id
         id: u32,
+        /// map x coordinate
         x: u16,
+        /// map y coordinate
         y: u16,
+        /// direction for the object
         direction: u8,
     },
+    /// indiates spell power and magic resistance for the player
     CharSpMrBonus {
+        /// spell power
         sp: u8,
+        /// magic resistance
         mr: u8,
     },
+    /// weather update
     Weather(u8),
+    /// A system message for the player
     SystemMessage(String),
+    /// an npc shout message
     NpcShout(String),
+    /// regular chat
     RegularChat {
+        /// object id?
         id: u32,
         ///msg = "player name: message"
         msg: String,
     },
+    /// yell level chat
     YellChat {
+        /// object id?
         id: u32,
+        /// the message
         msg: String,
+        /// where the yell came from map x coordinate
         x: u16,
+        /// where the yell came from map y coordinate
         y: u16,
     },
+    /// a whisper from another player
     WhisperChat {
+        /// the player that did the whispering
         name: String,
         ///msg = "<player name> message"
         msg: String,
     },
+    /// A global level chat
     GlobalChat(String),
-    ///msg = "[player name] message"
+    ///pledge level chat, msg = "[player name] message"
     PledgeChat(String),
+    /// party level chat
     PartyChat(String),
     /// Adds a bunch of inventory items
     InventoryVec(Vec<InventoryElement>),
@@ -427,10 +577,10 @@ pub enum ServerPacket {
 pub struct AttackEffect {
     /// The actual effect
     id: u32,
-    /// TODO unknown
-    u1: u16,
-    /// TODO unknown
-    u2: u8,
+    /// sprite number
+    sprite: u16,
+    /// light size
+    light: u8,
     /// coordinate 1 x
     x1: u16,
     /// coordinate 1 y
@@ -440,7 +590,7 @@ pub struct AttackEffect {
     /// coordinate 2 y
     y2: u16,
     /// TODO unknown
-    u7: u8,
+    leave: u8,
     /// description of unknown
     desc: String,
 }
@@ -481,13 +631,13 @@ impl ServerPacket {
                 match effect {
                     Some(e) => {
                         p.add_u32(e.id)
-                            .add_u16(e.u1)
-                            .add_u8(e.u2)
+                            .add_u16(e.sprite)
+                            .add_u8(e.light)
                             .add_u16(e.x1)
                             .add_u16(e.y1)
                             .add_u16(e.x2)
                             .add_u16(e.y2)
-                            .add_u8(e.u7)
+                            .add_u8(e.leave)
                             .add_string(&e.desc);
                     }
                     None => {
@@ -857,19 +1007,25 @@ pub fn key_init(k: u32) -> u64 {
 /// A packet of data that can be sent or received over a network connection
 #[derive(Clone, Debug)]
 pub struct Packet {
+    /// The contents of the packet
     data: Vec<u8>,
+    /// The amount of data already read from the packet
     read: usize,
 }
 
 /// Used for converting u8 to i8 and vice versa
 union U8Converter {
+    /// unsigned
     u: u8,
+    /// signed
     i: i8,
 }
 
 /// Used for converting u16 to i16 and vice versa
 union U16Converter {
+    /// The unsigned 16 bit word
     u: u16,
+    /// The signed 16 bit word
     i: i16,
 }
 
@@ -1247,6 +1403,7 @@ pub struct ServerPacketSender {
 }
 
 impl ServerPacketSender {
+    /// Construct a new packet sender
     pub fn new(w: tokio::net::tcp::OwnedWriteHalf) -> ServerPacketSender {
         ServerPacketSender {
             writer: w,
