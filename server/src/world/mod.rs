@@ -8,6 +8,7 @@ use std::{
 };
 
 pub mod item;
+pub mod map_info;
 pub mod monster;
 pub mod npc;
 pub mod object;
@@ -106,102 +107,6 @@ impl ObjectRef {
     }
 }
 
-/// Represents the dynamic information of a map
-#[derive(Debug)]
-pub struct MapInfo {
-    /// The objects on the map
-    objects: HashMap<WorldObjectId, object::Object>,
-}
-
-impl MapInfo {
-    /// Construct a new map info object
-    pub fn new() -> Self {
-        Self {
-            objects: HashMap::new(),
-        }
-    }
-
-    /// Add an object to the map
-    pub async fn add_new_object(&mut self, new_o: object::Object) {
-        self.objects.insert(new_o.id(), new_o);
-    }
-
-    /// Get a location of an object reference
-    pub async fn get_location(&self, r: ObjectRef) -> Option<Location> {
-        if let Some(o) = self.objects.get(&r.id) {
-            return Some(o.get_location());
-        }
-        None
-    }
-
-    /// Move an object on the map
-    pub async fn move_object(
-        &mut self,
-        r: ObjectRef,
-        new_loc: Location,
-        mut pw: Option<&mut ServerPacketSender>,
-    ) -> Result<(), ClientError> {
-        let mut object_list = ObjectList::new();
-        if let Some(myobj) = self.objects.get_mut(&r.id) {
-            myobj.set_location(new_loc);
-        }
-        for (id, o) in &mut self.objects {
-            if *id != r.id && o.linear_distance(&new_loc) < 17.0 {
-                object_list.add_object(*id);
-            }
-        }
-        {
-            let mut old_objects = Vec::new();
-            let mut new_objects = Vec::new();
-            if let Some(myobj) = self.objects.get_mut(&r.id) {
-                if let Some(ol) = myobj.get_known_objects() {
-                    ol.find_changes(&mut old_objects, &mut new_objects, &object_list);
-                }
-            }
-            let monster_move_packet = self.objects.get(&r.id).unwrap().build_move_object_packet();
-            for o in object_list.get_objects() {
-                if let Some(o) = self.objects.get_mut(o) {
-                    if let Some(s) = o.sender() {
-                        let _ = s.send(monster_move_packet.clone()).await;
-                    }
-                }
-            }
-            for objid in old_objects {
-                if let Some(pw) = &mut pw {
-                    pw.send_packet(ServerPacket::RemoveObject(objid.get_u32()).build())
-                        .await?;
-                }
-                if let Some(obj) = self.objects.get_mut(&r.id) {
-                    if let Some(pw) = &mut pw {
-                        pw.send_packet(ServerPacket::RemoveObject(objid.get_u32()).build())
-                            .await?;
-                    }
-                    obj.remove_object(objid).await;
-                }
-            }
-            for objid in new_objects {
-                if let Some(pw) = &mut pw {
-                    if let Some(obj) = self.objects.get_mut(&objid) {
-                        pw.send_packet(obj.build_put_object_packet()).await?;
-                    }
-                }
-                if let Some(obj) = self.objects.get_mut(&r.id) {
-                    obj.add_object(objid).await;
-                }
-            }
-        }
-        Ok(())
-    }
-
-    /// Remove an object from the map
-    pub async fn remove_object(&mut self, id: WorldObjectId) {
-        self.objects.remove(&id);
-        for o in &mut self.objects {
-            o.1.remove_object(id).await;
-        }
-    }
-}
-
 impl mysql_async::prelude::FromRow for Map {
     fn from_row_opt(row: mysql_async::Row) -> Result<Self, mysql_async::FromRowError>
     where
@@ -262,7 +167,7 @@ pub struct World {
     /// maps of the world
     maps: HashMap<u16, Map>,
     /// dynamic information for all maps
-    map_info: Arc<tokio::sync::Mutex<HashMap<u16, MapInfo>>>,
+    map_info: Arc<tokio::sync::Mutex<HashMap<u16, map_info::MapInfo>>>,
     /// The item lookup table
     pub item_table: Arc<Mutex<HashMap<u32, item::Item>>>,
     /// The npc lookup table
@@ -360,8 +265,8 @@ impl World {
         let mut mi = self.map_info.lock().await;
         let map = mi.get_mut(&r.map);
         if let Some(map) = map {
-            if let Some(obj) = map.objects.get(&r.id) {
-                if obj.can_shutdown() {
+            if let Some(obj) = map.get_object_from_id(r.id) {
+                if obj.lock().await.can_shutdown() {
                     let _ = self
                         .server_s
                         .send(crate::server_message::ServerShutdownMessage::Shutdown)
@@ -376,8 +281,8 @@ impl World {
         let mut mi = self.map_info.lock().await;
         let map = mi.get_mut(&r.map);
         if let Some(map) = map {
-            if let Some(obj) = map.objects.get(&r.id) {
-                if obj.can_shutdown() {
+            if let Some(obj) = map.get_object_from_id(r.id) {
+                if obj.lock().await.can_shutdown() {
                     let _ = self
                         .server_s
                         .send(crate::server_message::ServerShutdownMessage::Restart)
@@ -385,6 +290,16 @@ impl World {
                 }
             }
         }
+    }
+
+    /// Get an object from the world
+    pub async fn get_object(&self, r: ObjectRef) -> Option<Arc<tokio::sync::Mutex<object::Object>>> {
+        let mut mi = self.map_info.lock().await;
+        let map = mi.get_mut(&r.map);
+        if let Some(map) = map {
+            return map.get_object(r);
+        }
+        None
     }
 
     /// Spawn all monsters
@@ -439,8 +354,8 @@ impl World {
         let mut mi = self.map_info.lock().await;
         let map = mi.get_mut(&location.map);
         if let Some(map) = map {
-            if let Some(obj) = map.objects.get(&id) {
-                let p = obj.build_put_object_packet();
+            if let Some(obj) = map.get_object_from_id(id) {
+                let p = obj.lock().await.build_put_object_packet();
                 pw.send_packet(p).await?;
             }
         }
@@ -489,12 +404,16 @@ impl World {
     where
         F: AsyncFn(&crate::character::FullCharacter, &mut T, &Map) -> Option<E>,
     {
-        let mi = self.map_info.lock().await;
-        let map = mi.get(&refo.map);
+        let mut mi = self.map_info.lock().await;
+        let map = mi.get_mut(&refo.map);
         if let Some(map) = map {
-            if let Some(object::Object::Player(fc)) = map.objects.get(&refo.id) {
-                let themap = self.maps.get(&refo.map).unwrap().clone();
-                return f(fc, gen, &themap).await;
+            if let Some(obj) = map.get_object(refo) {
+                let obj2 = obj.lock().await;
+                let obj2: &object::Object = &obj2;
+                if let object::Object::Player(fc) = obj2 {
+                    let themap = self.maps.get(&refo.map).unwrap().clone();
+                    return f(fc, gen, &themap).await;
+                }
             }
         }
         None
@@ -508,9 +427,13 @@ impl World {
         let mut mi = self.map_info.lock().await;
         let map = mi.get_mut(&refo.map);
         if let Some(map) = map {
-            if let Some(object::Object::Player(fc)) = map.objects.get_mut(&refo.id) {
-                let themap = self.maps.get(&refo.map).unwrap().clone();
-                return f(fc, gen, &themap).await;
+            if let Some(obj) = map.get_object(refo) {
+                let mut obj2 = obj.lock().await;
+                let obj2: &mut object::Object = &mut obj2;
+                if let object::Object::Player(fc) = obj2 {
+                    let themap = self.maps.get(&refo.map).unwrap().clone();
+                    return f(fc, gen, &themap).await;
+                }
             }
         }
         None
@@ -520,7 +443,6 @@ impl World {
     pub async fn with_objects_on_screen_do<F, T, E>(
         &self,
         refo: &ObjectRef,
-        distance: f32,
         gen: &mut T,
         f: F,
     ) -> Result<(), E>
@@ -530,38 +452,19 @@ impl World {
         let mut mi = self.map_info.lock().await;
         let map = mi.get_mut(&refo.map);
         if let Some(map) = map {
-            let my_location = map.objects.get(&refo.id).unwrap().get_location();
+            let me = map.get_object(*refo).unwrap();
+            let mylocation = {
+                let m2 = me.lock().await;
+                m2.get_location()
+            };
             let themap = self.maps.get(&refo.map).unwrap().clone();
-            for obj in map.objects.values() {
-                let d = obj.manhattan_distance(&my_location);
-                // TODO a better algorithm for on screen calculation
-                if d < 17 && refo.id != obj.id() {
-                    f(obj, gen, &themap).await?;
-                }
-            }
-        }
-        Ok(())
-    }
-
-    /// Run an asynchronous closure on objects close enough to the specified player ref
-    pub async fn with_objects_near_me_do<F, T, E>(
-        &self,
-        refo: &ObjectRef,
-        distance: f32,
-        gen: &mut T,
-        f: F,
-    ) -> Result<(), E>
-    where
-        F: AsyncFn(&object::Object, &mut T, &Map) -> Result<(), E>,
-    {
-        let mut mi = self.map_info.lock().await;
-        let map = mi.get_mut(&refo.map);
-        if let Some(map) = map {
-            let my_location = map.objects.get(&refo.id).unwrap().get_location();
-            let themap = self.maps.get(&refo.map).unwrap().clone();
-            for obj in map.objects.values() {
-                if obj.linear_distance(&my_location) < distance && refo.id != obj.id() {
-                    f(obj, gen, &themap).await?;
+            for (id, obj) in map.objects_iter() {
+                if *id != refo.id {
+                    let obj = obj.lock().await;
+                    // TODO a better algorithm for on screen calculation
+                    if obj.manhattan_distance(&mylocation) < 17 {
+                        f(&obj, gen, &themap).await?;
+                    }
                 }
             }
         }
@@ -576,10 +479,11 @@ impl World {
     ) -> Result<(), String> {
         let mut mi = self.map_info.lock().await;
         for map in mi.values_mut() {
-            for obj in &mut map.objects {
-                if let Some(name) = obj.1.player_name() {
+            for obj in map.objects_iter() {
+                let mut o = obj.1.lock().await;
+                if let Some(name) = o.player_name() {
                     if name == other_person {
-                        if let Some(sender) = obj.1.sender() {
+                        if let Some(sender) = o.sender() {
                             let _ = sender.send(m).await;
                             return Ok(());
                         }
@@ -594,8 +498,9 @@ impl World {
     pub async fn send_global_chat(&self, m: common::packet::ServerPacket) {
         let mut mi = self.map_info.lock().await;
         for map in mi.values_mut() {
-            for obj in &mut map.objects {
-                if let Some(sender) = obj.1.sender() {
+            for obj in map.objects_iter() {
+                let mut o = obj.1.lock().await;
+                if let Some(sender) = o.sender() {
                     let _ = sender.send(m.clone()).await;
                 }
             }
@@ -617,12 +522,46 @@ impl World {
         let mut mi = self.map_info.lock().await;
         let map = mi.get_mut(&refo.map);
         if let Some(map) = map {
-            let my_location = map.objects.get(&refo.id).unwrap().get_location();
-            for obj in map.objects.values_mut() {
-                if obj.linear_distance(&my_location) < distance
-                    && (include_self || refo.id != obj.id())
-                {
-                    f(obj, gen).await?;
+            let my_location = map.get_location(*refo).await.unwrap();
+            for (k, obj) in map.objects_iter() {
+                if include_self || *k != refo.id {
+                    let mut obj = obj.lock().await;
+                    if obj.linear_distance(&my_location) < distance
+                    {
+                        f(&mut obj, gen).await?;
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Run an asynchronous closure on objects close enough to the specified player ref
+    pub async fn with_objects_near_me_do<F, T, E>(
+        &self,
+        refo: &ObjectRef,
+        distance: f32,
+        gen: &mut T,
+        f: F,
+    ) -> Result<(), E>
+    where
+        F: AsyncFn(&object::Object, &mut T, &Map) -> Result<(), E>,
+    {
+        let mut mi = self.map_info.lock().await;
+        let map = mi.get_mut(&refo.map);
+        if let Some(map) = map {
+            let me = map.get_object(*refo).unwrap();
+            let mylocation = {
+                let m2 = me.lock().await;
+                m2.get_location()
+            };
+            let themap = self.maps.get(&refo.map).unwrap().clone();
+            for (id, obj) in map.objects_iter() {
+                if *id != refo.id {
+                    let obj = obj.lock().await;
+                    if obj.linear_distance(&mylocation) < distance {
+                        f(&obj, gen, &themap).await?;
+                    }
                 }
             }
         }
@@ -643,10 +582,17 @@ impl World {
         let mi = self.map_info.lock().await;
         let map = mi.get(&refo.map);
         if let Some(map) = map {
-            let mylocation = map.objects.get(&refo.id).map(|o| o.get_location()).unwrap();
-            for obj in map.objects.values() {
-                if obj.linear_distance(&mylocation) < distance && refo.id != obj.id() {
-                    f(obj, gen).await?;
+            let me = map.get_object(refo).unwrap();
+            let mylocation = {
+                let m2 = me.lock().await;
+                m2.get_location()
+            };
+            for (id, obj) in map.objects_iter() {
+                if *id != refo.id {
+                    let obj = obj.lock().await;
+                    if obj.linear_distance(&mylocation) < distance {
+                        f(&obj, gen).await?;
+                    }
                 }
             }
         }
@@ -735,7 +681,7 @@ impl World {
     /// (Re)load all maps from the database
     pub async fn load_maps_data(
         mysql: &mut mysql_async::Conn,
-    ) -> Result<(HashMap<u16, Map>, HashMap<u16, MapInfo>), String> {
+    ) -> Result<(HashMap<u16, Map>, HashMap<u16, map_info::MapInfo>), String> {
         let mut hmaps = HashMap::new();
         use mysql_async::prelude::Queryable;
         let query = "SELECT mapid, locationname, startX, endX, startY, endY, monster_amount, drop_rate, underwater, markable, teleportable, escapable, resurrection, painwand, penalty, take_pets, recall_pets, usable_item, usable_skill from mapids";
@@ -746,7 +692,7 @@ impl World {
             .map_err(|e| e.to_string())?;
         let mut hdata = HashMap::new();
         for m in maps {
-            hdata.entry(m.id).or_insert_with(MapInfo::new);
+            hdata.entry(m.id).or_insert_with(map_info::MapInfo::new);
             hmaps.insert(m.id, m);
         }
         Ok((hmaps, hdata))
