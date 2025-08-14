@@ -1071,7 +1071,11 @@ impl Packet {
                 ClientPacket::GlobalChat(self.pull_string())
             }
             43 => ClientPacket::NewsDone,
-            45 => ClientPacket::AttackObject { id: self.pull_u32(), x: self.pull_u16(), y: self.pull_u16(), },
+            45 => ClientPacket::AttackObject {
+                id: self.pull_u32(),
+                x: self.pull_u16(),
+                y: self.pull_u16(),
+            },
             47 => ClientPacket::Restart,
             57 => ClientPacket::KeepAlive,
             71 => {

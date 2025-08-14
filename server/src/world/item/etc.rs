@@ -170,7 +170,6 @@ pub struct EtcItemInstance {
     world_id: WorldObjectId,
 }
 
-
 impl ItemTrait for EtcItemInstance {
     fn world_id(&self) -> WorldObjectId {
         self.world_id
@@ -214,7 +213,9 @@ impl ItemTrait for EtcItemInstance {
         if stuff.count > 1 {
             description.push_str(&format!("({}) ", stuff.count));
         }
-        if self.definition.id == EtcItem::PET_COLLAR_ID || self.definition.id == EtcItem::HIGH_QUALITY_PET_COLLAR {
+        if self.definition.id == EtcItem::PET_COLLAR_ID
+            || self.definition.id == EtcItem::HIGH_QUALITY_PET_COLLAR
+        {
             description.push_str("[PET TODO]");
         }
 

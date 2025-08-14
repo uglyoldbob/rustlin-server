@@ -1,8 +1,7 @@
 //! Code for weapons
 
+use super::super::{ItemTrait, WorldObjectId};
 use super::{ElementalEnchantType, ItemStuff, ItemUsage};
-use super::super::{WorldObjectId, ItemTrait};
-
 
 /// A weapon definition
 #[derive(Clone, Debug)]

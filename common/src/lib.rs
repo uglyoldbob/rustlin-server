@@ -4,4 +4,3 @@
 //! This crate contains code common to both the server and client implementations
 
 pub mod packet;
-
