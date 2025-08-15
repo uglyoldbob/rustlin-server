@@ -1409,6 +1409,8 @@ pub struct ServerPacketSender {
     writer: tokio::net::tcp::OwnedWriteHalf,
     /// The encryption key to use for the next data to send out
     encryption_key: Option<u64>,
+    /// The packets pending being sent out
+    pending_packets: Vec<ServerPacket>,
 }
 
 impl ServerPacketSender {
@@ -1417,6 +1419,7 @@ impl ServerPacketSender {
         ServerPacketSender {
             writer: w,
             encryption_key: None,
+            pending_packets: Vec::new(),
         }
     }
 
@@ -1425,8 +1428,17 @@ impl ServerPacketSender {
         self.encryption_key = Some(d);
     }
 
-    /// Send a packet
-    pub async fn send_packet(&mut self, data: ServerPacket) -> Result<(), PacketError> {
+    /// Send all pending packets
+    pub async fn send_all_current_packets(&mut self) -> Result<(), PacketError> {
+        let v = self.pending_packets.clone();
+        self.pending_packets.clear();
+        for p in v {
+            self.send_packet(p).await?;
+        }
+        Ok(())
+    }
+
+    async fn send_packet(&mut self, data: ServerPacket) -> Result<(), PacketError> {
         log::info!("Sending packet {:?}", data);
         let mut data = data.build();
         self.writer.writable().await?;
@@ -1442,5 +1454,10 @@ impl ServerPacketSender {
         self.writer.write_u16_le(data.len() + 2).await?;
         self.writer.write_all(&data.buf()).await?;
         Ok(())
+    }
+
+    /// Send a packet
+    pub fn queue_packet(&mut self, data: ServerPacket) {
+        self.pending_packets.push(data);
     }
 }

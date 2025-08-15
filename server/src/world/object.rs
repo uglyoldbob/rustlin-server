@@ -55,8 +55,6 @@ impl ObjectList {
     }
 }
 
-use crate::world::item::Item;
-
 /// The generic object trait for the server
 #[enum_dispatch::enum_dispatch]
 pub trait ObjectTrait {
@@ -128,10 +126,10 @@ pub trait ObjectTrait {
     }
 
     /// Add an object to the list of known objects, if applicable
-    async fn add_object(&mut self, o: WorldObjectId) {}
+    fn add_object(&mut self, o: WorldObjectId) {}
 
     /// Remove an object from the list of known objects, if applicable
-    async fn remove_object(&mut self, o: WorldObjectId) {}
+    fn remove_object(&mut self, o: WorldObjectId) {}
 
     /// Return true if the object can initiate a server shutdown
     fn can_shutdown(&self) -> bool {

@@ -175,11 +175,11 @@ impl crate::world::object::ObjectTrait for FullCharacter {
         self.world_id
     }
 
-    async fn add_object(&mut self, o: WorldObjectId) {
+    fn add_object(&mut self, o: WorldObjectId) {
         self.known_objects.add_object(o);
     }
 
-    async fn remove_object(&mut self, o: crate::world::WorldObjectId) {
+    fn remove_object(&mut self, o: crate::world::WorldObjectId) {
         self.known_objects.remove_object(o);
     }
 
@@ -236,7 +236,7 @@ impl FullCharacter {
     }
 
     /// Use the specified item
-    pub async fn use_item(
+    pub fn use_item(
         &mut self,
         id: &u32,
         p2: &mut crate::server::client::ItemUseData,
@@ -343,7 +343,7 @@ impl FullCharacter {
     }
 
     /// Send all items the player has to the user
-    pub async fn send_all_items(
+    pub fn send_all_items(
         &self,
         packet_writer: &mut ServerPacketSender,
     ) -> Result<(), crate::server::ClientError> {
@@ -353,9 +353,7 @@ impl FullCharacter {
                 elements.push(i.inventory_element());
             }
         }
-        packet_writer
-            .send_packet(common::packet::ServerPacket::InventoryVec(elements))
-            .await?;
+        packet_writer.queue_packet(common::packet::ServerPacket::InventoryVec(elements));
         Ok(())
     }
 

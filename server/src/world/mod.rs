@@ -1,11 +1,8 @@
 //! Represents the world in the server
 
-use std::{
-    collections::HashMap,
-    future::AsyncDrop,
-    pin::Pin,
-    sync::{Arc, Mutex},
-};
+use std::{collections::HashMap, future::AsyncDrop, pin::Pin, sync::Arc};
+
+use parking_lot::FairMutex as Mutex;
 
 pub mod item;
 pub mod map_info;
@@ -191,7 +188,7 @@ impl Drop for World {
 impl AsyncDrop for World {
     async fn drop(mut self: Pin<&mut Self>) {
         if let Some(m) = self.monster_set.take() {
-            let mut m2 = m.lock().unwrap();
+            let mut m2 = m.lock();
             m2.abort_all();
         }
     }
@@ -229,7 +226,7 @@ impl World {
             server_s,
         };
         {
-            let mut idgen = w.id_generator.lock().unwrap();
+            let mut idgen = w.id_generator.lock();
             for s in &w.npc_spawn_table {
                 let new_id = idgen.new_id();
                 let npc = s.make_npc(new_id, &w.npc_table);
@@ -246,7 +243,7 @@ impl World {
 
     /// Get a new object id
     pub fn new_object_id(&self) -> WorldObjectId {
-        let mut idgen = self.id_generator.lock().unwrap();
+        let mut idgen = self.id_generator.lock();
         idgen.new_id()
     }
 
@@ -266,7 +263,7 @@ impl World {
         let map = mi.get_mut(&r.map);
         if let Some(map) = map {
             if let Some(obj) = map.get_object_from_id(r.id) {
-                if obj.lock().await.can_shutdown() {
+                if obj.lock().can_shutdown() {
                     let _ = self
                         .server_s
                         .send(crate::server_message::ServerShutdownMessage::Shutdown)
@@ -282,7 +279,7 @@ impl World {
         let map = mi.get_mut(&r.map);
         if let Some(map) = map {
             if let Some(obj) = map.get_object_from_id(r.id) {
-                if obj.lock().await.can_shutdown() {
+                if obj.lock().can_shutdown() {
                     let _ = self
                         .server_s
                         .send(crate::server_message::ServerShutdownMessage::Restart)
@@ -293,10 +290,7 @@ impl World {
     }
 
     /// Get an object from the world
-    pub async fn get_object(
-        &self,
-        r: ObjectRef,
-    ) -> Option<Arc<tokio::sync::Mutex<object::Object>>> {
+    pub async fn get_object(&self, r: ObjectRef) -> Option<Arc<Mutex<object::Object>>> {
         let mut mi = self.map_info.lock().await;
         let map = mi.get_mut(&r.map);
         if let Some(map) = map {
@@ -309,13 +303,13 @@ impl World {
     pub async fn spawn_monsters(self: &Arc<Self>) {
         if let Some(mset) = &self.monster_set {
             let mut monsters = Vec::new();
-            let mut idgen = self.id_generator.lock().unwrap();
+            let mut idgen = self.id_generator.lock();
             for ms in &self.monster_spawn_table {
                 let m = ms.make_monster(idgen.new_id(), &self.npc_table);
                 monsters.push(m);
             }
             {
-                let mut mset = mset.lock().unwrap();
+                let mut mset = mset.lock();
                 for m in &monsters {
                     let mut monref = m.reference(self.clone());
                     mset.spawn(async move { monref.run_ai().await });
@@ -358,31 +352,27 @@ impl World {
         let map = mi.get_mut(&location.map);
         if let Some(map) = map {
             if let Some(obj) = map.get_object_from_id(id) {
-                let p = obj.lock().await.build_put_object_packet();
-                pw.send_packet(p).await?;
+                let p = obj.lock().build_put_object_packet();
+                pw.queue_packet(p);
             }
         }
         Ok(())
     }
 
     /// Add a player to the world
-    pub async fn add_player(
+    pub fn add_player(
         &self,
         p: crate::character::FullCharacter,
         pw: &mut ServerPacketSender,
     ) -> Option<ObjectRef> {
         let location = p.location_ref().to_owned();
 
-        pw.send_packet(p.details_packet()).await.ok()?;
-        pw.send_packet(p.get_map_packet()).await.ok()?;
-        pw.send_packet(p.get_object_packet()).await.ok()?;
-        p.send_all_items(pw).await.ok()?;
-        pw
-            .send_packet(ServerPacket::CharSpMrBonus { sp: 0, mr: 0 })
-            .await.ok()?;
-        pw
-            .send_packet(ServerPacket::Weather(0))
-            .await.ok()?;
+        pw.queue_packet(p.details_packet());
+        pw.queue_packet(p.get_map_packet());
+        pw.queue_packet(p.get_object_packet());
+        p.send_all_items(pw).ok()?;
+        pw.queue_packet(ServerPacket::CharSpMrBonus { sp: 0, mr: 0 });
+        pw.queue_packet(ServerPacket::Weather(0));
 
         let obj: object::Object = p.into();
         let id = obj.id();
@@ -400,7 +390,14 @@ impl World {
                 id,
             };
             log::error!("add player 4");
-            for o in map.get_object(or).unwrap().lock().await.get_known_objects().unwrap().get_objects() {
+            for o in map
+                .get_object(or)
+                .unwrap()
+                .lock()
+                .get_known_objects()
+                .unwrap()
+                .get_objects()
+            {
                 log::error!("Player knows about object {:?}", o);
             }
             map.move_object(or, location, Some(pw)).await.ok()?;
@@ -427,17 +424,17 @@ impl World {
     /// Run an asynchronous closure on the player object
     pub async fn with_player_ref_do<F, T, E>(&self, refo: ObjectRef, gen: &mut T, f: F) -> Option<E>
     where
-        F: AsyncFn(&crate::character::FullCharacter, &mut T, &Map) -> Option<E>,
+        F: Fn(&crate::character::FullCharacter, &mut T, &Map) -> Option<E>,
     {
         let mut mi = self.map_info.lock().await;
         let map = mi.get_mut(&refo.map);
         if let Some(map) = map {
             if let Some(obj) = map.get_object(refo) {
-                let obj2 = obj.lock().await;
+                let obj2 = obj.lock();
                 let obj2: &object::Object = &obj2;
                 if let object::Object::Player(fc) = obj2 {
                     let themap = self.maps.get(&refo.map).unwrap().clone();
-                    return f(fc, gen, &themap).await;
+                    return f(fc, gen, &themap);
                 }
             }
         }
@@ -447,17 +444,17 @@ impl World {
     /// Run an asynchronous closure on the player object
     pub async fn with_player_mut_do<F, T, E>(&self, refo: ObjectRef, gen: &mut T, f: F) -> Option<E>
     where
-        F: AsyncFn(&mut crate::character::FullCharacter, &mut T, &Map) -> Option<E>,
+        F: Fn(&mut crate::character::FullCharacter, &mut T, &Map) -> Option<E>,
     {
         let mut mi = self.map_info.lock().await;
         let map = mi.get_mut(&refo.map);
         if let Some(map) = map {
             if let Some(obj) = map.get_object(refo) {
-                let mut obj2 = obj.lock().await;
+                let mut obj2 = obj.lock();
                 let obj2: &mut object::Object = &mut obj2;
                 if let object::Object::Player(fc) = obj2 {
                     let themap = self.maps.get(&refo.map).unwrap().clone();
-                    return f(fc, gen, &themap).await;
+                    return f(fc, gen, &themap);
                 }
             }
         }
@@ -472,23 +469,23 @@ impl World {
         f: F,
     ) -> Result<(), E>
     where
-        F: AsyncFn(&object::Object, &mut T, &Map) -> Result<(), E>,
+        F: Fn(&object::Object, &mut T, &Map) -> Result<(), E>,
     {
         let mut mi = self.map_info.lock().await;
         let map = mi.get_mut(&refo.map);
         if let Some(map) = map {
             let me = map.get_object(*refo).unwrap();
             let mylocation = {
-                let m2 = me.lock().await;
+                let m2 = me.lock();
                 m2.get_location()
             };
             let themap = self.maps.get(&refo.map).unwrap().clone();
             for (id, obj) in map.objects_iter() {
                 if *id != refo.id {
-                    let obj = obj.lock().await;
+                    let obj = obj.lock();
                     // TODO a better algorithm for on screen calculation
                     if obj.manhattan_distance(&mylocation) < 17 {
-                        f(&obj, gen, &themap).await?;
+                        f(&obj, gen, &themap)?;
                     }
                 }
             }
@@ -505,7 +502,7 @@ impl World {
         let mut mi = self.map_info.lock().await;
         for map in mi.values_mut() {
             for obj in map.objects_iter() {
-                let mut o = obj.1.lock().await;
+                let mut o = obj.1.lock();
                 if let Some(name) = o.player_name() {
                     if name == other_person {
                         if let Some(sender) = o.sender() {
@@ -524,7 +521,7 @@ impl World {
         let mut mi = self.map_info.lock().await;
         for map in mi.values_mut() {
             for obj in map.objects_iter() {
-                let mut o = obj.1.lock().await;
+                let mut o = obj.1.lock();
                 if let Some(sender) = o.sender() {
                     let _ = sender.send(m.clone()).await;
                 }
@@ -542,7 +539,7 @@ impl World {
         f: F,
     ) -> Result<(), E>
     where
-        F: AsyncFn(&mut object::Object, &mut T) -> Result<(), E>,
+        F: Fn(&mut object::Object, &mut T) -> Result<(), E>,
     {
         let mut mi = self.map_info.lock().await;
         let map = mi.get_mut(&refo.map);
@@ -550,9 +547,9 @@ impl World {
             let my_location = map.get_location(*refo).await.unwrap();
             for (k, obj) in map.objects_iter() {
                 if include_self || *k != refo.id {
-                    let mut obj = obj.lock().await;
+                    let mut obj = obj.lock();
                     if obj.linear_distance(&my_location) < distance {
-                        f(&mut obj, gen).await?;
+                        f(&mut obj, gen)?;
                     }
                 }
             }
@@ -569,22 +566,22 @@ impl World {
         f: F,
     ) -> Result<(), E>
     where
-        F: AsyncFn(&object::Object, &mut T, &Map) -> Result<(), E>,
+        F: Fn(&object::Object, &mut T, &Map) -> Result<(), E>,
     {
         let mut mi = self.map_info.lock().await;
         let map = mi.get_mut(&refo.map);
         if let Some(map) = map {
             let me = map.get_object(*refo).unwrap();
             let mylocation = {
-                let m2 = me.lock().await;
+                let m2 = me.lock();
                 m2.get_location()
             };
             let themap = self.maps.get(&refo.map).unwrap().clone();
             for (id, obj) in map.objects_iter() {
                 if *id != refo.id {
-                    let obj = obj.lock().await;
+                    let obj = obj.lock();
                     if obj.linear_distance(&mylocation) < distance {
-                        f(&obj, gen, &themap).await?;
+                        f(&obj, gen, &themap)?;
                     }
                 }
             }
@@ -601,21 +598,21 @@ impl World {
         f: F,
     ) -> Result<(), E>
     where
-        F: AsyncFn(&object::Object, &mut T) -> Result<(), E>,
+        F: Fn(&object::Object, &mut T) -> Result<(), E>,
     {
         let mi = self.map_info.lock().await;
         let map = mi.get(&refo.map);
         if let Some(map) = map {
             let me = map.get_object(refo).unwrap();
             let mylocation = {
-                let m2 = me.lock().await;
+                let m2 = me.lock();
                 m2.get_location()
             };
             for (id, obj) in map.objects_iter() {
                 if *id != refo.id {
-                    let obj = obj.lock().await;
+                    let obj = obj.lock();
                     if obj.linear_distance(&mylocation) < distance {
-                        f(&obj, gen).await?;
+                        f(&obj, gen)?;
                     }
                 }
             }
@@ -636,7 +633,7 @@ impl World {
             .exec_map(s, (), |a: item::Weapon| a)
             .await
             .map_err(|e| e.to_string())?;
-        let mut idgen = next_object_id.lock().unwrap();
+        let mut idgen = next_object_id.lock();
         for w in weapons {
             let w = w.get_instance(idgen.new_id());
             item_table.insert(w.db_id(), w.into());
@@ -657,7 +654,7 @@ impl World {
             .exec_map(s, (), |a: item::EtcItem| a)
             .await
             .map_err(|e| e.to_string())?;
-        let mut idgen = next_object_id.lock().unwrap();
+        let mut idgen = next_object_id.lock();
         for w in items {
             let w = w.get_instance(idgen.new_id());
             item_table.insert(w.db_id(), w.into());
@@ -678,7 +675,7 @@ impl World {
             .exec_map(s, (), |a: item::Armor| a)
             .await
             .map_err(|e| e.to_string())?;
-        let mut idgen = next_object_id.lock().unwrap();
+        let mut idgen = next_object_id.lock();
         for w in items {
             let w = w.get_instance(idgen.new_id());
             item_table.insert(w.db_id(), w.into());
@@ -724,14 +721,14 @@ impl World {
 
     /// Insert a character id into the world
     pub async fn insert_id(&self, id: u32, account: String) -> Result<(), ClientError> {
-        let mut u = self.users.lock().unwrap();
+        let mut u = self.users.lock();
         u.insert(id, account);
         Ok(())
     }
 
     /// lookup account name from user id
     pub async fn lookup_id(&self, id: u32) -> Option<String> {
-        let u = self.users.lock().unwrap();
+        let u = self.users.lock();
         u.get(&id).map(|e| e.to_owned())
     }
 
@@ -760,7 +757,7 @@ impl World {
 
     /// Register a new user
     pub fn register_user(&self) -> u32 {
-        let mut c = self.client_ids.lock().unwrap();
+        let mut c = self.client_ids.lock();
         c.new_entry()
     }
 
@@ -772,15 +769,15 @@ impl World {
 
     /// Unregister a user
     pub fn unregister_user(&self, uid: u32) {
-        let mut c = self.client_ids.lock().unwrap();
+        let mut c = self.client_ids.lock();
         c.remove_entry(uid);
-        let mut d = self.users.lock().unwrap();
+        let mut d = self.users.lock();
         d.remove(&uid);
     }
 
     /// Get the number of players currently in the world
     pub fn get_number_players(&self) -> u16 {
-        let users = self.users.lock().unwrap();
+        let users = self.users.lock();
         users.len() as u16
     }
 }

@@ -1466,6 +1466,7 @@ dependencies = [
  "futures",
  "log",
  "mysql_async",
+ "parking_lot",
  "rand 0.8.5",
  "regex",
  "rust-crypto",

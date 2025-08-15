@@ -37,7 +37,7 @@ impl std::future::AsyncDrop for Client {
         log::info!("Running async drop on client");
         let _ = self
             .packet_writer
-            .send_packet(ServerPacket::Disconnect)
+            .queue_packet(ServerPacket::Disconnect)
             .await;
         self.world.unregister_user(self.id);
     }
@@ -108,11 +108,11 @@ impl Client {
                         intelligence,
                     ) {
                         self.world.save_new_character(&mut c).await?;
-                        self.send_packet(ServerPacket::CharacterCreationStatus(0))
+                        self.queue_packet(ServerPacket::CharacterCreationStatus(0))
                             .await?;
-                        self.send_packet(c.get_new_char_details_packet()).await?;
+                        self.queue_packet(c.get_new_char_details_packet()).await?;
                     } else {
-                        self.send_packet(ServerPacket::CharacterCreationStatus(1))
+                        self.queue_packet(ServerPacket::CharacterCreationStatus(1))
                             .await?;
                     }
                 }
@@ -127,7 +127,7 @@ impl Client {
                 if let Some(r) = self.char_ref {
                     let m = self
                         .world
-                        .with_player_ref_do(r, &mut self.packet_writer, async move |fc, pw, _| {
+                        .with_player_ref_do(r, &mut self.packet_writer, move |fc, pw, _| {
                             let amsg = format!("[{}] {}", fc.name, msg);
                             Some(ServerPacket::RegularChat { id: 0, msg: amsg })
                         })
@@ -140,7 +140,7 @@ impl Client {
                                 30.0,
                                 true,
                                 &mut self.packet_writer,
-                                async move |o: &mut crate::world::object::Object, pw| {
+                                move |o: &mut crate::world::object::Object, pw| {
                                     if let Some(sender) = o.sender() {
                                         let _ = sender.send(m.clone()).await;
                                     }
@@ -156,7 +156,7 @@ impl Client {
                 if let Some(r) = self.char_ref {
                     let m = self
                         .world
-                        .with_player_ref_do(r, &mut self.packet_writer, async move |fc, pw, _| {
+                        .with_player_ref_do(r, &mut self.packet_writer, move |fc, pw, _| {
                             let amsg = format!("[{}] {}", fc.name, msg);
                             Some(ServerPacket::YellChat {
                                 id: 0,
@@ -174,7 +174,7 @@ impl Client {
                                 60.0,
                                 true,
                                 &mut self.packet_writer,
-                                async move |o: &mut crate::world::object::Object, pw| {
+                                move |o: &mut crate::world::object::Object, pw| {
                                     if let Some(sender) = o.sender() {
                                         let _ = sender.send(m.clone()).await;
                                     }
@@ -189,7 +189,7 @@ impl Client {
                 if let Some(r) = self.char_ref {
                     let m = self
                         .world
-                        .with_player_ref_do(r, &mut self.packet_writer, async move |fc, pw, _| {
+                        .with_player_ref_do(r, &mut self.packet_writer, move |fc, pw, _| {
                             let amsg = format!("[{}] {}", fc.name, msg);
                             Some(ServerPacket::GlobalChat(amsg))
                         })
@@ -203,7 +203,7 @@ impl Client {
                 if let Some(r) = self.char_ref {
                     let m = self
                         .world
-                        .with_player_ref_do(r, &mut self.packet_writer, async move |fc, pw, _| {
+                        .with_player_ref_do(r, &mut self.packet_writer, move |fc, pw, _| {
                             let amsg = format!("[{}] {}", fc.name, msg);
                             Some(ServerPacket::PledgeChat(amsg))
                         })
@@ -217,7 +217,7 @@ impl Client {
                 if let Some(r) = self.char_ref {
                     let m = self
                         .world
-                        .with_player_ref_do(r, &mut self.packet_writer, async move |fc, pw, _| {
+                        .with_player_ref_do(r, &mut self.packet_writer, move |fc, pw, _| {
                             let amsg = format!("[{}] {}", fc.name, msg);
                             Some(ServerPacket::PartyChat(amsg))
                         })
@@ -231,7 +231,7 @@ impl Client {
                 if let Some(r) = self.char_ref {
                     let m = self
                         .world
-                        .with_player_ref_do(r, &mut self.packet_writer, async move |fc, pw, _| {
+                        .with_player_ref_do(r, &mut self.packet_writer, move |fc, pw, _| {
                             Some(ServerPacket::WhisperChat {
                                 name: fc.name.clone(),
                                 msg: msg.clone(),
@@ -241,11 +241,10 @@ impl Client {
                     if let Some(m) = m {
                         if let Err(e) = self.world.send_packet_to(person.as_str(), m).await {
                             self.packet_writer
-                                .send_packet(ServerPacket::Message {
+                                .queue_packet(ServerPacket::Message {
                                     ty: 73,
                                     msgs: vec![person],
-                                })
-                                .await?;
+                                });
                         }
                     }
                 }
@@ -255,8 +254,8 @@ impl Client {
     }
 
     /// Send a packet to the client
-    pub async fn send_packet(&mut self, data: ServerPacket) -> Result<(), PacketError> {
-        self.packet_writer.send_packet(data).await
+    pub fn queue_packet(&mut self, data: ServerPacket) {
+        self.packet_writer.queue_packet(data)
     }
 
     /// Delete the character with the specified name
@@ -280,28 +279,26 @@ impl Client {
     }
 
     /// Performs packet testing
-    pub async fn test1(&mut self) -> Result<(), ClientError> {
+    pub fn test1(&mut self) -> Result<(), ClientError> {
         self.packet_writer
-            .send_packet(ServerPacket::Message {
+            .queue_packet(ServerPacket::Message {
                 ty: 74,
                 msgs: vec!["stuff".to_string()],
-            })
-            .await?;
+            });
         Ok(())
     }
 
     /// Performs packet testing
-    pub async fn test2(&mut self) -> Result<(), ClientError> {
+    pub fn test2(&mut self) -> Result<(), ClientError> {
         self.packet_writer
-            .send_packet(ServerPacket::CloneObject {
+            .queue_packet(ServerPacket::CloneObject {
                 id: 2,
                 speed: 255,
                 poly_id: 2001,
                 alignment: -32767,
                 poly_action: 0,
                 title: "Evil dragon 3".to_string(),
-            })
-            .await?;
+            });
         Ok(())
     }
 
@@ -309,11 +306,11 @@ impl Client {
     /// This still should be called even if there was no news.
     async fn after_news(&mut self) -> Result<(), ClientError> {
         let response = ServerPacket::NumberCharacters(self.chars.len() as u8, 8);
-        self.packet_writer.send_packet(response).await?;
+        self.packet_writer.queue_packet(response);
 
         for c in &self.chars {
             let response = c.get_details_packet();
-            self.packet_writer.send_packet(response).await?;
+            self.packet_writer.queue_packet(response);
         }
         Ok(())
     }
@@ -325,15 +322,13 @@ impl Client {
         username: String,
     ) -> Result<(), ClientError> {
         self.packet_writer
-            .send_packet(ServerPacket::LoginResult { code: 0 })
-            .await?;
+            .queue_packet(ServerPacket::LoginResult { code: 0 });
         let news = config.get_news();
         if news.is_empty() {
             self.after_news().await?;
         } else {
             self.packet_writer
-                .send_packet(ServerPacket::News(news))
-                .await?;
+                .queue_packet(ServerPacket::News(news));
         }
         self.process_client_message(ClientMessage::LoggedIn(self.id, username))
             .await?;
@@ -368,15 +363,14 @@ impl Client {
             ClientPacket::AttackObject { id, x, y } => {
                 if let Some(r) = self.char_ref {
                     self.packet_writer
-                        .send_packet(ServerPacket::Attack {
+                        .queue_packet(ServerPacket::Attack {
                             attack_type: 3,
                             id: r.world_id().get_u32(),
                             id2: id,
                             impact: 1,
                             direction: 2,
                             effect: None,
-                        })
-                        .await?;
+                        });
                 }
             }
             ClientPacket::UseItem { id, remainder } => {
@@ -388,18 +382,18 @@ impl Client {
                 };
                 if let Some(r) = self.char_ref {
                     self.world
-                        .with_player_mut_do(r, &mut p2, async move |fc, p2, map| {
+                        .with_player_mut_do(r, &mut p2, move |fc, p2, map| {
                             // Can't use items whe you are dead
                             if fc.curr_hp() == 0 {
                                 return None;
                             }
-                            fc.use_item(&id, p2, map).await.ok()?;
+                            fc.use_item(&id, p2, map).ok()?;
                             Some(42)
                         })
                         .await;
                 }
                 for p in p2.packets {
-                    self.packet_writer.send_packet(p).await?;
+                    self.packet_writer.queue_packet(p);
                 }
             }
             ClientPacket::Ping(v) => {
@@ -409,8 +403,7 @@ impl Client {
                 log::info!("Player restarts");
                 self.world.remove_player(&mut self.char_ref).await;
                 self.packet_writer
-                    .send_packet(ServerPacket::BackToCharacterSelect)
-                    .await?;
+                    .queue_packet(ServerPacket::BackToCharacterSelect);
             }
             ClientPacket::RemoveFriend(name) => {
                 log::info!("User used the remove friend command with {name}");
@@ -434,7 +427,7 @@ impl Client {
                     english: 1,
                     country: 0,
                 };
-                self.packet_writer.send_packet(response).await?;
+                self.packet_writer.queue_packet(response);
             }
             ClientPacket::Login(u, p, v1, v2, v3, v4, v5, v6, v7) => {
                 log::info!(
@@ -460,8 +453,7 @@ impl Client {
                             self.login_with_news(config, u).await?;
                         } else {
                             self.packet_writer
-                                .send_packet(ServerPacket::LoginResult { code: 8 })
-                                .await?;
+                                .queue_packet(ServerPacket::LoginResult { code: 8 });
                         }
                     }
                     None => {
@@ -479,8 +471,7 @@ impl Client {
                             self.login_with_news(config, u).await?;
                         } else {
                             self.packet_writer
-                                .send_packet(ServerPacket::LoginResult { code: 8 })
-                                .await?;
+                                .queue_packet(ServerPacket::LoginResult { code: 8 });
                         }
                     }
                 }
@@ -521,8 +512,7 @@ impl Client {
                     if c.needs_delete_waiting() {
                         //TODO implement the actual delete in a scheduled async task
                         self.packet_writer
-                            .send_packet(ServerPacket::DeleteCharacterWait)
-                            .await?;
+                            .queue_packet(ServerPacket::DeleteCharacterWait);
                     } else {
                         self.process_client_message(ClientMessage::DeleteCharacter {
                             id: self.id,
@@ -530,8 +520,7 @@ impl Client {
                         })
                         .await?;
                         self.packet_writer
-                            .send_packet(ServerPacket::DeleteCharacterOk)
-                            .await?;
+                            .queue_packet(ServerPacket::DeleteCharacterOk);
                     }
                 }
             }
@@ -542,20 +531,19 @@ impl Client {
                     .ok_or(ClientError::InvalidCharSelection)?;
 
                 self.packet_writer
-                    .send_packet(ServerPacket::StartGame(0))
-                    .await?;
+                    .queue_packet(ServerPacket::StartGame(0));
                 let mut mysql = self.world.get_mysql_conn().await?;
                 let c = self.chars[c]
                     .get_partial_details(self.world.new_object_id(), &mut mysql)
                     .await?;
                 self.char_ref = {
                     let c = {
-                        let item_table = self.world.item_table.lock().unwrap();
+                        let item_table = self.world.item_table.lock();
                         c.into_full(&item_table, sender.clone())
                     };
-                    self.world.add_player(c, &mut self.packet_writer).await
+                    self.world.add_player(c, &mut self.packet_writer)
                 };
-                self.test1().await?;
+                self.test1()?;
                 log::error!("Character select 5");
             }
             ClientPacket::KeepAlive => {}
@@ -594,7 +582,7 @@ impl Client {
             ClientPacket::ChangeDirection(d) => {
                 if let Some(r) = self.char_ref {
                     self.world
-                        .with_player_mut_do(r, &mut 42, async move |fc, _, _| {
+                        .with_player_mut_do(r, &mut 42, move |fc, _, _| {
                             let l = fc.location_mut();
                             l.direction = d;
                             Some(42)
@@ -657,52 +645,38 @@ impl Client {
                             }
                         }
                         "quit" => {
-                            self.packet_writer
-                                .send_packet(ServerPacket::Disconnect)
-                                .await?;
+                            self.packet_writer.queue_packet(ServerPacket::Disconnect);
                         }
                         "test" => {
-                            self.test2().await?;
+                            self.test2()?;
                         }
                         "chat" => {
+                            self.packet_writer.queue_packet(ServerPacket::SystemMessage(
+                                "This is a test of the system message".to_string(),
+                            ));
                             self.packet_writer
-                                .send_packet(ServerPacket::SystemMessage(
-                                    "This is a test of the system message".to_string(),
-                                ))
-                                .await?;
-                            self.packet_writer
-                                .send_packet(ServerPacket::NpcShout("NPC Shout test".to_string()))
-                                .await?;
+                                .queue_packet(ServerPacket::NpcShout("NPC Shout test".to_string()));
 
+                            self.packet_writer.queue_packet(ServerPacket::RegularChat {
+                                id: 0,
+                                msg: "regular chat".to_string(),
+                            });
+                            self.packet_writer.queue_packet(ServerPacket::YellChat {
+                                id: 0,
+                                msg: "yelling".to_string(),
+                                x: 32768,
+                                y: 32768,
+                            });
                             self.packet_writer
-                                .send_packet(ServerPacket::RegularChat {
-                                    id: 0,
-                                    msg: "regular chat".to_string(),
-                                })
-                                .await?;
+                                .queue_packet(ServerPacket::GlobalChat("global chat".to_string()));
                             self.packet_writer
-                                .send_packet(ServerPacket::YellChat {
-                                    id: 0,
-                                    msg: "yelling".to_string(),
-                                    x: 32768,
-                                    y: 32768,
-                                })
-                                .await?;
+                                .queue_packet(ServerPacket::PledgeChat("pledge chat".to_string()));
                             self.packet_writer
-                                .send_packet(ServerPacket::GlobalChat("global chat".to_string()))
-                                .await?;
-                            self.packet_writer
-                                .send_packet(ServerPacket::PledgeChat("pledge chat".to_string()))
-                                .await?;
-                            self.packet_writer
-                                .send_packet(ServerPacket::PartyChat("party chat".to_string()))
-                                .await?;
-                            self.packet_writer
-                                .send_packet(ServerPacket::WhisperChat {
-                                    name: "test".to_string(),
-                                    msg: "whisper message".to_string(),
-                                })
-                                .await?;
+                                .queue_packet(ServerPacket::PartyChat("party chat".to_string()));
+                            self.packet_writer.queue_packet(ServerPacket::WhisperChat {
+                                name: "test".to_string(),
+                                msg: "whisper message".to_string(),
+                            });
                         }
                         _ => {
                             log::info!("An unknown command {}", m);
@@ -727,18 +701,15 @@ impl Client {
                         if password_success {
                             log::info!("User wants to change password and entered correct details");
                             self.packet_writer
-                                .send_packet(ServerPacket::LoginResult { code: 0x30 })
-                                .await?;
+                                .queue_packet(ServerPacket::LoginResult { code: 0x30 });
                         } else {
                             self.packet_writer
-                                .send_packet(ServerPacket::LoginResult { code: 8 })
-                                .await?;
+                                .queue_packet(ServerPacket::LoginResult { code: 8 });
                         }
                     }
                     _ => {
                         self.packet_writer
-                            .send_packet(ServerPacket::LoginResult { code: 8 })
-                            .await?;
+                            .queue_packet(ServerPacket::LoginResult { code: 8 });
                     }
                 }
             }
@@ -763,8 +734,7 @@ impl Client {
         let mut packet_reader = ServerPacketReceiver::new(reader, encryption_key);
 
         self.packet_writer
-            .send_packet(ServerPacket::EncryptionKey(encryption_key))
-            .await?;
+            .queue_packet(ServerPacket::EncryptionKey(encryption_key));
         self.packet_writer
             .set_encryption_key(packet_reader.get_key());
         loop {
@@ -775,7 +745,7 @@ impl Client {
                 }
                 msg = receiver.recv().fuse() => {
                     let p = msg.unwrap();
-                    self.packet_writer.send_packet(p).await?;
+                    self.packet_writer.queue_packet(p);
                 }
                 _ = end_rx.recv().fuse() => {
                     break;
