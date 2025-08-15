@@ -8,7 +8,6 @@ use crate::world::{object::ObjectTrait, ObjectRef};
 
 use super::WorldObjectId;
 
-
 /// Represents the dynamic information of a map
 #[derive(Debug)]
 pub struct MapInfo {
@@ -26,7 +25,8 @@ impl MapInfo {
 
     /// Add an object to the map
     pub async fn add_new_object(&mut self, new_o: super::object::Object) {
-        self.objects.insert(new_o.id(), Arc::new(tokio::sync::Mutex::new(new_o)));
+        self.objects
+            .insert(new_o.id(), Arc::new(tokio::sync::Mutex::new(new_o)));
     }
 
     /// Get a location of an object reference
@@ -39,7 +39,10 @@ impl MapInfo {
 
     /// Get an object from the map
     /// Get an object from the world
-    pub fn get_object(&self, r: super::ObjectRef) -> Option<Arc<tokio::sync::Mutex<super::object::Object>>> {
+    pub fn get_object(
+        &self,
+        r: super::ObjectRef,
+    ) -> Option<Arc<tokio::sync::Mutex<super::object::Object>>> {
         if let Some(o) = self.objects.get(&r.id) {
             return Some(o.clone());
         }
@@ -47,7 +50,10 @@ impl MapInfo {
     }
 
     /// Get an object from the object id
-    pub fn get_object_from_id(&self, id: WorldObjectId) -> Option<Arc<tokio::sync::Mutex<super::object::Object>>> {
+    pub fn get_object_from_id(
+        &self,
+        id: WorldObjectId,
+    ) -> Option<Arc<tokio::sync::Mutex<super::object::Object>>> {
         if let Some(o) = self.objects.get(&id) {
             return Some(o.clone());
         }
@@ -55,7 +61,13 @@ impl MapInfo {
     }
 
     /// Get an iterator over all objects
-    pub fn objects_iter(&self) -> std::collections::hash_map::Iter<'_, WorldObjectId, Arc<tokio::sync::Mutex<super::object::Object>>> {
+    pub fn objects_iter(
+        &self,
+    ) -> std::collections::hash_map::Iter<
+        '_,
+        WorldObjectId,
+        Arc<tokio::sync::Mutex<super::object::Object>>,
+    > {
         self.objects.iter()
     }
 
@@ -93,12 +105,12 @@ impl MapInfo {
             }
             for objid in old_objects {
                 if let Some(pw) = &mut pw {
-                    pw.send_packet(ServerPacket::RemoveObject(objid.get_u32()).build())
+                    pw.send_packet(ServerPacket::RemoveObject(objid.get_u32()))
                         .await?;
                 }
                 if let Some(obj) = self.objects.get_mut(&r.id) {
                     if let Some(pw) = &mut pw {
-                        pw.send_packet(ServerPacket::RemoveObject(objid.get_u32()).build())
+                        pw.send_packet(ServerPacket::RemoveObject(objid.get_u32()))
                             .await?;
                     }
                     obj.lock().await.remove_object(objid).await;
@@ -107,7 +119,8 @@ impl MapInfo {
             for objid in new_objects {
                 if let Some(pw) = &mut pw {
                     if let Some(obj) = self.objects.get_mut(&objid) {
-                        pw.send_packet(obj.lock().await.build_put_object_packet()).await?;
+                        pw.send_packet(obj.lock().await.build_put_object_packet())
+                            .await?;
                     }
                 }
                 if let Some(obj) = self.objects.get_mut(&r.id) {

@@ -120,22 +120,19 @@ struct UpdateServer {
 impl UpdateServer {
     /// Run the update server
     async fn run(mut self) -> Result<(), u32> {
-        let mut f = futures::stream::FuturesUnordered::new();
         loop {
-            use futures::stream::StreamExt;
             tokio::select! {
                 Ok(res) = self.update_listener.accept() => {
                     let (socket, addr) = res;
                     log::info!("update: Received an update client from {}", addr);
                     let world2 = self.world.clone();
                     let updates2 = self.updates.clone();
-                    f.push(async move {
+                    tokio::task::spawn(async move {
                         if let Err(e) = process_update_client(socket, world2, updates2).await {
                             log::info!("update: Client {} errored during the update process {}", addr, e);
                         }
                     });
                 }
-                Ok(Some(_)) = AssertUnwindSafe(f.next()).catch_unwind() => {}
                 a = (&mut self.update_rx) => {
                     if let Ok(a) = a {
                         log::info!("update: Received a message {:?} to shut down", a);

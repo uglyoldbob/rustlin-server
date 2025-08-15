@@ -256,13 +256,13 @@ impl ItemInstance {
     }
 
     /// Get the inventory description update packet
-    pub fn update_description_packet(&self) -> common::packet::Packet {
+    pub fn update_description_packet(&self) -> common::packet::ServerPacket {
         let a = common::packet::ServerPacket::InventoryDescriptionUpdate {
             id: self.stuff.item_id,
             description: self.name(),
         };
         log::info!("Description packet: {:?}", a);
-        a.build()
+        a
     }
 }
 
@@ -364,7 +364,7 @@ impl ObjectTrait for ItemWithLocation {
         ItemTrait::world_id(&self.item)
     }
 
-    fn build_put_object_packet(&self) -> common::packet::Packet {
+    fn build_put_object_packet(&self) -> common::packet::ServerPacket {
         common::packet::ServerPacket::PutObject {
             x: self.location.x,
             y: self.location.y,
@@ -387,6 +387,5 @@ impl ObjectTrait for ItemWithLocation {
             v2: 0,
             level: 1,
         }
-        .build()
     }
 }

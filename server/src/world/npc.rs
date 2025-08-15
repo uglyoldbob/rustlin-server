@@ -178,7 +178,7 @@ impl super::object::ObjectTrait for Npc {
         None
     }
 
-    fn build_put_object_packet(&self) -> common::packet::Packet {
+    fn build_put_object_packet(&self) -> common::packet::ServerPacket {
         common::packet::ServerPacket::PutObject {
             x: self.location.x,
             y: self.location.y,
@@ -201,6 +201,5 @@ impl super::object::ObjectTrait for Npc {
             v2: 0,
             level: 54,
         }
-        .build()
     }
 }

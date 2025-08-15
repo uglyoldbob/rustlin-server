@@ -87,7 +87,7 @@ pub trait ObjectTrait {
     }
 
     /// Build a packet for placing the object on the map for a user
-    fn build_put_object_packet(&self) -> common::packet::Packet;
+    fn build_put_object_packet(&self) -> common::packet::ServerPacket;
 
     /// Build a packet for moving the object on the map
     fn build_move_object_packet(&self) -> common::packet::ServerPacket {

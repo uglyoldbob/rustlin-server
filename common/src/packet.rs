@@ -270,6 +270,8 @@ pub enum ServerPacket {
         /// Country?
         country: u8,
     },
+    /// Send the encryption key
+    EncryptionKey(u32),
     /// The player is being disconnected
     Disconnect,
     /// The result of a login attempt
@@ -614,6 +616,9 @@ impl ServerPacket {
     pub fn build(self) -> Packet {
         let mut p = Packet::new();
         match self {
+            ServerPacket::EncryptionKey(k) => {
+                p.add_u8(65).add_u32(k);
+            }
             ServerPacket::Attack {
                 attack_type: u1,
                 id,
@@ -1421,7 +1426,8 @@ impl ServerPacketSender {
     }
 
     /// Send a packet
-    pub async fn send_packet(&mut self, mut data: Packet) -> Result<(), PacketError> {
+    pub async fn send_packet(&mut self, data: ServerPacket) -> Result<(), PacketError> {
+        let mut data = data.build();
         self.writer.writable().await?;
         while data.buf().len() < 4 {
             data.add_u8(0);

@@ -203,7 +203,7 @@ impl crate::world::object::ObjectTrait for FullCharacter {
         Some(&mut self.sender)
     }
 
-    fn build_put_object_packet(&self) -> common::packet::Packet {
+    fn build_put_object_packet(&self) -> common::packet::ServerPacket {
         ServerPacket::PutObject {
             x: self.details.location.x,
             y: self.details.location.y,
@@ -226,7 +226,6 @@ impl crate::world::object::ObjectTrait for FullCharacter {
             v2: 0,
             level: self.level,
         }
-        .build()
     }
 }
 
@@ -247,24 +246,18 @@ impl FullCharacter {
             ////TODO check to see if item delay in effect for the item being used, return None if it is
             ////TODO Check to see if there is a delay timer in effect for the item being used
             if crate::world::item::ItemUsage::None == item.usage() {
-                p2.packets.push(
-                    ServerPacket::Message {
-                        ty: 74,
-                        msgs: vec![item.name()],
-                    }
-                    .build(),
-                );
+                p2.packets.push(ServerPacket::Message {
+                    ty: 74,
+                    msgs: vec![item.name()],
+                });
                 return Ok(());
             }
             // Or when the map you are on disallows item usage
             if !map.can_use_items() {
-                p2.packets.push(
-                    ServerPacket::Message {
-                        ty: 563,
-                        msgs: vec![],
-                    }
-                    .build(),
-                );
+                p2.packets.push(ServerPacket::Message {
+                    ty: 563,
+                    msgs: vec![],
+                });
                 return Ok(());
             }
             let mut poly_name = None;
@@ -325,7 +318,7 @@ impl FullCharacter {
                     item.toggle_equip();
                     {
                         let packet: ServerPacket = ServerPacket::InventoryMod(item.update_packet());
-                        p2.packets.push(packet.build());
+                        p2.packets.push(packet);
                         p2.packets.push(item.update_description_packet());
                     }
                 }
@@ -334,7 +327,7 @@ impl FullCharacter {
                     item.toggle_equip();
                     {
                         let packet: ServerPacket = ServerPacket::InventoryMod(item.update_packet());
-                        p2.packets.push(packet.build());
+                        p2.packets.push(packet);
                         //p2.packets.push(item.update_description_packet());
                     }
                 }
@@ -361,7 +354,7 @@ impl FullCharacter {
             }
         }
         packet_writer
-            .send_packet(common::packet::ServerPacket::InventoryVec(elements).build())
+            .send_packet(common::packet::ServerPacket::InventoryVec(elements))
             .await?;
         Ok(())
     }

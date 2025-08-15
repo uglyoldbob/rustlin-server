@@ -266,7 +266,7 @@ impl super::ObjectTrait for Monster {
         self.id
     }
 
-    fn build_put_object_packet(&self) -> common::packet::Packet {
+    fn build_put_object_packet(&self) -> common::packet::ServerPacket {
         common::packet::ServerPacket::PutObject {
             x: self.location.x,
             y: self.location.y,
@@ -289,7 +289,6 @@ impl super::ObjectTrait for Monster {
             v2: 0,
             level: 54,
         }
-        .build()
     }
 
     fn get_items(&self) -> Option<&HashMap<u32, super::item::ItemInstance>> {

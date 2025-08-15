@@ -293,7 +293,10 @@ impl World {
     }
 
     /// Get an object from the world
-    pub async fn get_object(&self, r: ObjectRef) -> Option<Arc<tokio::sync::Mutex<object::Object>>> {
+    pub async fn get_object(
+        &self,
+        r: ObjectRef,
+    ) -> Option<Arc<tokio::sync::Mutex<object::Object>>> {
         let mut mi = self.map_info.lock().await;
         let map = mi.get_mut(&r.map);
         if let Some(map) = map {
@@ -526,8 +529,7 @@ impl World {
             for (k, obj) in map.objects_iter() {
                 if include_self || *k != refo.id {
                     let mut obj = obj.lock().await;
-                    if obj.linear_distance(&my_location) < distance
-                    {
+                    if obj.linear_distance(&my_location) < distance {
                         f(&mut obj, gen).await?;
                     }
                 }
