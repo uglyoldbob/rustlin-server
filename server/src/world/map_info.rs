@@ -81,10 +81,21 @@ impl MapInfo {
         let mut object_list = super::ObjectList::new();
         let objr = self.get_object(r).unwrap();
         let mut object_to_move = objr.lock().await;
+        let print = {
+            let or : &super::object::Object = &object_to_move;
+            if let super::object::Object::Player(_) = or {
+                true
+            } else {
+                false
+            }
+        };
         object_to_move.set_location(new_loc);
         for (id, o) in &mut self.objects {
             if *id != r.id {
                 if o.lock().await.linear_distance(&new_loc) < 17.0 {
+                    if print {
+                        log::info!("Object {:?} is in range", id);
+                    }
                     object_list.add_object(*id);
                 }
             }
@@ -93,17 +104,17 @@ impl MapInfo {
             let mut old_objects = Vec::new();
             let mut new_objects = Vec::new();
             if let Some(ol) = object_to_move.get_known_objects() {
-                ol.find_changes(&mut old_objects, &mut new_objects, &object_list);
-            }
-            let thing_move_packet = object_to_move.build_move_object_packet();
-            for o in object_list.get_objects() {
-                if let Some(o) = self.objects.get_mut(o) {
-                    if let Some(s) = o.lock().await.sender() {
-                        let _ = s.send(thing_move_packet.clone()).await;
+                if print {
+                    for o in ol.get_objects() {
+                        log::error!("Player already knows about object {:?}", o);
                     }
                 }
+                ol.find_changes(&mut old_objects, &mut new_objects, &object_list);
             }
             for objid in old_objects {
+                if print {
+                    log::info!("Object {:?} is no longer in range", objid);
+                }
                 if let Some(pw) = &mut pw {
                     pw.send_packet(ServerPacket::RemoveObject(objid.get_u32()))
                         .await?;
@@ -117,6 +128,9 @@ impl MapInfo {
                 }
             }
             for objid in new_objects {
+                if print {
+                    log::info!("Object {:?} is now in range", objid);
+                }
                 if let Some(pw) = &mut pw {
                     if let Some(obj) = self.objects.get_mut(&objid) {
                         pw.send_packet(obj.lock().await.build_put_object_packet())
@@ -125,6 +139,17 @@ impl MapInfo {
                 }
                 if let Some(obj) = self.objects.get_mut(&r.id) {
                     obj.lock().await.add_object(objid).await;
+                }
+            }
+            let thing_move_packet = object_to_move.build_move_object_packet();
+            for o in object_list.get_objects() {
+                if print {
+                    log::info!("Object {:?} is in motion", o);
+                }
+                if let Some(o) = self.objects.get_mut(o) {
+                    if let Some(s) = o.lock().await.sender() {
+                        let _ = s.send(thing_move_packet.clone()).await;
+                    }
                 }
             }
         }

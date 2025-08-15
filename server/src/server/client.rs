@@ -555,29 +555,8 @@ impl Client {
                     };
                     self.world.add_player(c, &mut self.packet_writer).await
                 };
-
-                if let Some(r) = self.char_ref {
-                    self.world
-                        .with_player_ref_do(r, &mut self.packet_writer, async |c, pw, _| {
-                            pw.send_packet(c.details_packet()).await.ok()?;
-                            pw.send_packet(c.get_map_packet()).await.ok()?;
-                            pw.send_packet(c.get_object_packet()).await.ok()?;
-                            c.send_all_items(pw).await.ok()?;
-                            Some(42)
-                        })
-                        .await;
-                }
-
-                self.packet_writer
-                    .send_packet(ServerPacket::CharSpMrBonus { sp: 0, mr: 0 })
-                    .await?;
-
-                self.packet_writer
-                    .send_packet(ServerPacket::Weather(0))
-                    .await?;
-
-                //TODO send owncharstatus packet
                 self.test1().await?;
+                log::error!("Character select 5");
             }
             ClientPacket::KeepAlive => {}
             ClientPacket::GameInitDone => {}

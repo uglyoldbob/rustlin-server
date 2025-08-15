@@ -372,20 +372,42 @@ impl World {
         pw: &mut ServerPacketSender,
     ) -> Option<ObjectRef> {
         let location = p.location_ref().to_owned();
+
+        pw.send_packet(p.details_packet()).await.ok()?;
+        pw.send_packet(p.get_map_packet()).await.ok()?;
+        pw.send_packet(p.get_object_packet()).await.ok()?;
+        p.send_all_items(pw).await.ok()?;
+        pw
+            .send_packet(ServerPacket::CharSpMrBonus { sp: 0, mr: 0 })
+            .await.ok()?;
+        pw
+            .send_packet(ServerPacket::Weather(0))
+            .await.ok()?;
+
         let obj: object::Object = p.into();
         let id = obj.id();
         let mut m = self.map_info.lock().await;
+
         let m2 = m.get_mut(&location.map);
+        log::error!("add player 1");
         if let Some(map) = m2 {
+            log::error!("add player 2");
             let location = obj.get_location();
             map.add_new_object(obj).await;
+            log::error!("add player 3");
             let or = ObjectRef {
                 map: location.map,
                 id,
             };
+            log::error!("add player 4");
+            for o in map.get_object(or).unwrap().lock().await.get_known_objects().unwrap().get_objects() {
+                log::error!("Player knows about object {:?}", o);
+            }
             map.move_object(or, location, Some(pw)).await.ok()?;
+            log::error!("add player 5");
             Some(or)
         } else {
+            log::error!("add player 6");
             None
         }
     }
