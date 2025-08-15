@@ -137,8 +137,12 @@ impl MapInfo {
                             .await?;
                     }
                 }
-                if let Some(obj) = self.objects.get_mut(&r.id) {
-                    obj.lock().await.add_object(objid).await;
+                if print {
+                    log::info!("Object {:?} is still in range", objid);
+                }
+                object_to_move.add_object(objid).await;
+                if print {
+                    log::info!("Object {:?} is done in range", objid);
                 }
             }
             let thing_move_packet = object_to_move.build_move_object_packet();
