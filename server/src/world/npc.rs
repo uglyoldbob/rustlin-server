@@ -174,10 +174,6 @@ impl super::object::ObjectTrait for Npc {
         None
     }
 
-    fn sender(&mut self) -> Option<&mut tokio::sync::mpsc::Sender<common::packet::ServerPacket>> {
-        None
-    }
-
     fn build_put_object_packet(&self) -> common::packet::ServerPacket {
         common::packet::ServerPacket::PutObject {
             x: self.location.x,

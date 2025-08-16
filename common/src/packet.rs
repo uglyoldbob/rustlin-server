@@ -1438,6 +1438,13 @@ impl ServerPacketSender {
         Ok(())
     }
 
+    /// get all packets that are supposed to go to the client
+    pub fn get_all_current_packets(&mut self) -> Vec<ServerPacket> {
+        let v = self.pending_packets.clone();
+        self.pending_packets.clear();
+        v
+    }
+
     async fn send_packet(&mut self, data: ServerPacket) -> Result<(), PacketError> {
         log::info!("Sending packet {:?}", data);
         let mut data = data.build();

@@ -26,12 +26,12 @@ impl MapInfo {
     }
 
     /// Add an object to the map
-    pub async fn add_new_object(&mut self, new_o: super::object::Object) {
+    pub fn add_new_object(&mut self, new_o: super::object::Object) {
         self.objects.insert(new_o.id(), Arc::new(Mutex::new(new_o)));
     }
 
     /// Get a location of an object reference
-    pub async fn get_location(&self, r: super::ObjectRef) -> Option<super::Location> {
+    pub fn get_location(&self, r: super::ObjectRef) -> Option<super::Location> {
         if let Some(o) = self.get_object(r) {
             return Some(o.lock().get_location());
         }
@@ -67,7 +67,7 @@ impl MapInfo {
     }
 
     /// Move an object on the map
-    pub async fn move_object(
+    pub fn move_object(
         &mut self,
         r: super::ObjectRef,
         new_loc: super::Location,
@@ -75,7 +75,7 @@ impl MapInfo {
     ) -> Result<(), super::ClientError> {
         let mut object_list = super::ObjectList::new();
         let objr = self.get_object(r).unwrap();
-        {
+        let thing_move_packet = {
             let mut object_to_move = objr.lock();
             let print = {
                 let or: &super::object::Object = &object_to_move;
@@ -138,12 +138,10 @@ impl MapInfo {
                     }
                 }
                 let thing_move_packet = object_to_move.build_move_object_packet();
+                thing_move_packet
             }
-        }
+        };
         for o in object_list.get_objects() {
-            if print {
-                log::info!("Object {:?} is in motion", o);
-            }
             if r.id == *o {
                 log::error!("Triggering a bug?");
                 panic!();
@@ -155,14 +153,14 @@ impl MapInfo {
                 None
             };
             if let Some(s) = sender {
-                let _ = s.send(thing_move_packet.clone()).await;
+                let _ = s.send(thing_move_packet.clone());
             }
         }
         Ok(())
     }
 
     /// Remove an object from the map
-    pub async fn remove_object(&mut self, id: WorldObjectId) {
+    pub fn remove_object(&mut self, id: WorldObjectId) {
         self.objects.remove(&id);
         for o in &mut self.objects {
             o.1.lock().remove_object(id);

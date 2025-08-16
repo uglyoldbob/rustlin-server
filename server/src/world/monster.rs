@@ -186,7 +186,7 @@ impl MonsterRef {
             tokio::time::sleep(std::time::Duration::from_secs(1)).await;
             use rand::Rng;
             let direction = rand::thread_rng().gen_range(0..=7u8);
-            let myloc = self.world.get_location(self.reference).await;
+            let myloc = self.world.get_location(self.reference);
             if let Some(l) = myloc {
                 let (x, y) = (l.x, l.y);
                 let (x2, y2) = match direction {
@@ -296,10 +296,6 @@ impl super::ObjectTrait for Monster {
     }
 
     fn items_mut(&mut self) -> Option<&mut HashMap<u32, super::item::ItemInstance>> {
-        None
-    }
-
-    fn sender(&mut self) -> Option<&mut tokio::sync::mpsc::Sender<common::packet::ServerPacket>> {
         None
     }
 

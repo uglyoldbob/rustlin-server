@@ -199,8 +199,8 @@ impl crate::world::object::ObjectTrait for FullCharacter {
         Some(&mut self.items)
     }
 
-    fn sender(&mut self) -> Option<&mut tokio::sync::mpsc::Sender<common::packet::ServerPacket>> {
-        Some(&mut self.sender)
+    fn sender(&mut self) -> Option<tokio::sync::mpsc::Sender<common::packet::ServerPacket>> {
+        Some(self.sender.clone())
     }
 
     fn build_put_object_packet(&self) -> common::packet::ServerPacket {

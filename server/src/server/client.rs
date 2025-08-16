@@ -37,8 +37,8 @@ impl std::future::AsyncDrop for Client {
         log::info!("Running async drop on client");
         let _ = self
             .packet_writer
-            .queue_packet(ServerPacket::Disconnect)
-            .await;
+            .queue_packet(ServerPacket::Disconnect);
+        self.packet_writer.send_all_current_packets().await;
         self.world.unregister_user(self.id);
     }
 }
@@ -108,12 +108,10 @@ impl Client {
                         intelligence,
                     ) {
                         self.world.save_new_character(&mut c).await?;
-                        self.queue_packet(ServerPacket::CharacterCreationStatus(0))
-                            .await?;
-                        self.queue_packet(c.get_new_char_details_packet()).await?;
+                        self.queue_packet(ServerPacket::CharacterCreationStatus(0));
+                        self.queue_packet(c.get_new_char_details_packet());
                     } else {
-                        self.queue_packet(ServerPacket::CharacterCreationStatus(1))
-                            .await?;
+                        self.queue_packet(ServerPacket::CharacterCreationStatus(1));
                     }
                 }
             }
@@ -133,21 +131,25 @@ impl Client {
                         })
                         .await;
                     if let Some(m) = m {
+                        let mut p = Vec::new();
                         let _ = self
                             .world
                             .with_mut_objects_near_me_do(
                                 &r,
                                 30.0,
                                 true,
-                                &mut self.packet_writer,
+                                &mut p,
                                 move |o: &mut crate::world::object::Object, pw| {
                                     if let Some(sender) = o.sender() {
-                                        let _ = sender.send(m.clone()).await;
+                                        pw.push((sender, m.clone()));
                                     }
                                     Ok::<(), String>(())
                                 },
                             )
                             .await;
+                        for (sender, p) in p {
+                            let _ = sender.send(p).await;
+                        }
                     }
                 }
             }
@@ -167,21 +169,25 @@ impl Client {
                         })
                         .await;
                     if let Some(m) = m {
+                        let mut p = Vec::new();
                         let _ = self
                             .world
                             .with_mut_objects_near_me_do(
                                 &r,
-                                60.0,
+                                30.0,
                                 true,
-                                &mut self.packet_writer,
+                                &mut p,
                                 move |o: &mut crate::world::object::Object, pw| {
                                     if let Some(sender) = o.sender() {
-                                        let _ = sender.send(m.clone()).await;
+                                        pw.push((sender, m.clone()));
                                     }
                                     Ok::<(), String>(())
                                 },
                             )
                             .await;
+                        for (sender, p) in p {
+                            let _ = sender.send(p).await;
+                        }
                     }
                 }
             }
