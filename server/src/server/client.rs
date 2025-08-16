@@ -365,6 +365,7 @@ impl Client {
         sender: &tokio::sync::mpsc::Sender<ServerPacket>,
     ) -> Result<(), ClientError> {
         let c = p.convert();
+        log::info!("Processing client packet {:?}", c);
         match c {
             ClientPacket::AttackObject { id, x, y } => {
                 if let Some(r) = self.char_ref {
@@ -741,6 +742,7 @@ impl Client {
 
         self.packet_writer
             .queue_packet(ServerPacket::EncryptionKey(encryption_key));
+        self.packet_writer.send_all_current_packets().await?;
         self.packet_writer
             .set_encryption_key(packet_reader.get_key());
         loop {
@@ -748,10 +750,12 @@ impl Client {
                 packet = packet_reader.read_packet().fuse() => {
                     let p = packet?;
                     self.process_packet(p, peer, config, &sender).await?;
+                    self.packet_writer.send_all_current_packets().await?;
                 }
                 msg = receiver.recv().fuse() => {
                     let p = msg.unwrap();
                     self.packet_writer.queue_packet(p);
+                    self.packet_writer.send_all_current_packets().await?;
                 }
                 _ = end_rx.recv().fuse() => {
                     break;
