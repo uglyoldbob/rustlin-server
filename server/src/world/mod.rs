@@ -164,7 +164,7 @@ pub struct World {
     /// maps of the world
     maps: HashMap<u16, Map>,
     /// dynamic information for all maps
-    map_info: Arc<Mutex<HashMap<u16, map_info::MapInfo>>>,
+    map_info: HashMap<u16, Arc<Mutex<map_info::MapInfo>>>,
     /// The item lookup table
     pub item_table: Arc<Mutex<HashMap<u32, item::Item>>>,
     /// The npc lookup table
@@ -216,7 +216,7 @@ impl World {
             client_ids: Arc::new(Mutex::new(crate::ClientList::new())),
             mysql,
             maps: mapd,
-            map_info: Arc::new(Mutex::new(mapi)),
+            map_info: mapi,
             item_table: Arc::new(Mutex::new(items)),
             npc_table: npc,
             npc_spawn_table,
@@ -232,9 +232,8 @@ impl World {
                 let npc = s.make_npc(new_id, &w.npc_table);
                 let o: object::Object = npc.into();
                 let mapid = o.get_location().map;
-                let mut mi = w.map_info.lock();
-                if let Some(map) = mi.get_mut(&mapid) {
-                    map.add_new_object(o);
+                if let Some(map) = w.map_info.get(&mapid) {
+                    map.lock().add_new_object(o);
                 }
             }
         }
@@ -249,10 +248,9 @@ impl World {
 
     /// Get a location of an object reference
     pub fn get_location(&self, r: ObjectRef) -> Option<Location> {
-        let mi = self.map_info.lock();
-        let map = mi.get(&r.map);
+        let map = self.map_info.get(&r.map);
         if let Some(map) = map {
-            return map.get_location(r);
+            return map.lock().get_location(r);
         }
         None
     }
@@ -260,9 +258,9 @@ impl World {
     /// Shutdown the server if the player is authorized to do so
     pub async fn shutdown(&self, r: &ObjectRef) {
         let shutdown = {
-            let mut mi = self.map_info.lock();
-            let map = mi.get_mut(&r.map);
+            let map = self.map_info.get(&r.map);
             if let Some(map) = map {
+                let map = map.lock();
                 if let Some(obj) = map.get_object_from_id(r.id) {
                     obj.lock().can_shutdown()
                 } else {
@@ -283,9 +281,9 @@ impl World {
     /// Restart the server if the player is authorized to do so
     pub async fn restart(&self, r: &ObjectRef) {
         let shutdown = {
-            let mut mi = self.map_info.lock();
-            let map = mi.get_mut(&r.map);
+            let map = self.map_info.get(&r.map);
             if let Some(map) = map {
+                let map = map.lock();
                 if let Some(obj) = map.get_object_from_id(r.id) {
                     obj.lock().can_shutdown()
                 } else {
@@ -305,10 +303,9 @@ impl World {
 
     /// Get an object from the world
     pub async fn get_object(&self, r: ObjectRef) -> Option<Arc<Mutex<object::Object>>> {
-        let mut mi = self.map_info.lock();
-        let map = mi.get_mut(&r.map);
+        let map = self.map_info.get(&r.map);
         if let Some(map) = map {
-            return map.get_object(r);
+            return map.lock().get_object(r);
         }
         None
     }
@@ -330,9 +327,9 @@ impl World {
                 }
             }
             {
-                let mut mi = self.map_info.lock();
                 for m in monsters {
-                    if let Some(map) = mi.get_mut(&m.get_location().map) {
+                    if let Some(map) = self.map_info.get(&m.get_location().map) {
+                        let mut map = map.lock();
                         map.add_new_object(m.into());
                     }
                 }
@@ -347,10 +344,9 @@ impl World {
         new_loc: Location,
         pw: Option<&mut ServerPacketSender>,
     ) -> Result<(), ClientError> {
-        let mut mi = self.map_info.lock();
-        let map = mi.get_mut(&new_loc.map);
+        let map = self.map_info.get(&new_loc.map);
         if let Some(map) = map {
-            map.move_object(r, new_loc, pw)?;
+            map.lock().move_object(r, new_loc, pw)?;
         }
         Ok(())
     }
@@ -362,9 +358,9 @@ impl World {
         id: WorldObjectId,
         pw: &mut common::packet::ServerPacketSender,
     ) -> Result<(), ClientError> {
-        let mut mi = self.map_info.lock();
-        let map = mi.get_mut(&location.map);
+        let map = self.map_info.get(&location.map);
         if let Some(map) = map {
+            let map = map.lock();
             if let Some(obj) = map.get_object_from_id(id) {
                 let p = obj.lock().build_put_object_packet();
                 pw.queue_packet(p);
@@ -390,11 +386,11 @@ impl World {
 
         let obj: object::Object = p.into();
         let id = obj.id();
-        let mut m = self.map_info.lock();
 
-        let m2 = m.get_mut(&location.map);
+        let m2 = self.map_info.get(&location.map);
         log::error!("add player 1");
         if let Some(map) = m2 {
+            let mut map = map.lock();
             log::error!("add player 2");
             let location = obj.get_location();
             map.add_new_object(obj);
@@ -426,10 +422,9 @@ impl World {
     /// Remove a player from the world
     pub async fn remove_player(&self, r: &mut Option<ObjectRef>) {
         if let Some(r) = &r {
-            let mut mi = self.map_info.lock();
-            let map = mi.get_mut(&r.map);
+            let map = self.map_info.get(&r.map);
             if let Some(map) = map {
-                map.remove_object(r.id);
+                map.lock().remove_object(r.id);
             }
         }
         *r = None;
@@ -440,9 +435,9 @@ impl World {
     where
         F: Fn(&crate::character::FullCharacter, &mut T, &Map) -> Option<E>,
     {
-        let mut mi = self.map_info.lock();
-        let map = mi.get_mut(&refo.map);
+        let map = self.map_info.get(&refo.map);
         if let Some(map) = map {
+            let map = map.lock();
             if let Some(obj) = map.get_object(refo) {
                 let obj2 = obj.lock();
                 let obj2: &object::Object = &obj2;
@@ -460,9 +455,9 @@ impl World {
     where
         F: Fn(&mut crate::character::FullCharacter, &mut T, &Map) -> Option<E>,
     {
-        let mut mi = self.map_info.lock();
-        let map = mi.get_mut(&refo.map);
+        let map = self.map_info.get(&refo.map);
         if let Some(map) = map {
+            let map = map.lock();
             if let Some(obj) = map.get_object(refo) {
                 let mut obj2 = obj.lock();
                 let obj2: &mut object::Object = &mut obj2;
@@ -485,9 +480,9 @@ impl World {
     where
         F: Fn(&object::Object, &mut T, &Map) -> Result<(), E>,
     {
-        let mut mi = self.map_info.lock();
-        let map = mi.get_mut(&refo.map);
+        let map = self.map_info.get(&refo.map);
         if let Some(map) = map {
+            let map = map.lock();
             let me = map.get_object(*refo).unwrap();
             let mylocation = {
                 let m2 = me.lock();
@@ -515,9 +510,8 @@ impl World {
     ) -> Result<(), String> {
         let mut send = None;
         {
-            let mut mi = self.map_info.lock();
-            for map in mi.values_mut() {
-                for obj in map.objects_iter() {
+            for map in self.map_info.values() {
+                for obj in map.lock().objects_iter() {
                     let mut o = obj.1.lock();
                     if let Some(name) = o.player_name() {
                         if name == other_person {
@@ -542,9 +536,8 @@ impl World {
     pub async fn send_global_chat(&self, m: common::packet::ServerPacket) {
         let mut p = Vec::new();
         {
-            let mut mi = self.map_info.lock();
-            for map in mi.values_mut() {
-                for obj in map.objects_iter() {
+            for map in self.map_info.values() {
+                for obj in map.lock().objects_iter() {
                     let mut o = obj.1.lock();
                     if let Some(sender) = o.sender() {
                         p.push((sender, m.clone()));
@@ -569,9 +562,9 @@ impl World {
     where
         F: Fn(&mut object::Object, &mut T) -> Result<(), E>,
     {
-        let mut mi = self.map_info.lock();
-        let map = mi.get_mut(&refo.map);
+        let map = self.map_info.get(&refo.map);
         if let Some(map) = map {
+            let map = map.lock();
             let my_location = map.get_location(*refo).unwrap();
             for (k, obj) in map.objects_iter() {
                 if include_self || *k != refo.id {
@@ -596,9 +589,9 @@ impl World {
     where
         F: Fn(&object::Object, &mut T, &Map) -> Result<(), E>,
     {
-        let mut mi = self.map_info.lock();
-        let map = mi.get_mut(&refo.map);
+        let map = self.map_info.get(&refo.map);
         if let Some(map) = map {
+            let map = map.lock();
             let me = map.get_object(*refo).unwrap();
             let mylocation = {
                 let m2 = me.lock();
@@ -628,9 +621,9 @@ impl World {
     where
         F: Fn(&object::Object, &mut T) -> Result<(), E>,
     {
-        let mi = self.map_info.lock();
-        let map = mi.get(&refo.map);
+        let map = self.map_info.get(&refo.map);
         if let Some(map) = map {
+            let map = map.lock();
             let me = map.get_object(refo).unwrap();
             let mylocation = {
                 let m2 = me.lock();
@@ -730,7 +723,7 @@ impl World {
     /// (Re)load all maps from the database
     pub async fn load_maps_data(
         mysql: &mut mysql_async::Conn,
-    ) -> Result<(HashMap<u16, Map>, HashMap<u16, map_info::MapInfo>), String> {
+    ) -> Result<(HashMap<u16, Map>, HashMap<u16, Arc<Mutex<map_info::MapInfo>>>), String> {
         let mut hmaps = HashMap::new();
         use mysql_async::prelude::Queryable;
         let query = "SELECT mapid, locationname, startX, endX, startY, endY, monster_amount, drop_rate, underwater, markable, teleportable, escapable, resurrection, painwand, penalty, take_pets, recall_pets, usable_item, usable_skill from mapids";
@@ -741,7 +734,7 @@ impl World {
             .map_err(|e| e.to_string())?;
         let mut hdata = HashMap::new();
         for m in maps {
-            hdata.entry(m.id).or_insert_with(map_info::MapInfo::new);
+            hdata.entry(m.id).or_insert_with(|| Arc::new(Mutex::new(map_info::MapInfo::new())));
             hmaps.insert(m.id, m);
         }
         Ok((hmaps, hdata))
