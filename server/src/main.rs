@@ -21,6 +21,7 @@ use crate::clients::ClientList;
 
 fn main() -> Result<(), String> {
     tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(20)
         .enable_all()
         .thread_stack_size(32 * 1024 * 1024)
         .build()

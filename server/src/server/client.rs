@@ -40,6 +40,7 @@ impl std::future::AsyncDrop for Client {
             .queue_packet(ServerPacket::Disconnect);
         self.packet_writer.send_all_current_packets().await;
         self.world.unregister_user(self.id);
+        log::info!("DONE Running async drop on client");
     }
 }
 

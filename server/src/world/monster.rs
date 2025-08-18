@@ -171,6 +171,32 @@ impl MonsterSpawn {
     }
 }
 
+pub struct MonsterGroup {
+    group: Vec<MonsterRef>,
+}
+
+impl MonsterGroup {
+    pub async fn run_ai(&mut self) {
+        use rand::Rng;
+        let initial_delay = rand::thread_rng().gen_range(0..=100000000);
+        tokio::time::sleep(std::time::Duration::from_micros(initial_delay)).await;
+        loop {
+            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+            for m in &mut self.group {
+                m.run_ai().await;
+            }
+        }
+    }
+}
+
+impl From<Vec<MonsterRef>> for MonsterGroup {
+    fn from(value: Vec<MonsterRef>) -> Self {
+        Self {
+            group: value,
+        }
+    }
+}
+
 /// The holder of a reference to a monster
 pub struct MonsterRef {
     /// A reference to the monster on the world
@@ -181,41 +207,36 @@ pub struct MonsterRef {
 
 impl MonsterRef {
     /// Run the ai for the monster
-    pub async fn run_ai(&mut self) {
+    async fn run_ai(&mut self) {
         use rand::Rng;
-        let initial_delay = rand::thread_rng().gen_range(0..=100000000);
-        tokio::time::sleep(std::time::Duration::from_micros(initial_delay)).await;
-        loop {
-            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-            let direction = rand::thread_rng().gen_range(0..=7u8);
-            let myloc = self.world.get_location(self.reference);
-            if let Some(l) = myloc {
-                let (x, y) = (l.x, l.y);
-                let (x2, y2) = match direction {
-                    0 => (x, y - 1),
-                    1 => (x + 1, y - 1),
-                    2 => (x + 1, y),
-                    3 => (x + 1, y + 1),
-                    4 => (x, y + 1),
-                    5 => (x - 1, y + 1),
-                    6 => (x - 1, y),
-                    7 => (x - 1, y - 1),
-                    _ => (x, y),
-                };
-                let new_loc = Location {
-                    x: x2,
-                    y: y2,
-                    map: l.map,
-                    direction,
-                };
-                if self.reference.id.get_u32() == 6431 {
-                    log::info!("Moving the bear to {:?}", new_loc);
-                }
-                let mut list = crate::world::map_info::SendsToAnotherObject::new();
-                let _ = self.world.move_object(self.reference, new_loc, None, &mut list).await;
-                if self.reference.id.get_u32() == 6431 {
-                    log::info!("Done moving the bear to {:?}", new_loc);
-                }
+        let direction = rand::thread_rng().gen_range(0..=7u8);
+        let myloc = self.world.get_location(self.reference);
+        if let Some(l) = myloc {
+            let (x, y) = (l.x, l.y);
+            let (x2, y2) = match direction {
+                0 => (x, y - 1),
+                1 => (x + 1, y - 1),
+                2 => (x + 1, y),
+                3 => (x + 1, y + 1),
+                4 => (x, y + 1),
+                5 => (x - 1, y + 1),
+                6 => (x - 1, y),
+                7 => (x - 1, y - 1),
+                _ => (x, y),
+            };
+            let new_loc = Location {
+                x: x2,
+                y: y2,
+                map: l.map,
+                direction,
+            };
+            if self.reference.id.get_u32() == 6431 {
+                log::info!("Moving the bear to {:?}", new_loc);
+            }
+            let mut list = crate::world::map_info::SendsToAnotherObject::new();
+            let _ = self.world.move_object(self.reference, new_loc, None, &mut list).await;
+            if self.reference.id.get_u32() == 6431 {
+                log::info!("Done moving the bear to {:?}", new_loc);
             }
         }
     }

@@ -96,7 +96,7 @@ impl std::future::AsyncDrop for GameServer {
             let k = self.kill.lock().await;
             for (addr, k) in k.iter() {
                 log::info!("Sending kill to {:?}", addr);
-                let _ = k.send(0).await;
+                let _ = k.send(0).await.inspect_err(|e| log::error!("Error sending kill {:?}", e));
             }
         }
         log::info!("Waiting for all clients to finish");

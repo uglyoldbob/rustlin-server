@@ -313,27 +313,22 @@ impl World {
     /// Spawn all monsters
     pub async fn spawn_monsters(self: &Arc<Self>) {
         if let Some(mset) = &self.monster_set {
-            let mut monsters = Vec::new();
             let mut idgen = self.id_generator.lock();
-            for ms in &self.monster_spawn_table {
-                let m = ms.make_monster(idgen.new_id(), &self.npc_table);
-                monsters.push(m);
-            }
-            {
-                let mut mset = mset.lock();
-                for m in &monsters {
-                    let mut monref = m.reference(self.clone());
-                    mset.spawn(async move { monref.run_ai().await });
-                }
-            }
-            {
-                log::info!("There are {} monsters to spawn", monsters.len());
+            log::info!("There are {} monsters to spawn", self.monster_spawn_table.len());
+            for mc in self.monster_spawn_table.chunks(15) {
+                let monsters: Vec<monster::Monster> = mc.iter().map(|ms| ms.make_monster(idgen.new_id(), &self.npc_table)).collect();
+                let mrs : Vec<monster::MonsterRef> = monsters.iter().map(|m| m.reference(self.clone())).collect();
+                let mut mrg : monster::MonsterGroup = mrs.into();
                 for m in monsters {
                     if let Some(map) = self.map_info.get(&m.get_location().map) {
                         let mut map = map.lock();
                         map.add_new_object(m.into());
                     }
                 }
+                let mut mset = mset.lock();
+                mset.spawn(async move {
+                    mrg.run_ai().await
+                });
             }
         }
     }
