@@ -182,9 +182,11 @@ pub struct MonsterRef {
 impl MonsterRef {
     /// Run the ai for the monster
     pub async fn run_ai(&mut self) {
+        use rand::Rng;
+        let initial_delay = rand::thread_rng().gen_range(0..=100000000);
+        tokio::time::sleep(std::time::Duration::from_micros(initial_delay)).await;
         loop {
             tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-            use rand::Rng;
             let direction = rand::thread_rng().gen_range(0..=7u8);
             let myloc = self.world.get_location(self.reference);
             if let Some(l) = myloc {
@@ -206,7 +208,14 @@ impl MonsterRef {
                     map: l.map,
                     direction,
                 };
-                let _ = self.world.move_object(self.reference, new_loc, None).await;
+                if self.reference.id.get_u32() == 6431 {
+                    log::info!("Moving the bear to {:?}", new_loc);
+                }
+                let mut list = crate::world::map_info::SendsToAnotherObject::new();
+                let _ = self.world.move_object(self.reference, new_loc, None, &mut list).await;
+                if self.reference.id.get_u32() == 6431 {
+                    log::info!("Done moving the bear to {:?}", new_loc);
+                }
             }
         }
     }

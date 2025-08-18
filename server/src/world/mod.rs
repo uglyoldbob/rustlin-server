@@ -327,6 +327,7 @@ impl World {
                 }
             }
             {
+                log::info!("There are {} monsters to spawn", monsters.len());
                 for m in monsters {
                     if let Some(map) = self.map_info.get(&m.get_location().map) {
                         let mut map = map.lock();
@@ -343,10 +344,11 @@ impl World {
         r: ObjectRef,
         new_loc: Location,
         pw: Option<&mut ServerPacketSender>,
+        list: &mut map_info::SendsToAnotherObject,
     ) -> Result<(), ClientError> {
         let map = self.map_info.get(&new_loc.map);
         if let Some(map) = map {
-            map.lock().move_object(r, new_loc, pw)?;
+            map.lock().move_object(r, new_loc, pw, list)?;
         }
         Ok(())
     }
@@ -374,6 +376,7 @@ impl World {
         &self,
         p: crate::character::FullCharacter,
         pw: &mut ServerPacketSender,
+        list: &mut map_info::SendsToAnotherObject,
     ) -> Option<ObjectRef> {
         let location = p.location_ref().to_owned();
 
@@ -410,7 +413,7 @@ impl World {
             {
                 log::error!("Player knows about object {:?}", o);
             }
-            map.move_object(or, location, Some(pw)).ok()?;
+            map.move_object(or, location, Some(pw), list).ok()?;
             log::error!("add player 5");
             Some(or)
         } else {

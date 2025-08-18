@@ -44,6 +44,7 @@ enum ShutdownMode {
 /// The main function of the server.
 async fn smain() -> Result<(), String> {
     simple_logger::init_with_level(log::Level::Info).unwrap();
+    console_subscriber::init();
 
     log::info!("server: Game server is starting");
 

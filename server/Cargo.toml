@@ -18,13 +18,17 @@ simple_logger = "5.0.0"
 stacker="0.1.15"
 toml = "0.8.14"
 
+[dependencies.console-subscriber]
+version = "0.4.1"
+features = ["parking_lot"]
+
 [dependencies.serde]
 version = "1.0.197"
 features = ["derive"]
 
 [dependencies.tokio]
 version = "1.47.1"
-features = ["rt-multi-thread", "net", "time", "macros", "signal", "sync", "io-util"]
+features = ["tracing", "rt-multi-thread", "net", "time", "macros", "signal", "sync", "io-util"]
 
 [dependencies.common]
 version = "^0"

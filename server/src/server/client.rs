@@ -365,6 +365,7 @@ impl Client {
         sender: &tokio::sync::mpsc::Sender<ServerPacket>,
     ) -> Result<(), ClientError> {
         let c = p.convert();
+        let mut list = crate::world::map_info::SendsToAnotherObject::new();
         log::info!("Processing client packet {:?}", c);
         match c {
             ClientPacket::AttackObject { id, x, y } => {
@@ -548,7 +549,7 @@ impl Client {
                         let item_table = self.world.item_table.lock();
                         c.into_full(&item_table, sender.clone())
                     };
-                    self.world.add_player(c, &mut self.packet_writer)
+                    self.world.add_player(c, &mut self.packet_writer, &mut list)
                 };
                 self.test1()?;
                 log::error!("Character select 5");
@@ -582,6 +583,7 @@ impl Client {
                                 direction: heading,
                             },
                             Some(&mut self.packet_writer),
+                            &mut list,
                         )
                         .await?;
                 }
@@ -754,6 +756,7 @@ impl Client {
                 }
                 msg = receiver.recv().fuse() => {
                     let p = msg.unwrap();
+                    log::info!("Got a async packet to send to client: {:?}", p);
                     self.packet_writer.queue_packet(p);
                     self.packet_writer.send_all_current_packets().await?;
                 }
