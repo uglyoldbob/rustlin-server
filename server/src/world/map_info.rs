@@ -124,12 +124,11 @@ impl MapInfo {
         &mut self,
         r: super::ObjectRef,
         new_loc: super::Location,
-        mut pw: Option<&mut ServerPacketSender>,
-        list: &mut SendsToAnotherObject,
     ) -> Result<(), super::ClientError> {
         let mut object_list = super::ObjectList::new();
         let thing_move_packet = {
             self.get_object_mut(r).unwrap().set_location(new_loc);
+            let mut pw = self.get_object_mut(r).unwrap().sender();
             for (id, o) in &mut self.objects {
                 if *id != r.id {
                     if o.linear_distance(&new_loc) < 17.0 {
@@ -145,18 +144,24 @@ impl MapInfo {
                 }
                 for objid in old_objects {
                     if let Some(pw) = &mut pw {
-                        pw.queue_packet(ServerPacket::RemoveObject(objid.get_u32()));
+                        pw.blocking_send(super::WorldResponse::ServerPacket(
+                            ServerPacket::RemoveObject(objid.get_u32()),
+                        ));
                     }
 
                     if let Some(pw) = &mut pw {
-                        pw.queue_packet(ServerPacket::RemoveObject(objid.get_u32()));
+                        pw.blocking_send(super::WorldResponse::ServerPacket(
+                            ServerPacket::RemoveObject(objid.get_u32()),
+                        ));
                     }
                     self.get_object_mut(r).unwrap().remove_object(objid);
                 }
                 for objid in new_objects {
                     if let Some(pw) = &mut pw {
                         if let Some(obj) = self.objects.get_mut(&objid) {
-                            pw.queue_packet(obj.build_put_object_packet());
+                            pw.blocking_send(super::WorldResponse::ServerPacket(
+                                obj.build_put_object_packet(),
+                            ));
                         }
                     }
                     self.get_object_mut(r).unwrap().add_object(objid);
@@ -177,7 +182,9 @@ impl MapInfo {
                 None
             };
             if let Some(s) = sender {
-                list.add_to_list(*o, s, thing_move_packet.clone());
+                s.blocking_send(super::WorldResponse::ServerPacket(
+                    thing_move_packet.clone(),
+                ));
             }
         }
         Ok(())

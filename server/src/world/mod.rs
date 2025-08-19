@@ -578,7 +578,8 @@ impl World {
                                         }
                                     }
                                 }
-                                if let Some(fc) = fco {
+                                if let Some(mut fc) = fco {
+                                    fc.add_sender(s.clone());
                                     self.add_player(fc, &mut s);
                                 }
                             } else {
@@ -616,8 +617,6 @@ impl World {
                                                 y: y2,
                                                 direction: heading,
                                             },
-                                            todo!(),
-                                            todo!(),
                                         );
                                     }
                                 }
@@ -1011,7 +1010,7 @@ impl World {
     pub fn spawn_monsters(&mut self) {
         if let Some(mset) = &mut self.monster_set {
             let mut monsters = Vec::new();
-            let mut idgen = &mut self.id_generator;
+            let idgen = &mut self.id_generator;
             for ms in &self.monster_spawn_table {
                 let m = ms.make_monster(idgen.new_id(), &self.npc_table);
                 monsters.push(m);
@@ -1019,7 +1018,8 @@ impl World {
             {
                 for m in &monsters {
                     let mut monref = m.reference();
-                    mset.spawn(async move { monref.run_ai().await });
+                    let s2 = self.sender.clone();
+                    mset.spawn(async move { monref.run_ai(s2).await });
                 }
             }
             {

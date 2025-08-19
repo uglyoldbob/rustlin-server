@@ -111,7 +111,7 @@ pub trait ObjectTrait {
     }
 
     /// If applicable (only for Player objects), get the object for sending messages to the user
-    fn sender(&mut self) -> Option<tokio::sync::mpsc::Sender<common::packet::ServerPacket>> {
+    fn sender(&mut self) -> Option<tokio::sync::mpsc::Sender<crate::world::WorldResponse>> {
         None
     }
 

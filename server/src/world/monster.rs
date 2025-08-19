@@ -1,6 +1,9 @@
 //! Monster related code for the world
 
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    net::{Ipv4Addr, SocketAddrV4},
+};
 
 /// Defines how a monster location is determined when spawned
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -176,47 +179,80 @@ pub struct MonsterRef {
 }
 
 impl MonsterRef {
-    /// Run the ai for the monster
-    pub async fn run_ai(&mut self) {
+    ///move the monster randomly
+    pub async fn moving(&mut self) {
         use rand::Rng;
-        let initial_delay = rand::thread_rng().gen_range(0..=100000000);
-        tokio::time::sleep(std::time::Duration::from_micros(initial_delay)).await;
-        loop {
-            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-            let direction = rand::thread_rng().gen_range(0..=7u8);
-            let myloc: Option<Location> = None;
-            if let Some(l) = myloc {
-                let (x, y) = (l.x, l.y);
-                let (x2, y2) = match direction {
-                    0 => (x, y - 1),
-                    1 => (x + 1, y - 1),
-                    2 => (x + 1, y),
-                    3 => (x + 1, y + 1),
-                    4 => (x, y + 1),
-                    5 => (x - 1, y + 1),
-                    6 => (x - 1, y),
-                    7 => (x - 1, y - 1),
-                    _ => (x, y),
-                };
-                let new_loc = Location {
-                    x: x2,
-                    y: y2,
-                    map: l.map,
-                    direction,
-                };
-                if self.reference.id.get_u32() == 6431 {
-                    log::info!("Moving the bear to {:?}", new_loc);
-                }
-                let mut list = crate::world::map_info::SendsToAnotherObject::new();
-                if self.reference.id.get_u32() == 6431 {
-                    log::info!("Done moving the bear to {:?}", new_loc);
-                }
+        let direction = rand::thread_rng().gen_range(0..=7u8);
+        let myloc: Option<Location> = None;
+        if let Some(l) = myloc {
+            let (x, y) = (l.x, l.y);
+            let (x2, y2) = match direction {
+                0 => (x, y - 1),
+                1 => (x + 1, y - 1),
+                2 => (x + 1, y),
+                3 => (x + 1, y + 1),
+                4 => (x, y + 1),
+                5 => (x - 1, y + 1),
+                6 => (x - 1, y),
+                7 => (x - 1, y - 1),
+                _ => (x, y),
+            };
+            let new_loc = Location {
+                x: x2,
+                y: y2,
+                map: l.map,
+                direction,
+            };
+            if self.reference.id.get_u32() == 6431 {
+                log::info!("Moving the bear to {:?}", new_loc);
+            }
+            let mut list = crate::world::map_info::SendsToAnotherObject::new();
+            if self.reference.id.get_u32() == 6431 {
+                log::info!("Done moving the bear to {:?}", new_loc);
             }
         }
     }
+
+    /// Run the ai for the monster
+    pub async fn run_ai(&mut self, sender: tokio::sync::mpsc::Sender<super::WorldMessage>) {
+        let mut chan = tokio::sync::mpsc::channel(5);
+        let _ = sender
+            .send(WorldMessage {
+                data: crate::world::WorldMessageData::RegisterSender(chan.0),
+                sender: None,
+                peer: std::net::SocketAddr::V4(SocketAddrV4::new(
+                    Ipv4Addr::new(127, 0, 0, 1),
+                    1234,
+                )),
+            })
+            .await;
+        let mut myid = None;
+        loop {
+            use futures::FutureExt;
+            futures::select! {
+                msg = chan.1.recv().fuse() => {
+                    let p = msg.unwrap();
+                    match p {
+                        super::WorldResponse::ServerPacket(p) => {
+                            log::error!("Unhandled packet for monster {:?}: {:?}", myid, p);
+                        }
+                        super::WorldResponse::NewClientId(id) => {
+                            log::info!("Got a client id {}", id);
+                            myid = Some(id);
+                        }
+                    }
+
+                }
+            }
+        }
+        log::info!("Exiting monster ai");
+    }
 }
 
-use crate::{character::Location, world::ObjectRef};
+use crate::{
+    character::Location,
+    world::{ObjectRef, WorldMessage},
+};
 
 /// A monster on the world
 #[derive(Debug)]

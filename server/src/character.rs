@@ -61,6 +61,8 @@ pub struct FullCharacter {
     items: HashMap<u32, crate::world::item::ItemInstance>,
     /// The known objects for the character
     known_objects: ObjectList,
+    /// How to send messages to the async task for this character
+    sender: Option<tokio::sync::mpsc::Sender<crate::world::WorldResponse>>,
 }
 
 /// Represents a partial playable character in the game
@@ -111,7 +113,7 @@ pub struct PartialCharacter {
 }
 
 impl PartialCharacter {
-    /// Convert into a full character, returning a FullCharacter and a receiver
+    /// Convert into a full character, returning a FullCharacter
     pub fn into_full(self, item_table: &HashMap<u32, crate::world::item::Item>) -> FullCharacter {
         let mut items = HashMap::new();
         for (k, i) in self.items.into_iter() {
@@ -142,6 +144,7 @@ impl PartialCharacter {
             details: self.details,
             items,
             known_objects: ObjectList::new(),
+            sender: None,
         }
     }
 }
@@ -192,8 +195,8 @@ impl crate::world::object::ObjectTrait for FullCharacter {
         Some(&mut self.items)
     }
 
-    fn sender(&mut self) -> Option<tokio::sync::mpsc::Sender<common::packet::ServerPacket>> {
-        None
+    fn sender(&mut self) -> Option<tokio::sync::mpsc::Sender<crate::world::WorldResponse>> {
+        self.sender.clone()
     }
 
     fn build_put_object_packet(&self) -> common::packet::ServerPacket {
@@ -226,6 +229,10 @@ impl FullCharacter {
     /// Get a reference to the location of the character
     pub fn location_ref(&self) -> &Location {
         &self.details.location
+    }
+
+    pub fn add_sender(&mut self, s: tokio::sync::mpsc::Sender<crate::world::WorldResponse>) {
+        self.sender = Some(s);
     }
 
     /// Use the specified item
