@@ -42,7 +42,7 @@ impl std::future::AsyncDrop for Client {
                 .send(WorldMessage {
                     data: crate::world::WorldMessageData::UnregisterClient(id),
                     peer: self.peer,
-                    sender: 42,
+                    sender: Some(id),
                 })
                 .await;
         }
@@ -106,11 +106,10 @@ impl Client {
     pub async fn process_packet(&mut self, p: Packet) -> Result<(), ClientError> {
         let c = p.convert();
         log::info!("Processing client packet {:?}", c);
-        let myid = self.id.unwrap();
         self.world_sender
             .send(WorldMessage {
                 data: crate::world::WorldMessageData::ClientPacket(c),
-                sender: myid,
+                sender: self.id,
                 peer: self.peer,
             })
             .await;
