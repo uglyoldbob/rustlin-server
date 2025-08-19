@@ -36,7 +36,7 @@ impl std::future::AsyncDrop for Client {
     async fn drop(mut self: std::pin::Pin<&mut Self>) {
         log::info!("Running async drop on client");
         let _ = self.packet_writer.queue_packet(ServerPacket::Disconnect);
-        self.packet_writer.send_all_current_packets().await;
+        self.packet_writer.send_all_current_packets(None).await;
         if let Some(id) = self.id {
             self.world_sender
                 .send(WorldMessage {
@@ -125,19 +125,23 @@ impl Client {
         mut end_rx: tokio::sync::mpsc::Receiver<u32>,
     ) -> Result<u8, ClientError> {
         let encryption_key: u32 = rand::thread_rng().gen();
+        self.packet_writer.set_future_encryption_key(encryption_key);
         let mut packet_reader = ServerPacketReceiver::new(reader, encryption_key);
 
-        self.packet_writer
-            .queue_packet(ServerPacket::EncryptionKey(encryption_key));
-        self.packet_writer.send_all_current_packets().await?;
-        self.packet_writer
-            .set_encryption_key(packet_reader.get_key());
+        self.world_sender
+            .send(WorldMessage {
+                data: crate::world::WorldMessageData::RegisterSender(sender),
+                sender: self.id,
+                peer: self.peer,
+            })
+            .await;
         loop {
             futures::select! {
                 packet = packet_reader.read_packet().fuse() => {
                     let p = packet?;
+                    log::info!("Processing a packet {:?}", p);
                     self.process_packet(p).await?;
-                    self.packet_writer.send_all_current_packets().await?;
+                    self.packet_writer.send_all_current_packets(Some(&mut packet_reader)).await?;
                 }
                 msg = receiver.recv().fuse() => {
                     let p = msg.unwrap();
@@ -145,9 +149,12 @@ impl Client {
                     match p {
                         WorldResponse::ServerPacket(p) => {
                             self.packet_writer.queue_packet(p);
-                            self.packet_writer.send_all_current_packets().await?;
+                            self.packet_writer.send_all_current_packets(Some(&mut packet_reader)).await?;
                         }
-                        WorldResponse::NewClientId(_) => {
+                        WorldResponse::NewClientId(id) => {
+                            log::info!("Got a client id {}", id);
+                            self.id = Some(id);
+                            self.packet_writer.send_all_current_packets(Some(&mut packet_reader)).await?;
                         }
                     }
 

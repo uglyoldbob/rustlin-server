@@ -69,6 +69,8 @@ async fn smain() -> Result<(), String> {
     .map_err(|e| format!("{:?}", e))?;
     world.spawn_monsters();
 
+    std::thread::spawn(move || world.run());
+
     let mut update_tx = Some(
         update::setup_update_server(&mut tasks)
             .await

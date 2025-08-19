@@ -9,7 +9,6 @@ pub mod npc;
 pub mod object;
 
 use common::packet::{ClientPacket, ServerPacket, ServerPacketSender};
-use futures::never;
 
 use crate::{
     character::{Character, FullCharacter, Location},
@@ -949,6 +948,7 @@ impl World {
                 },
             }
         }
+        log::error!("Exiting world run instance");
     }
 
     /// Get a new object id

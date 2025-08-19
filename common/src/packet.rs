@@ -1409,6 +1409,8 @@ pub struct ServerPacketSender {
     writer: tokio::net::tcp::OwnedWriteHalf,
     /// The encryption key to use for the next data to send out
     encryption_key: Option<u64>,
+    /// The future encryption key to use
+    future_encryption_key: Option<u32>,
     /// The packets pending being sent out
     pending_packets: Vec<ServerPacket>,
 }
@@ -1419,8 +1421,14 @@ impl ServerPacketSender {
         ServerPacketSender {
             writer: w,
             encryption_key: None,
+            future_encryption_key: None,
             pending_packets: Vec::new(),
         }
+    }
+
+    /// Set the future encryption key
+    pub fn set_future_encryption_key(&mut self, ek: u32) {
+        self.future_encryption_key = Some(ek);
     }
 
     /// Set the encryption key for outbound traffic
@@ -1429,9 +1437,24 @@ impl ServerPacketSender {
     }
 
     /// Send all pending packets
-    pub async fn send_all_current_packets(&mut self) -> Result<(), PacketError> {
+    pub async fn send_all_current_packets(
+        &mut self,
+        recv: Option<&mut ServerPacketReceiver>,
+    ) -> Result<(), PacketError> {
         let v = self.pending_packets.clone();
         self.pending_packets.clear();
+        if self.encryption_key.is_none() {
+            log::info!("Sending initial encryption packet");
+            if let Some(recv) = recv {
+                let ekey = self.future_encryption_key.take().unwrap();
+                self.send_packet(ServerPacket::EncryptionKey(ekey)).await?;
+                log::info!("Waiting for client encryption key");
+                self.set_encryption_key(recv.get_key());
+                log::info!("got client encryption key");
+            } else {
+                panic!();
+            }
+        }
         for p in v {
             self.send_packet(p).await?;
         }

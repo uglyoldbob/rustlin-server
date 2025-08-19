@@ -102,7 +102,6 @@ impl GameServer {
             tokio::select! {
                 Ok((socket, addr)) = self.listener.accept() => {
                     log::info!("Received a client from {}", addr);
-                    let config3 = self.config.clone();
                     let sender2 = sender.clone();
                     let (kill_s, kill_r) = tokio::sync::mpsc::channel(5);
                     let kills2 = self.kill.clone();
