@@ -32,19 +32,19 @@ impl Weapon {
     }
 }
 
-impl mysql_async::prelude::FromRow for Weapon {
-    fn from_row_opt(row: mysql_async::Row) -> Result<Self, mysql_async::FromRowError>
+impl mysql::prelude::FromRow for Weapon {
+    fn from_row_opt(row: mysql::Row) -> Result<Self, mysql::FromRowError>
     where
         Self: Sized,
     {
         Ok(Self {
-            id: row.get(0).ok_or(mysql_async::FromRowError(row.clone()))?,
-            weight: row.get(6).ok_or(mysql_async::FromRowError(row.clone()))?,
-            inventory_graphic: row.get(7).ok_or(mysql_async::FromRowError(row.clone()))?,
-            ground_graphic: row.get(8).ok_or(mysql_async::FromRowError(row.clone()))?,
-            unidentified: row.get(2).ok_or(mysql_async::FromRowError(row.clone()))?,
-            identified: row.get(3).ok_or(mysql_async::FromRowError(row.clone()))?,
-            max_use_time: row.get(44).ok_or(mysql_async::FromRowError(row.clone()))?,
+            id: row.get(0).ok_or(mysql::FromRowError(row.clone()))?,
+            weight: row.get(6).ok_or(mysql::FromRowError(row.clone()))?,
+            inventory_graphic: row.get(7).ok_or(mysql::FromRowError(row.clone()))?,
+            ground_graphic: row.get(8).ok_or(mysql::FromRowError(row.clone()))?,
+            unidentified: row.get(2).ok_or(mysql::FromRowError(row.clone()))?,
+            identified: row.get(3).ok_or(mysql::FromRowError(row.clone()))?,
+            max_use_time: row.get(44).ok_or(mysql::FromRowError(row.clone()))?,
         })
     }
 }

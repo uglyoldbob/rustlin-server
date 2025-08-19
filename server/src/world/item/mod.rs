@@ -287,15 +287,15 @@ impl ItemInstanceWithoutDefinition {
     }
 }
 
-impl mysql_async::prelude::FromRow for ItemStuff {
-    fn from_row_opt(row: mysql_async::Row) -> Result<Self, mysql_async::FromRowError>
+impl mysql::prelude::FromRow for ItemStuff {
+    fn from_row_opt(row: mysql::Row) -> Result<Self, mysql::FromRowError>
     where
         Self: Sized,
     {
         let elemental_enchant_type: Option<u8> =
-            row.get(11).ok_or(mysql_async::FromRowError(row.clone()))?;
+            row.get(11).ok_or(mysql::FromRowError(row.clone()))?;
         let elemental_enchant_level: Option<u8> =
-            row.get(12).ok_or(mysql_async::FromRowError(row.clone()))?;
+            row.get(12).ok_or(mysql::FromRowError(row.clone()))?;
         let e = if let Some(elemental_enchant_type) = elemental_enchant_type {
             if let Some(elemental_enchant_level) = elemental_enchant_level {
                 match elemental_enchant_type {
@@ -312,28 +312,28 @@ impl mysql_async::prelude::FromRow for ItemStuff {
             None
         };
         Ok(Self {
-            item_id: row.get(0).ok_or(mysql_async::FromRowError(row.clone()))?,
-            count: row.get(4).ok_or(mysql_async::FromRowError(row.clone()))?,
-            equipped: row.get(5).ok_or(mysql_async::FromRowError(row.clone()))?,
-            enchanted_level: row.get(6).ok_or(mysql_async::FromRowError(row.clone()))?,
-            identified: row.get(7).ok_or(mysql_async::FromRowError(row.clone()))?,
-            durability: row.get(8).ok_or(mysql_async::FromRowError(row.clone()))?,
-            blessed: row.get(10).ok_or(mysql_async::FromRowError(row.clone()))?,
-            charges: row.get(13).ok_or(mysql_async::FromRowError(row.clone()))?,
-            time_remaining: row.get(14).ok_or(mysql_async::FromRowError(row.clone()))?,
+            item_id: row.get(0).ok_or(mysql::FromRowError(row.clone()))?,
+            count: row.get(4).ok_or(mysql::FromRowError(row.clone()))?,
+            equipped: row.get(5).ok_or(mysql::FromRowError(row.clone()))?,
+            enchanted_level: row.get(6).ok_or(mysql::FromRowError(row.clone()))?,
+            identified: row.get(7).ok_or(mysql::FromRowError(row.clone()))?,
+            durability: row.get(8).ok_or(mysql::FromRowError(row.clone()))?,
+            blessed: row.get(10).ok_or(mysql::FromRowError(row.clone()))?,
+            charges: row.get(13).ok_or(mysql::FromRowError(row.clone()))?,
+            time_remaining: row.get(14).ok_or(mysql::FromRowError(row.clone()))?,
             elemental_enchant: e,
         })
     }
 }
 
-impl mysql_async::prelude::FromRow for ItemInstanceWithoutDefinition {
-    fn from_row_opt(row: mysql_async::Row) -> Result<Self, mysql_async::FromRowError>
+impl mysql::prelude::FromRow for ItemInstanceWithoutDefinition {
+    fn from_row_opt(row: mysql::Row) -> Result<Self, mysql::FromRowError>
     where
         Self: Sized,
     {
         Ok(Self {
-            id: row.get(1).ok_or(mysql_async::FromRowError(row.clone()))?,
-            stuff: mysql_async::prelude::FromRow::from_row_opt(row)?,
+            id: row.get(1).ok_or(mysql::FromRowError(row.clone()))?,
+            stuff: mysql::prelude::FromRow::from_row_opt(row)?,
         })
     }
 }

@@ -4,10 +4,8 @@
 
 //! The server for the game
 
-mod client_message;
 mod server;
 mod update;
-use client_message::*;
 
 mod server_message;
 
@@ -53,27 +51,31 @@ async fn smain() -> Result<(), String> {
     log::info!("Trying to connect to database");
     let _mysql_conn = mysql_pool
         .get_conn()
-        .await
         .expect("Failed to connect to mysql server");
 
     let mut tasks: tokio::task::JoinSet<Result<(), u32>> = tokio::task::JoinSet::new();
 
     let (iscs, mut iscr) = tokio::sync::mpsc::channel(5);
 
-    let world = std::sync::Arc::new(
-        world::World::new(mysql_pool, iscs)
-            .await
-            .map_err(|e| format!("{:?}", e))?,
-    );
-    world.spawn_monsters().await;
+    let (main_s, main_r) = tokio::sync::mpsc::channel(10000);
+
+    let mut world = world::World::new(
+        mysql_pool,
+        iscs,
+        main_r,
+        main_s.clone(),
+        settings.config.clone(),
+    )
+    .map_err(|e| format!("{:?}", e))?;
+    world.spawn_monsters();
 
     let mut update_tx = Some(
-        update::setup_update_server(&mut tasks, world.clone())
+        update::setup_update_server(&mut tasks)
             .await
             .expect("Failed to setup update server"),
     );
     let mut server_tx = Some(
-        server::setup_game_server(&mut tasks, world.clone(), &settings.config)
+        server::setup_game_server(&mut tasks, &settings.config, main_s)
             .await
             .expect("Failed to setup legacy server"),
     );

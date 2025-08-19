@@ -21,12 +21,11 @@ pub struct NpcDefinition {
 
 impl NpcDefinition {
     /// Load the npc definition table from the database
-    pub async fn load_table(mysql: &mut mysql_async::Conn) -> Result<HashMap<u32, Self>, String> {
-        use mysql_async::prelude::Queryable;
+    pub fn load_table(mysql: &mut mysql::PooledConn) -> Result<HashMap<u32, Self>, String> {
+        use mysql::prelude::Queryable;
         let query = "SELECT * from npc";
         let s = mysql
             .exec_map(query, (), |a: Self| a)
-            .await
             .map_err(|e| format!("{:?}", e))?;
         let mut t = HashMap::new();
         for s in s {
@@ -36,17 +35,17 @@ impl NpcDefinition {
     }
 }
 
-impl mysql_async::prelude::FromRow for NpcDefinition {
-    fn from_row_opt(row: mysql_async::Row) -> Result<Self, mysql_async::FromRowError>
+impl mysql::prelude::FromRow for NpcDefinition {
+    fn from_row_opt(row: mysql::Row) -> Result<Self, mysql::FromRowError>
     where
         Self: Sized,
     {
         Ok(Self {
-            id: row.get(0).ok_or(mysql_async::FromRowError(row.clone()))?,
-            name: row.get(2).ok_or(mysql_async::FromRowError(row.clone()))?,
-            graphics_id: row.get(5).ok_or(mysql_async::FromRowError(row.clone()))?,
-            light_size: row.get(60).ok_or(mysql_async::FromRowError(row.clone()))?,
-            alignment: row.get(17).ok_or(mysql_async::FromRowError(row.clone()))?,
+            id: row.get(0).ok_or(mysql::FromRowError(row.clone()))?,
+            name: row.get(2).ok_or(mysql::FromRowError(row.clone()))?,
+            graphics_id: row.get(5).ok_or(mysql::FromRowError(row.clone()))?,
+            light_size: row.get(60).ok_or(mysql::FromRowError(row.clone()))?,
+            alignment: row.get(17).ok_or(mysql::FromRowError(row.clone()))?,
         })
     }
 }
@@ -72,41 +71,39 @@ pub struct NpcSpawn {
     distance: u32,
 }
 
-impl mysql_async::prelude::FromRow for NpcSpawn {
-    fn from_row_opt(row: mysql_async::Row) -> Result<Self, mysql_async::FromRowError>
+impl mysql::prelude::FromRow for NpcSpawn {
+    fn from_row_opt(row: mysql::Row) -> Result<Self, mysql::FromRowError>
     where
         Self: Sized,
     {
-        let locx: u16 = row.get(4).ok_or(mysql_async::FromRowError(row.clone()))?;
-        let locy: u16 = row.get(5).ok_or(mysql_async::FromRowError(row.clone()))?;
-        let map: u16 = row.get(10).ok_or(mysql_async::FromRowError(row.clone()))?;
-        let direction: u8 = row.get(8).ok_or(mysql_async::FromRowError(row.clone()))?;
+        let locx: u16 = row.get(4).ok_or(mysql::FromRowError(row.clone()))?;
+        let locy: u16 = row.get(5).ok_or(mysql::FromRowError(row.clone()))?;
+        let map: u16 = row.get(10).ok_or(mysql::FromRowError(row.clone()))?;
+        let direction: u8 = row.get(8).ok_or(mysql::FromRowError(row.clone()))?;
         Ok(Self {
-            id: row.get(0).ok_or(mysql_async::FromRowError(row.clone()))?,
-            count: row.get(2).ok_or(mysql_async::FromRowError(row.clone()))?,
-            npc_definition: row.get(3).ok_or(mysql_async::FromRowError(row.clone()))?,
+            id: row.get(0).ok_or(mysql::FromRowError(row.clone()))?,
+            count: row.get(2).ok_or(mysql::FromRowError(row.clone()))?,
+            npc_definition: row.get(3).ok_or(mysql::FromRowError(row.clone()))?,
             location: Location {
                 x: locx,
                 y: locy,
                 map,
                 direction,
             },
-            randomx: row.get(6).ok_or(mysql_async::FromRowError(row.clone()))?,
-            randomy: row.get(7).ok_or(mysql_async::FromRowError(row.clone()))?,
-            respawn_delay: row.get(9).ok_or(mysql_async::FromRowError(row.clone()))?,
-            distance: row.get(11).ok_or(mysql_async::FromRowError(row.clone()))?,
+            randomx: row.get(6).ok_or(mysql::FromRowError(row.clone()))?,
+            randomy: row.get(7).ok_or(mysql::FromRowError(row.clone()))?,
+            respawn_delay: row.get(9).ok_or(mysql::FromRowError(row.clone()))?,
+            distance: row.get(11).ok_or(mysql::FromRowError(row.clone()))?,
         })
     }
 }
 
 impl NpcSpawn {
     /// Load the npc spawn table from the database
-    pub async fn load_table(
-        mysql: &mut mysql_async::Conn,
-    ) -> Result<Vec<Self>, super::ClientError> {
-        use mysql_async::prelude::Queryable;
+    pub fn load_table(mysql: &mut mysql::PooledConn) -> Result<Vec<Self>, super::ClientError> {
+        use mysql::prelude::Queryable;
         let query = "SELECT * from spawnlist_npc";
-        let s = mysql.exec_map(query, (), |a: Self| a).await?;
+        let s = mysql.exec_map(query, (), |a: Self| a)?;
         Ok(s)
     }
 

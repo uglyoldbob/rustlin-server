@@ -62,11 +62,11 @@ pub fn load_config() -> Result<MainConfiguration, toml::de::Error> {
 }
 
 /// Open a connection to the mysql server
-pub fn open_mysql(settings: &MainConfiguration) -> Result<mysql_async::Pool, mysql_async::Error> {
+pub fn open_mysql(settings: &MainConfiguration) -> Result<mysql::Pool, mysql::Error> {
     let mysql_conn_s = format!(
         "mysql://{}:{}@{}/{}",
         settings.db.username, settings.db.password, settings.db.url, settings.db.dbname
     );
-    let mysql_opt = mysql_async::Opts::from_url(mysql_conn_s.as_str())?;
-    Ok(mysql_async::Pool::new(mysql_opt))
+    let mysql_opt = mysql::Opts::from_url(mysql_conn_s.as_str())?;
+    mysql::Pool::new(mysql_opt)
 }

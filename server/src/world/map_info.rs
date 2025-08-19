@@ -3,11 +3,8 @@
 use std::{collections::HashMap, sync::Arc};
 
 use common::packet::{ServerPacket, ServerPacketSender};
-use futures::sink::Send;
 
 use crate::world::object::ObjectTrait;
-
-use parking_lot::FairMutex as Mutex;
 
 use super::WorldObjectId;
 
@@ -15,7 +12,7 @@ use super::WorldObjectId;
 #[derive(Debug)]
 pub struct MapInfo {
     /// The objects on the map
-    objects: HashMap<WorldObjectId, Arc<Mutex<super::object::Object>>>,
+    objects: HashMap<WorldObjectId, super::object::Object>,
 }
 
 /// This object is used to collect all of the packets destined for other objects
@@ -43,7 +40,12 @@ impl SendsToAnotherObject {
     }
 
     /// Add to the list
-    pub fn add_to_list(&mut self, id: WorldObjectId, s: tokio::sync::mpsc::Sender<ServerPacket>, p: ServerPacket) {
+    pub fn add_to_list(
+        &mut self,
+        id: WorldObjectId,
+        s: tokio::sync::mpsc::Sender<ServerPacket>,
+        p: ServerPacket,
+    ) {
         if let Some(a) = self.data.get_mut(&id) {
             a.1.push(p);
         } else {
@@ -73,33 +75,39 @@ impl MapInfo {
 
     /// Add an object to the map
     pub fn add_new_object(&mut self, new_o: super::object::Object) {
-        self.objects.insert(new_o.id(), Arc::new(Mutex::new(new_o)));
+        self.objects.insert(new_o.id(), new_o);
     }
 
     /// Get a location of an object reference
     pub fn get_location(&self, r: super::ObjectRef) -> Option<super::Location> {
         if let Some(o) = self.get_object(r) {
-            return Some(o.lock().get_location());
+            return Some(o.get_location());
         }
         None
     }
 
-    /// Get an object from the map
-    /// Get an object from the world
-    pub fn get_object(&self, r: super::ObjectRef) -> Option<Arc<Mutex<super::object::Object>>> {
-        if let Some(o) = self.objects.get(&r.id) {
-            return Some(o.clone());
+    /// Get the name of an object reference
+    pub fn get_name(&self, r: super::ObjectRef) -> Option<String> {
+        if let Some(o) = self.get_object(r) {
+            return o.player_name();
         }
         None
+    }
+
+    /// Get an object reference from the map
+    pub fn get_object(&self, r: super::ObjectRef) -> Option<&super::object::Object> {
+        self.objects.get(&r.id)
+    }
+
+    /// Get a mutable reference from the map
+    pub fn get_object_mut(&mut self, r: super::ObjectRef) -> Option<&mut super::object::Object> {
+        self.objects.get_mut(&r.id)
     }
 
     /// Get an object from the object id
-    pub fn get_object_from_id(
-        &self,
-        id: WorldObjectId,
-    ) -> Option<Arc<Mutex<super::object::Object>>> {
+    pub fn get_object_from_id(&self, id: WorldObjectId) -> Option<&super::object::Object> {
         if let Some(o) = self.objects.get(&id) {
-            return Some(o.clone());
+            return Some(o);
         }
         None
     }
@@ -107,8 +115,7 @@ impl MapInfo {
     /// Get an iterator over all objects
     pub fn objects_iter(
         &self,
-    ) -> std::collections::hash_map::Iter<'_, WorldObjectId, Arc<Mutex<super::object::Object>>>
-    {
+    ) -> std::collections::hash_map::Iter<'_, WorldObjectId, super::object::Object> {
         self.objects.iter()
     }
 
@@ -121,13 +128,11 @@ impl MapInfo {
         list: &mut SendsToAnotherObject,
     ) -> Result<(), super::ClientError> {
         let mut object_list = super::ObjectList::new();
-        let objr = self.get_object(r).unwrap();
         let thing_move_packet = {
-            let mut object_to_move = objr.lock();
-            object_to_move.set_location(new_loc);
+            self.get_object_mut(r).unwrap().set_location(new_loc);
             for (id, o) in &mut self.objects {
                 if *id != r.id {
-                    if o.lock().linear_distance(&new_loc) < 17.0 {
+                    if o.linear_distance(&new_loc) < 17.0 {
                         object_list.add_object(*id);
                     }
                 }
@@ -135,7 +140,7 @@ impl MapInfo {
             {
                 let mut old_objects = Vec::new();
                 let mut new_objects = Vec::new();
-                if let Some(ol) = object_to_move.get_known_objects() {
+                if let Some(ol) = self.get_object_mut(r).unwrap().get_known_objects() {
                     ol.find_changes(&mut old_objects, &mut new_objects, &object_list);
                 }
                 for objid in old_objects {
@@ -146,17 +151,17 @@ impl MapInfo {
                     if let Some(pw) = &mut pw {
                         pw.queue_packet(ServerPacket::RemoveObject(objid.get_u32()));
                     }
-                    object_to_move.remove_object(objid);
+                    self.get_object_mut(r).unwrap().remove_object(objid);
                 }
                 for objid in new_objects {
                     if let Some(pw) = &mut pw {
                         if let Some(obj) = self.objects.get_mut(&objid) {
-                            pw.queue_packet(obj.lock().build_put_object_packet());
+                            pw.queue_packet(obj.build_put_object_packet());
                         }
                     }
-                    object_to_move.add_object(objid);
+                    self.get_object_mut(r).unwrap().add_object(objid);
                 }
-                let thing_move_packet = object_to_move.build_move_object_packet();
+                let thing_move_packet = self.get_object_mut(r).unwrap().build_move_object_packet();
                 thing_move_packet
             }
         };
@@ -166,7 +171,7 @@ impl MapInfo {
                 panic!();
             }
             let sender = if let Some(o) = self.objects.get_mut(o) {
-                let sender = { o.lock().sender().map(|s| s.clone()) };
+                let sender = { o.sender().map(|s| s.clone()) };
                 sender
             } else {
                 None
@@ -182,7 +187,7 @@ impl MapInfo {
     pub fn remove_object(&mut self, id: WorldObjectId) {
         self.objects.remove(&id);
         for o in &mut self.objects {
-            o.1.lock().remove_object(id);
+            o.1.remove_object(id);
         }
     }
 }

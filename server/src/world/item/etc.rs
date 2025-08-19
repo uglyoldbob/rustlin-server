@@ -139,22 +139,22 @@ impl EtcItem {
     }
 }
 
-impl mysql_async::prelude::FromRow for EtcItem {
-    fn from_row_opt(row: mysql_async::Row) -> Result<Self, mysql_async::FromRowError>
+impl mysql::prelude::FromRow for EtcItem {
+    fn from_row_opt(row: mysql::Row) -> Result<Self, mysql::FromRowError>
     where
         Self: Sized,
     {
-        let itype: String = row.get(4).ok_or(mysql_async::FromRowError(row.clone()))?;
-        let usage: String = row.get(5).ok_or(mysql_async::FromRowError(row.clone()))?;
+        let itype: String = row.get(4).ok_or(mysql::FromRowError(row.clone()))?;
+        let usage: String = row.get(5).ok_or(mysql::FromRowError(row.clone()))?;
         Ok(Self {
-            id: row.get(0).ok_or(mysql_async::FromRowError(row.clone()))?,
+            id: row.get(0).ok_or(mysql::FromRowError(row.clone()))?,
             world_id: None,
-            weight: row.get(7).ok_or(mysql_async::FromRowError(row.clone()))?,
-            inventory_graphic: row.get(8).ok_or(mysql_async::FromRowError(row.clone()))?,
-            ground_graphic: row.get(9).ok_or(mysql_async::FromRowError(row.clone()))?,
-            max_charge_count: row.get(12).ok_or(mysql_async::FromRowError(row.clone()))?,
-            unidentified: row.get(2).ok_or(mysql_async::FromRowError(row.clone()))?,
-            identified: row.get(3).ok_or(mysql_async::FromRowError(row.clone()))?,
+            weight: row.get(7).ok_or(mysql::FromRowError(row.clone()))?,
+            inventory_graphic: row.get(8).ok_or(mysql::FromRowError(row.clone()))?,
+            ground_graphic: row.get(9).ok_or(mysql::FromRowError(row.clone()))?,
+            max_charge_count: row.get(12).ok_or(mysql::FromRowError(row.clone()))?,
+            unidentified: row.get(2).ok_or(mysql::FromRowError(row.clone()))?,
+            identified: row.get(3).ok_or(mysql::FromRowError(row.clone()))?,
             itype: itype.as_str().into(),
             usage: usage.as_str().into(),
         })

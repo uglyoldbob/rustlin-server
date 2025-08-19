@@ -6,10 +6,9 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::net::TcpListener;
 
-use crate::ClientMessage;
-
 pub mod client;
 use crate::server::client::*;
+use crate::world::WorldMessage;
 
 use common::packet::*;
 
@@ -20,10 +19,8 @@ pub enum ClientError {
     PacketError(common::packet::PacketError),
     /// An io error occurred
     IoError(std::io::Error),
-    /// Error sending a ClientMessage
-    ErrorSendingClientMessage(tokio::sync::mpsc::error::SendError<ClientMessage>),
     /// A mysql error occurred
-    MysqlError(mysql_async::Error),
+    MysqlError(mysql::Error),
     /// The user selected an invalid character
     InvalidCharSelection,
 }
@@ -40,14 +37,8 @@ impl From<std::io::Error> for ClientError {
     }
 }
 
-impl From<tokio::sync::mpsc::error::SendError<ClientMessage>> for ClientError {
-    fn from(a: tokio::sync::mpsc::error::SendError<ClientMessage>) -> ClientError {
-        ClientError::ErrorSendingClientMessage(a)
-    }
-}
-
-impl From<mysql_async::Error> for ClientError {
-    fn from(a: mysql_async::Error) -> ClientError {
+impl From<mysql::Error> for ClientError {
+    fn from(a: mysql::Error) -> ClientError {
         ClientError::MysqlError(a)
     }
 }
@@ -55,18 +46,17 @@ impl From<mysql_async::Error> for ClientError {
 /// Process a single client for the world in the server
 async fn process_client(
     socket: tokio::net::TcpStream,
-    world: std::sync::Arc<crate::world::World>,
-    config: std::sync::Arc<crate::ServerConfiguration>,
+    world_sender: tokio::sync::mpsc::Sender<crate::world::WorldMessage>,
     end_rx: tokio::sync::mpsc::Receiver<u32>,
 ) -> Result<u8, ClientError> {
     log::info!("Processing a client");
     let (reader, writer) = socket.into_split();
     let packet_writer = ServerPacketSender::new(writer);
 
-    let s = tokio::sync::mpsc::channel(10);
-
-    let c = Client::new(packet_writer, world.clone());
-    c.event_loop(reader, s.1, s.0, &config, end_rx).await?;
+    let (t_s, t_r) = tokio::sync::mpsc::channel(10);
+    let peer = reader.peer_addr()?;
+    let c = Client::new(packet_writer, world_sender, peer);
+    c.event_loop(reader, t_r, t_s, end_rx).await?;
     Ok(0)
 }
 
@@ -74,8 +64,6 @@ async fn process_client(
 struct GameServer {
     /// Used to accept new connections from game clients
     listener: TcpListener,
-    /// A reference to the server world
-    world: std::sync::Arc<crate::world::World>,
     /// The server configuration
     config: std::sync::Arc<crate::ServerConfiguration>,
     /// Used to receive a message to end the server
@@ -109,13 +97,13 @@ impl std::future::AsyncDrop for GameServer {
 
 impl GameServer {
     /// Run the server
-    async fn run(mut self) -> Result<(), u32> {
+    async fn run(mut self, sender: tokio::sync::mpsc::Sender<WorldMessage>) -> Result<(), u32> {
         loop {
             tokio::select! {
                 Ok((socket, addr)) = self.listener.accept() => {
                     log::info!("Received a client from {}", addr);
-                    let world2 = self.world.clone();
                     let config3 = self.config.clone();
+                    let sender2 = sender.clone();
                     let (kill_s, kill_r) = tokio::sync::mpsc::channel(5);
                     let kills2 = self.kill.clone();
                     if let Some(c) = &mut self.clients {
@@ -124,7 +112,7 @@ impl GameServer {
                                 let mut k = kills2.lock().await;
                                 k.insert(addr, kill_s);
                             }
-                            if let Err(e) = process_client(socket, world2, config3, kill_r).await {
+                            if let Err(e) = process_client(socket, sender2, kill_r).await {
                                 log::warn!("Client {} errored {:?}", addr, e);
                             }
                             {
@@ -148,8 +136,8 @@ impl GameServer {
 /// Start the game
 pub async fn setup_game_server(
     tasks: &mut tokio::task::JoinSet<Result<(), u32>>,
-    world: std::sync::Arc<crate::world::World>,
     config: &crate::ServerConfiguration,
+    sender: tokio::sync::mpsc::Sender<WorldMessage>,
 ) -> Result<tokio::sync::oneshot::Sender<u32>, Box<dyn Error>> {
     log::info!("server: Starting the game server");
     let (update_tx, update_rx) = tokio::sync::oneshot::channel::<u32>();
@@ -159,13 +147,12 @@ pub async fn setup_game_server(
 
     let server = GameServer {
         listener: update_listener,
-        world,
         config,
         update_rx,
         clients: Some(tokio::task::JoinSet::new()),
         kill: Arc::new(tokio::sync::Mutex::new(HashMap::new())),
     };
-    tasks.spawn(server.run());
+    tasks.spawn(server.run(sender));
 
     Ok(update_tx)
 }

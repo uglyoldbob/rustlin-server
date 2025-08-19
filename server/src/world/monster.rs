@@ -48,54 +48,52 @@ pub struct MonsterSpawn {
     spawn_type: SpawnType,
 }
 
-impl mysql_async::prelude::FromRow for MonsterSpawn {
-    fn from_row_opt(row: mysql_async::Row) -> Result<Self, mysql_async::FromRowError>
+impl mysql::prelude::FromRow for MonsterSpawn {
+    fn from_row_opt(row: mysql::Row) -> Result<Self, mysql::FromRowError>
     where
         Self: Sized,
     {
-        let locx: u16 = row.get(5).ok_or(mysql_async::FromRowError(row.clone()))?;
-        let locy: u16 = row.get(6).ok_or(mysql_async::FromRowError(row.clone()))?;
-        let map: u16 = row.get(16).ok_or(mysql_async::FromRowError(row.clone()))?;
-        let direction: u8 = row.get(13).ok_or(mysql_async::FromRowError(row.clone()))?;
-        let st: u8 = row.get(20).ok_or(mysql_async::FromRowError(row.clone()))?;
+        let locx: u16 = row.get(5).ok_or(mysql::FromRowError(row.clone()))?;
+        let locy: u16 = row.get(6).ok_or(mysql::FromRowError(row.clone()))?;
+        let map: u16 = row.get(16).ok_or(mysql::FromRowError(row.clone()))?;
+        let direction: u8 = row.get(13).ok_or(mysql::FromRowError(row.clone()))?;
+        let st: u8 = row.get(20).ok_or(mysql::FromRowError(row.clone()))?;
         Ok(Self {
-            id: row.get(0).ok_or(mysql_async::FromRowError(row.clone()))?,
-            count: row.get(2).ok_or(mysql_async::FromRowError(row.clone()))?,
-            npc_definition: row.get(3).ok_or(mysql_async::FromRowError(row.clone()))?,
+            id: row.get(0).ok_or(mysql::FromRowError(row.clone()))?,
+            count: row.get(2).ok_or(mysql::FromRowError(row.clone()))?,
+            npc_definition: row.get(3).ok_or(mysql::FromRowError(row.clone()))?,
             location: Location {
                 x: locx,
                 y: locy,
                 map,
                 direction,
             },
-            randomx: row.get(7).ok_or(mysql_async::FromRowError(row.clone()))?,
-            randomy: row.get(8).ok_or(mysql_async::FromRowError(row.clone()))?,
+            randomx: row.get(7).ok_or(mysql::FromRowError(row.clone()))?,
+            randomy: row.get(8).ok_or(mysql::FromRowError(row.clone()))?,
             coord1: (
-                row.get(9).ok_or(mysql_async::FromRowError(row.clone()))?,
-                row.get(10).ok_or(mysql_async::FromRowError(row.clone()))?,
+                row.get(9).ok_or(mysql::FromRowError(row.clone()))?,
+                row.get(10).ok_or(mysql::FromRowError(row.clone()))?,
             ),
             coord2: (
-                row.get(11).ok_or(mysql_async::FromRowError(row.clone()))?,
-                row.get(12).ok_or(mysql_async::FromRowError(row.clone()))?,
+                row.get(11).ok_or(mysql::FromRowError(row.clone()))?,
+                row.get(12).ok_or(mysql::FromRowError(row.clone()))?,
             ),
             respawn_delay: (
-                row.get(14).ok_or(mysql_async::FromRowError(row.clone()))?,
-                row.get(15).ok_or(mysql_async::FromRowError(row.clone()))?,
+                row.get(14).ok_or(mysql::FromRowError(row.clone()))?,
+                row.get(15).ok_or(mysql::FromRowError(row.clone()))?,
             ),
             spawn_type: std::convert::TryInto::try_into(st)
-                .map_err(|_| mysql_async::FromRowError(row.clone()))?,
+                .map_err(|_| mysql::FromRowError(row.clone()))?,
         })
     }
 }
 
 impl MonsterSpawn {
     /// Load the npc spawn table from the database
-    pub async fn load_table(
-        mysql: &mut mysql_async::Conn,
-    ) -> Result<Vec<Self>, super::ClientError> {
-        use mysql_async::prelude::Queryable;
+    pub fn load_table(mysql: &mut mysql::PooledConn) -> Result<Vec<Self>, super::ClientError> {
+        use mysql::prelude::Queryable;
         let query = "SELECT * from spawnlist";
-        let s = mysql.exec_map(query, (), |a: Self| a).await?;
+        let s = mysql.exec_map(query, (), |a: Self| a)?;
         Ok(s)
     }
 
@@ -175,8 +173,6 @@ impl MonsterSpawn {
 pub struct MonsterRef {
     /// A reference to the monster on the world
     reference: ObjectRef,
-    /// The world object
-    world: std::sync::Arc<crate::world::World>,
 }
 
 impl MonsterRef {
@@ -188,7 +184,7 @@ impl MonsterRef {
         loop {
             tokio::time::sleep(std::time::Duration::from_secs(1)).await;
             let direction = rand::thread_rng().gen_range(0..=7u8);
-            let myloc = self.world.get_location(self.reference);
+            let myloc: Option<Location> = None;
             if let Some(l) = myloc {
                 let (x, y) = (l.x, l.y);
                 let (x2, y2) = match direction {
@@ -212,7 +208,6 @@ impl MonsterRef {
                     log::info!("Moving the bear to {:?}", new_loc);
                 }
                 let mut list = crate::world::map_info::SendsToAnotherObject::new();
-                let _ = self.world.move_object(self.reference, new_loc, None, &mut list).await;
                 if self.reference.id.get_u32() == 6431 {
                     log::info!("Done moving the bear to {:?}", new_loc);
                 }
@@ -246,13 +241,12 @@ pub struct Monster {
 
 impl Monster {
     /// Get a reference to the monster
-    pub fn reference(&self, world: std::sync::Arc<crate::world::World>) -> MonsterRef {
+    pub fn reference(&self) -> MonsterRef {
         MonsterRef {
             reference: ObjectRef {
                 map: self.location.map,
                 id: self.id,
             },
-            world,
         }
     }
 }

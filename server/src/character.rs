@@ -3,14 +3,14 @@
 use std::{collections::HashMap, convert::TryInto};
 
 use common::packet::{ServerPacket, ServerPacketSender};
-use mysql_async::{prelude::Queryable, Params};
+use mysql::{prelude::Queryable, Params};
 
 use crate::{
     server::ClientError,
     world::{
         item::{ItemInstanceWithoutDefinition, ItemUsage},
         object::ObjectList,
-        Map, WorldObjectId,
+        Map, WorldObjectId, WorldResponse,
     },
 };
 
@@ -59,8 +59,6 @@ pub struct FullCharacter {
     details: ExtraCharacterDetails,
     /// All the items the character holds
     items: HashMap<u32, crate::world::item::ItemInstance>,
-    /// Used to send messages to the user when needed
-    sender: tokio::sync::mpsc::Sender<common::packet::ServerPacket>,
     /// The known objects for the character
     known_objects: ObjectList,
 }
@@ -114,11 +112,7 @@ pub struct PartialCharacter {
 
 impl PartialCharacter {
     /// Convert into a full character, returning a FullCharacter and a receiver
-    pub fn into_full(
-        self,
-        item_table: &HashMap<u32, crate::world::item::Item>,
-        sender: tokio::sync::mpsc::Sender<common::packet::ServerPacket>,
-    ) -> FullCharacter {
+    pub fn into_full(self, item_table: &HashMap<u32, crate::world::item::Item>) -> FullCharacter {
         let mut items = HashMap::new();
         for (k, i) in self.items.into_iter() {
             if let Some(i) = i.populate_item_definition(item_table) {
@@ -147,7 +141,6 @@ impl PartialCharacter {
             intelligence: self.intelligence,
             details: self.details,
             items,
-            sender: sender,
             known_objects: ObjectList::new(),
         }
     }
@@ -200,7 +193,7 @@ impl crate::world::object::ObjectTrait for FullCharacter {
     }
 
     fn sender(&mut self) -> Option<tokio::sync::mpsc::Sender<common::packet::ServerPacket>> {
-        Some(self.sender.clone())
+        None
     }
 
     fn build_put_object_packet(&self) -> common::packet::ServerPacket {
@@ -239,7 +232,7 @@ impl FullCharacter {
     pub fn use_item(
         &mut self,
         id: &u32,
-        p2: &mut crate::server::client::ItemUseData,
+        p2: &mut crate::world::ItemUseData,
         map: &Map,
     ) -> Result<(), ClientError> {
         if let Some(item) = self.items.get_mut(id) {
@@ -345,7 +338,7 @@ impl FullCharacter {
     /// Send all items the player has to the user
     pub fn send_all_items(
         &self,
-        packet_writer: &mut ServerPacketSender,
+        s: &mut tokio::sync::mpsc::Sender<WorldResponse>,
     ) -> Result<(), crate::server::ClientError> {
         let mut elements = Vec::new();
         {
@@ -353,7 +346,9 @@ impl FullCharacter {
                 elements.push(i.inventory_element());
             }
         }
-        packet_writer.queue_packet(common::packet::ServerPacket::InventoryVec(elements));
+        s.blocking_send(WorldResponse::ServerPacket(
+            common::packet::ServerPacket::InventoryVec(elements),
+        ));
         Ok(())
     }
 
@@ -537,26 +532,26 @@ pub struct ExtraCharacterDetails {
     old_location: Option<crate::character::Location>,
 }
 
-impl mysql_async::prelude::FromRow for ExtraCharacterDetails {
-    fn from_row_opt(row: mysql_async::Row) -> Result<Self, mysql_async::FromRowError>
+impl mysql::prelude::FromRow for ExtraCharacterDetails {
+    fn from_row_opt(row: mysql::Row) -> Result<Self, mysql::FromRowError>
     where
         Self: Sized,
     {
         Ok(Self {
-            exp: row.get(0).ok_or(mysql_async::FromRowError(row.clone()))?,
-            curr_hp: row.get(1).ok_or(mysql_async::FromRowError(row.clone()))?,
-            curr_mp: row.get(2).ok_or(mysql_async::FromRowError(row.clone()))?,
-            time: row.get(3).ok_or(mysql_async::FromRowError(row.clone()))?,
-            food: row.get(4).ok_or(mysql_async::FromRowError(row.clone()))?,
-            weight: row.get(5).ok_or(mysql_async::FromRowError(row.clone()))?,
-            fire_resist: row.get(6).ok_or(mysql_async::FromRowError(row.clone()))?,
-            water_resist: row.get(7).ok_or(mysql_async::FromRowError(row.clone()))?,
-            wind_resist: row.get(8).ok_or(mysql_async::FromRowError(row.clone()))?,
-            earth_resist: row.get(9).ok_or(mysql_async::FromRowError(row.clone()))?,
+            exp: row.get(0).ok_or(mysql::FromRowError(row.clone()))?,
+            curr_hp: row.get(1).ok_or(mysql::FromRowError(row.clone()))?,
+            curr_mp: row.get(2).ok_or(mysql::FromRowError(row.clone()))?,
+            time: row.get(3).ok_or(mysql::FromRowError(row.clone()))?,
+            food: row.get(4).ok_or(mysql::FromRowError(row.clone()))?,
+            weight: row.get(5).ok_or(mysql::FromRowError(row.clone()))?,
+            fire_resist: row.get(6).ok_or(mysql::FromRowError(row.clone()))?,
+            water_resist: row.get(7).ok_or(mysql::FromRowError(row.clone()))?,
+            wind_resist: row.get(8).ok_or(mysql::FromRowError(row.clone()))?,
+            earth_resist: row.get(9).ok_or(mysql::FromRowError(row.clone()))?,
             location: Location {
-                x: row.get(10).ok_or(mysql_async::FromRowError(row.clone()))?,
-                y: row.get(11).ok_or(mysql_async::FromRowError(row.clone()))?,
-                map: row.get(12).ok_or(mysql_async::FromRowError(row.clone()))?,
+                x: row.get(10).ok_or(mysql::FromRowError(row.clone()))?,
+                y: row.get(11).ok_or(mysql::FromRowError(row.clone()))?,
+                map: row.get(12).ok_or(mysql::FromRowError(row.clone()))?,
                 direction: 5,
             },
             old_location: None,
@@ -775,42 +770,38 @@ impl Character {
     }
 
     /// Retrieve all items for the character
-    async fn get_items(
+    fn get_items(
         &self,
-        mysql: &mut mysql_async::Conn,
+        mysql: &mut mysql::PooledConn,
     ) -> Result<Vec<ItemInstanceWithoutDefinition>, crate::server::ClientError> {
         let query = "SELECT * from character_items WHERE char_id=?";
-        let s = mysql.prep(query).await?;
+        let s = mysql.prep(query)?;
         let params = Params::Positional(vec![self.id.into()]);
-        let details = mysql
-            .exec_map(s, params, |a: ItemInstanceWithoutDefinition| a)
-            .await?;
+        let details = mysql.exec_map(s, params, |a: ItemInstanceWithoutDefinition| a)?;
         Ok(details)
     }
 
     /// Retrieve all gameplay details of the character from the database, some of the elements need to be looked up to finish the character.
-    pub async fn get_partial_details(
+    pub fn get_partial_details(
         &self,
         new_id: super::world::WorldObjectId,
-        mysql: &mut mysql_async::Conn,
+        mysql: &mut mysql::PooledConn,
     ) -> Result<PartialCharacter, crate::server::ClientError> {
-        use mysql_async::prelude::Queryable;
+        use mysql::prelude::Queryable;
         let query = "SELECT Exp, CurHp, CurMp, 1, Food, 32, 1, 2, 3, 4, LocX, LocY, MapID from characters WHERE account_name=? and char_name=?";
         log::info!(
             "Checking for account {} -  player {}",
             self.account_name,
             self.name
         );
-        let s = mysql.prep(query).await?;
-        let details = mysql
-            .exec_map(
-                s,
-                (&self.account_name, &self.name),
-                |a: ExtraCharacterDetails| a,
-            )
-            .await?;
+        let s = mysql.prep(query)?;
+        let details = mysql.exec_map(
+            s,
+            (&self.account_name, &self.name),
+            |a: ExtraCharacterDetails| a,
+        )?;
         let details = details[0];
-        let items = self.get_items(mysql).await?;
+        let items = self.get_items(mysql)?;
         let mut item_map = HashMap::new();
         for i in items {
             item_map.insert(i.id(), i);
@@ -841,48 +832,41 @@ impl Character {
     }
 
     /// Save a new character into the database, updating the id of the character to a new valid id
-    pub async fn save_new_to_db(
+    pub fn save_new_to_db(
         &mut self,
-        mysql: &mut mysql_async::Conn,
+        mysql: &mut mysql::PooledConn,
     ) -> Result<(), crate::server::ClientError> {
-        use mysql_async::prelude::Queryable;
-        let mut t = mysql.start_transaction(mysql_async::TxOpts::new()).await?;
-        let id = crate::world::World::get_new_id(&mut t).await?;
+        use mysql::prelude::Queryable;
+        let mut t = mysql.start_transaction(mysql::TxOpts::default())?;
+        let id = crate::world::World::get_new_id(&mut t)?;
         if let Some(id) = id {
             self.id = id;
         } else {
             self.id = 2;
         }
         let query = "INSERT INTO characters SET account_name=?,objid=?,char_name=?,level=?,MaxHp=?,MaxMp=?,Class=?,Sex=?,Ac=?,Str=?,Dex=?,Con=?,Wis=?,Cha=?,Intel=?";
-        t.exec_drop(query, self).await?;
-        t.commit().await?;
+        t.exec_drop(query, self)?;
+        t.commit()?;
         Ok(())
     }
 
     /// Delete the character from the database
-    pub async fn delete_char(
-        &self,
-        mysql: &mut mysql_async::Conn,
-    ) -> Result<(), mysql_async::Error> {
+    pub fn delete_char(&self, mysql: &mut mysql::PooledConn) -> Result<(), mysql::Error> {
         let query = "DELETE FROM characters WHERE account_name=? AND char_name=?";
-        mysql
-            .exec_drop(query, (self.account_name.clone(), self.name.clone()))
-            .await?;
+        mysql.exec_drop(query, (self.account_name.clone(), self.name.clone()))?;
         Ok(())
     }
 
     /// Retrieve characters for user account from database
-    pub async fn retrieve_chars(
+    pub fn retrieve_chars(
         account_name: &String,
-        mysql: &mut mysql_async::Conn,
+        mysql: &mut mysql::PooledConn,
     ) -> Result<Vec<crate::character::Character>, crate::server::ClientError> {
-        use mysql_async::prelude::Queryable;
+        use mysql::prelude::Queryable;
         let query = crate::character::Character::QUERY;
         log::info!("Checking for account {}", account_name);
-        let s = mysql.prep(query).await?;
-        let asdf = mysql
-            .exec_map(s, (account_name.clone(),), |a: Character| a)
-            .await?;
+        let s = mysql.prep(query)?;
+        let asdf = mysql.exec_map(s, (account_name.clone(),), |a: Character| a)?;
         Ok(asdf)
     }
 
@@ -950,33 +934,31 @@ impl From<&mut Character> for Params {
     }
 }
 
-impl mysql_async::prelude::FromRow for Character {
-    fn from_row_opt(row: mysql_async::Row) -> Result<Self, mysql_async::FromRowError>
+impl mysql::prelude::FromRow for Character {
+    fn from_row_opt(row: mysql::Row) -> Result<Self, mysql::FromRowError>
     where
         Self: Sized,
     {
-        let c: u16 = row.get(6).ok_or(mysql_async::FromRowError(row.clone()))?;
+        let c: u16 = row.get(6).ok_or(mysql::FromRowError(row.clone()))?;
         Ok(Self {
-            account_name: row.get(0).ok_or(mysql_async::FromRowError(row.clone()))?,
-            name: row.get(1).ok_or(mysql_async::FromRowError(row.clone()))?,
-            id: row.get(2).ok_or(mysql_async::FromRowError(row.clone()))?,
-            alignment: row.get(3).ok_or(mysql_async::FromRowError(row.clone()))?,
-            level: row.get(4).ok_or(mysql_async::FromRowError(row.clone()))?,
-            pledge: row.get(5).ok_or(mysql_async::FromRowError(row.clone()))?,
-            class: c
-                .try_into()
-                .map_err(|_| mysql_async::FromRowError(row.clone()))?,
-            gender: row.get(7).ok_or(mysql_async::FromRowError(row.clone()))?,
-            hp_max: row.get(8).ok_or(mysql_async::FromRowError(row.clone()))?,
-            mp_max: row.get(9).ok_or(mysql_async::FromRowError(row.clone()))?,
-            ac: row.get(10).ok_or(mysql_async::FromRowError(row.clone()))?,
-            strength: row.get(11).ok_or(mysql_async::FromRowError(row.clone()))?,
-            dexterity: row.get(12).ok_or(mysql_async::FromRowError(row.clone()))?,
-            constitution: row.get(13).ok_or(mysql_async::FromRowError(row.clone()))?,
-            wisdom: row.get(14).ok_or(mysql_async::FromRowError(row.clone()))?,
-            charisma: row.get(15).ok_or(mysql_async::FromRowError(row.clone()))?,
-            intelligence: row.get(16).ok_or(mysql_async::FromRowError(row.clone()))?,
-            access_level: row.get(17).ok_or(mysql_async::FromRowError(row.clone()))?,
+            account_name: row.get(0).ok_or(mysql::FromRowError(row.clone()))?,
+            name: row.get(1).ok_or(mysql::FromRowError(row.clone()))?,
+            id: row.get(2).ok_or(mysql::FromRowError(row.clone()))?,
+            alignment: row.get(3).ok_or(mysql::FromRowError(row.clone()))?,
+            level: row.get(4).ok_or(mysql::FromRowError(row.clone()))?,
+            pledge: row.get(5).ok_or(mysql::FromRowError(row.clone()))?,
+            class: c.try_into().map_err(|_| mysql::FromRowError(row.clone()))?,
+            gender: row.get(7).ok_or(mysql::FromRowError(row.clone()))?,
+            hp_max: row.get(8).ok_or(mysql::FromRowError(row.clone()))?,
+            mp_max: row.get(9).ok_or(mysql::FromRowError(row.clone()))?,
+            ac: row.get(10).ok_or(mysql::FromRowError(row.clone()))?,
+            strength: row.get(11).ok_or(mysql::FromRowError(row.clone()))?,
+            dexterity: row.get(12).ok_or(mysql::FromRowError(row.clone()))?,
+            constitution: row.get(13).ok_or(mysql::FromRowError(row.clone()))?,
+            wisdom: row.get(14).ok_or(mysql::FromRowError(row.clone()))?,
+            charisma: row.get(15).ok_or(mysql::FromRowError(row.clone()))?,
+            intelligence: row.get(16).ok_or(mysql::FromRowError(row.clone()))?,
+            access_level: row.get(17).ok_or(mysql::FromRowError(row.clone()))?,
         })
     }
 }

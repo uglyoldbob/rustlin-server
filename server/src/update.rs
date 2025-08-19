@@ -46,7 +46,6 @@ impl From<std::io::Error> for UpdateError {
 /// Process a single client for the update server
 async fn process_update_client(
     mut socket: tokio::net::TcpStream,
-    world: std::sync::Arc<crate::world::World>,
     ufiles: std::sync::Arc<UpdateFiles>,
 ) -> Result<u8, UpdateError> {
     //the AsyncReadExt trait is used
@@ -78,7 +77,7 @@ async fn process_update_client(
         socket.write_u32(0).await?; //unsure if necessary
         log::info!("Sending number of servers");
         socket.write_u32(1).await?; //number of servers
-        let number_players = world.get_number_players();
+        let number_players = 1; // TODO update this?
         log::info!("Sending number of players");
         socket.write_u16(number_players).await?;
     } else {
@@ -91,7 +90,7 @@ async fn process_update_client(
             socket.write_u32(0).await?; //unsure if necessary
             log::info!("Sending number of servers");
             socket.write_u32(1).await?; //number of servers
-            let number_players = world.get_number_players();
+            let number_players = 1; //TODO update this value?
             log::info!("Sending number of players");
             socket.write_u16(number_players).await?;
         } else {
@@ -109,8 +108,6 @@ async fn process_update_client(
 struct UpdateServer {
     /// The socket for listening for new update clients
     update_listener: TcpListener,
-    /// The world, used to determine how many players are logged in
-    world: std::sync::Arc<crate::world::World>,
     /// Used to receive a message to end the update server
     update_rx: tokio::sync::oneshot::Receiver<u32>,
     /// The list of updates to deploy to clients
@@ -125,10 +122,9 @@ impl UpdateServer {
                 Ok(res) = self.update_listener.accept() => {
                     let (socket, addr) = res;
                     log::info!("update: Received an update client from {}", addr);
-                    let world2 = self.world.clone();
                     let updates2 = self.updates.clone();
                     tokio::task::spawn(async move {
-                        if let Err(e) = process_update_client(socket, world2, updates2).await {
+                        if let Err(e) = process_update_client(socket, updates2).await {
                             log::info!("update: Client {} errored during the update process {}", addr, e);
                         }
                     });
@@ -152,7 +148,6 @@ impl UpdateServer {
 /// Setup and start the update portion of the server
 pub async fn setup_update_server(
     tasks: &mut tokio::task::JoinSet<Result<(), u32>>,
-    world: std::sync::Arc<crate::world::World>,
 ) -> Result<tokio::sync::oneshot::Sender<u32>, Box<dyn Error>> {
     log::info!("update: Starting the update server");
     let (update_tx, update_rx) = tokio::sync::oneshot::channel::<u32>();
@@ -204,7 +199,6 @@ pub async fn setup_update_server(
 
     let update_server = UpdateServer {
         update_listener,
-        world,
         update_rx,
         updates,
     };

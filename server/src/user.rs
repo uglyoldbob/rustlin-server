@@ -1,6 +1,6 @@
 //! Code for managing user accounts on the server
 
-use mysql_async::prelude::Queryable;
+use mysql::prelude::Queryable;
 
 use chrono::{TimeZone, Utc};
 use crypto::digest::Digest;
@@ -38,9 +38,9 @@ pub fn hash_password(name: &str, salt: &str, pw: &str) -> String {
 }
 
 /// Convert the mysql value to a usable date time
-fn convert_date(d: mysql_async::Value) -> chrono::DateTime<chrono::Utc> {
+fn convert_date(d: mysql::Value) -> chrono::DateTime<chrono::Utc> {
     let dt = match d {
-        mysql_async::Value::Date(y, m, d, h, min, s, _micro) => {
+        mysql::Value::Date(y, m, d, h, min, s, _micro) => {
             Utc.with_ymd_and_hms(y as i32, m as u32, d as u32, h as u32, min as u32, s as u32)
         }
         _ => Utc.with_ymd_and_hms(1970, 1, 1, 0, 0, 1),
@@ -49,7 +49,7 @@ fn convert_date(d: mysql_async::Value) -> chrono::DateTime<chrono::Utc> {
 }
 
 /// Get a user account from the db, if it exists
-pub async fn get_user_details(user: String, mysql: &mut mysql_async::Conn) -> Option<UserAccount> {
+pub fn get_user_details(user: String, mysql: &mut mysql::PooledConn) -> Option<UserAccount> {
     let query = "SELECT login, password, access_level, ip, host, banned, character_slot, lastactive from accounts WHERE login=? LIMIT 1";
     let usertest = mysql.exec_map(
         query,
@@ -62,7 +62,7 @@ pub async fn get_user_details(user: String, mysql: &mut mysql_async::Conn) -> Op
             String,
             u32,
             u32,
-            mysql_async::Value,
+            mysql::Value,
         )| {
             UserAccount {
                 name: a,
@@ -76,7 +76,7 @@ pub async fn get_user_details(user: String, mysql: &mut mysql_async::Conn) -> Op
             }
         },
     );
-    usertest.await.unwrap().pop()
+    usertest.unwrap().pop()
 }
 
 impl UserAccount {
@@ -102,22 +102,22 @@ impl UserAccount {
     }
 
     /// Retrieve characters for user account from database
-    pub async fn retrieve_chars(
+    pub fn retrieve_chars(
         &self,
-        mysql: &mut mysql_async::Conn,
+        mysql: &mut mysql::PooledConn,
     ) -> Result<Vec<crate::character::Character>, crate::server::ClientError> {
-        crate::character::Character::retrieve_chars(&self.name, mysql).await
+        crate::character::Character::retrieve_chars(&self.name, mysql)
     }
 
     /// Insert a new account into the database
-    pub async fn insert_into_db(&self, mysql: &mut mysql_async::Conn) {
+    pub fn insert_into_db(&self, mysql: &mut mysql::PooledConn) {
         let query = "INSERT INTO accounts SET login=?,password=?,lastactive=?,access_level=?,ip=?,host=?,banned=?,character_slot=?";
         let tq = mysql.exec_drop(
             query,
             (
                 self.name.clone(),
                 self.password.clone(),
-                mysql_async::Value::Date(2010, 3, 5, 4, 5, 6, 100),
+                mysql::Value::Date(2010, 3, 5, 4, 5, 6, 100),
                 self.access,
                 self.ip.clone(),
                 self.host.clone(),
@@ -125,8 +125,7 @@ impl UserAccount {
                 self.slot,
             ),
         );
-        let err = tq.await;
-        match err {
+        match tq {
             Err(e) => {
                 log::info!("error inserting account {}", e);
             }
