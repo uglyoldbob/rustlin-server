@@ -155,3 +155,14 @@ pub enum Object {
     /// An item on the ground
     GroundItem(super::item::ItemWithLocation),
 }
+
+impl Object {
+    /// Is the object a player?
+    pub fn is_player(&self) -> bool {
+        if let Object::Player(_f) = self {
+            true
+        } else {
+            false
+        }
+    }
+}

@@ -161,6 +161,8 @@ pub enum WorldMessageData {
     UnregisterClient(u32),
     /// Register sender with a new client id
     RegisterSender(tokio::sync::mpsc::Sender<WorldResponse>),
+    /// Register a monster
+    RegisterMonster(monster::Monster),
 }
 
 #[derive(Debug)]
@@ -196,7 +198,7 @@ pub struct World {
     object_ref_table: HashMap<WorldObjectId, ObjectRef>,
     /// A lookup table to convert client ids to user accounts
     account_table: HashMap<u32, UserAccount>,
-    /// The object id for each player
+    /// The object id for each character (covers monsters and players)
     characters: HashMap<u32, WorldObjectId>,
     /// The connection to the database
     mysql: mysql::Pool,
@@ -227,11 +229,8 @@ pub struct World {
 }
 
 impl Drop for World {
-    fn drop(&mut self) {}
-}
-
-impl AsyncDrop for World {
-    async fn drop(mut self: Pin<&mut Self>) {
+    fn drop(&mut self) {
+        log::error!("Dropping the world");
         if let Some(mut m) = self.monster_set.take() {
             m.abort_all();
         }
@@ -341,6 +340,13 @@ impl World {
     pub fn run(mut self) {
         while let Some(m) = self.recv.blocking_recv() {
             match m.data {
+                WorldMessageData::RegisterMonster(monster) => {
+                    let monster_id = m.sender.unwrap();
+                    if let Some(r) = self.add_monster(monster) {
+                        self.object_ref_table.insert(r.world_id(), r);
+                        self.characters.insert(monster_id, r.world_id());
+                    }
+                }
                 WorldMessageData::RegisterSender(s) => {
                     let newid = self.client_ids.new_entry();
                     s.blocking_send(WorldResponse::NewClientId(newid));
@@ -610,13 +616,9 @@ impl World {
                             _ => (x, y),
                         };
                         if let Some(sender) = m.sender {
-                            log::info!("Move player 2");
                             if let Some(r) = self.characters.get(&sender) {
-                                log::info!("Move player 3");
                                 if let Some(re) = self.object_ref_table.get(r) {
-                                    log::info!("Move player 4");
                                     if let Some(map) = self.map_info.get_mut(&re.map) {
-                                        log::info!("Move player 5 {} {}", x2, y2);
                                         map.move_object(
                                             *re,
                                             crate::character::Location {
@@ -1024,18 +1026,10 @@ impl World {
                 monsters.push(m);
             }
             {
-                for m in &monsters {
-                    let mut monref = m.reference();
-                    let s2 = self.sender.clone();
-                    mset.spawn(async move { monref.run_ai(s2).await });
-                }
-            }
-            {
-                log::info!("There are {} monsters to spawn", monsters.len());
                 for m in monsters {
-                    if let Some(map) = self.map_info.get_mut(&m.get_location().map) {
-                        map.add_new_object(m.into());
-                    }
+                    let monref = m.reference();
+                    let s2 = self.sender.clone();
+                    mset.spawn(async move { monref.run_ai(s2, m).await });
                 }
             }
         }
@@ -1058,14 +1052,36 @@ impl World {
         Ok(())
     }
 
+    fn add_object(&mut self, obj: object::Object) -> Option<ObjectRef> {
+        let id = obj.id();
+        let location = obj.get_location();
+        let m2 = self.map_info.get_mut(&location.map);
+        if let Some(map) = m2 {
+            let location = obj.get_location();
+            map.add_new_object(obj);
+            let or = ObjectRef {
+                map: location.map,
+                id,
+            };
+            map.object_is_new_here(or);
+            Some(or)
+        } else {
+            None
+        }
+    }
+    
+    /// Add a monster to the world
+    pub fn add_monster(&mut self, m: monster::Monster) -> Option<ObjectRef> {
+        let obj: object::Object = m.into();
+        self.add_object(obj)
+    }
+
     /// Add a player to the world
     pub fn add_player(
         &mut self,
         p: crate::character::FullCharacter,
         s: &mut tokio::sync::mpsc::Sender<WorldResponse>,
     ) -> Option<ObjectRef> {
-        let location = p.location_ref().to_owned();
-
         s.blocking_send(WorldResponse::ServerPacket(p.details_packet()));
         s.blocking_send(WorldResponse::ServerPacket(p.get_map_packet()));
         s.blocking_send(WorldResponse::ServerPacket(p.get_object_packet()));
@@ -1077,36 +1093,7 @@ impl World {
         s.blocking_send(WorldResponse::ServerPacket(ServerPacket::Weather(0)));
 
         let obj: object::Object = p.into();
-        let id = obj.id();
-
-        let m2 = self.map_info.get_mut(&location.map);
-        log::error!("add player 1");
-        if let Some(map) = m2 {
-            log::error!("add player 2");
-            let location = obj.get_location();
-            map.add_new_object(obj);
-            log::error!("add player 3");
-            let or = ObjectRef {
-                map: location.map,
-                id,
-            };
-            log::error!("add player 4");
-            for o in map
-                .get_object(or)
-                .unwrap()
-                .get_known_objects()
-                .unwrap()
-                .get_objects()
-            {
-                log::error!("Player knows about object {:?}", o);
-            }
-            map.object_is_new_here(or);
-            log::error!("add player 5");
-            Some(or)
-        } else {
-            log::error!("add player 6");
-            None
-        }
+        self.add_object(obj)
     }
 
     /// Remove a player from the world

@@ -178,6 +178,8 @@ pub struct MonsterRef {
     reference: ObjectRef,
     ///Monster location
     location: Location,
+    /// monster id
+    id: Option<u32>,
 }
 
 impl MonsterRef {
@@ -210,45 +212,58 @@ impl MonsterRef {
             .send(WorldMessage {
                 data: crate::world::WorldMessageData::ClientPacket(
                     common::packet::ClientPacket::MoveFrom {
-                        x: new_loc.x,
-                        y: new_loc.y,
+                        x,
+                        y,
                         heading: new_loc.direction,
                     },
                 ),
-                sender: None,
+                sender: self.id,
                 peer: std::net::SocketAddr::V4(SocketAddrV4::new(
                     Ipv4Addr::new(127, 0, 0, 1),
                     1234,
                 )),
             })
             .await;
+        self.location = new_loc;
         if self.reference.id.get_u32() == 6431 {
             log::info!("Done moving the bear to {:?}", new_loc);
         }
     }
 
     /// Run the ai for the monster
-    pub async fn run_ai(&mut self, mut sender: tokio::sync::mpsc::Sender<super::WorldMessage>) {
+    pub async fn run_ai(mut self, mut sender: tokio::sync::mpsc::Sender<super::WorldMessage>, m: Monster) {
+        let mut m = Some(m);
         let mut chan = tokio::sync::mpsc::channel(5);
         let _ = sender
             .send(WorldMessage {
                 data: crate::world::WorldMessageData::RegisterSender(chan.0),
-                sender: None,
+                sender: self.id,
                 peer: std::net::SocketAddr::V4(SocketAddrV4::new(
                     Ipv4Addr::new(127, 0, 0, 1),
                     1234,
                 )),
             })
             .await;
-        let mut myid = None;
         loop {
             while let Ok(msg) = chan.1.try_recv() {
                 match msg {
                     super::WorldResponse::ServerPacket(p) => {
-                        log::error!("Unhandled packet for monster {:?}: {:?}", myid, p);
+                        log::error!("Unhandled packet for monster {:?}: {:?}", self.id, p);
                     }
                     super::WorldResponse::NewClientId(id) => {
-                        myid = Some(id);
+                        if let Some(m) = m.take() {
+                            self.id = Some(id);
+                            let _ = sender
+                                .send(WorldMessage {
+                                    data: crate::world::WorldMessageData::RegisterMonster(m),
+                                    sender: self.id,
+                                    peer: std::net::SocketAddr::V4(SocketAddrV4::new(
+                                        Ipv4Addr::new(127, 0, 0, 1),
+                                        1234,
+                                    )),
+                                })
+                                .await;
+                        }
                     }
                 }
             }
@@ -294,6 +309,7 @@ impl Monster {
                 id: self.id,
             },
             location: self.location,
+            id: None,
         }
     }
 }

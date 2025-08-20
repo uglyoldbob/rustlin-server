@@ -147,6 +147,7 @@ impl MapInfo {
         r: super::ObjectRef,
         new_loc: super::Location,
     ) -> Result<(), super::ClientError> {
+        log::info!("Moving object {}", r.id.get_u32());
         let mut old_object_list = ObjectList::new();
         let mut new_object_list = ObjectList::new();
         let old_loc = self.objects.get(&r.id).unwrap().get_location();
@@ -165,25 +166,11 @@ impl MapInfo {
                 }
             }
         }
-        let print = self.get_object(r).map(|o| {
-            o.sender().is_some()
-        }).unwrap_or(false);
-        if print {
-            for o in old_object_list.get_objects() {
-                log::info!("Old object {}", o.get_u32());
-            }
-            for o in new_object_list.get_objects() {
-                log::info!("New object {}", o.get_u32());
-            }
-        }
         let mut moving_send = self.get_object_mut(r).unwrap().sender();
         let remove_objects = old_object_list.difference(&new_object_list);
         let add_objects = new_object_list.difference(&old_object_list);
         
         for obj in remove_objects {
-            if print {
-                log::info!("Removing object {}", obj.get_u32());
-            }
             if let Some(moving_send) = &mut moving_send {
                 moving_send.blocking_send(super::WorldResponse::ServerPacket(
                     ServerPacket::RemoveObject(obj.get_u32()),
@@ -191,7 +178,6 @@ impl MapInfo {
             }
             if let Some(other_obj) = self.objects.get(&obj) {
                 if let Some(s) = other_obj.sender() {
-                    log::info!("Object {} out of range of player", obj.get_u32());
                     s.blocking_send(super::WorldResponse::ServerPacket(
                         ServerPacket::RemoveObject(r.id.get_u32()),
                     ));
@@ -200,9 +186,6 @@ impl MapInfo {
         }
         let pop = self.objects.get(&r.id).unwrap().build_put_object_packet();
         for obj in add_objects {
-            if print {
-                log::info!("Adding object {}", obj.get_u32());
-            }
             if let Some(moving_send) = &mut moving_send {
                 if let Some(obj) = self.objects.get_mut(&obj) {
                     moving_send.blocking_send(super::WorldResponse::ServerPacket(
@@ -212,9 +195,18 @@ impl MapInfo {
             }
             if let Some(other_obj) = self.objects.get(&obj) {
                 if let Some(s) = other_obj.sender() {
-                    log::info!("Object {} in range of player", obj.get_u32());
                     s.blocking_send(super::WorldResponse::ServerPacket(
                         pop.clone(),
+                    ));
+                }
+            }
+        }
+        let move_packet = self.objects.get(&r.id).unwrap().build_move_object_packet();
+        for obj in new_object_list.get_objects() {
+            if let Some(other_obj) = self.objects.get(&obj) {
+                if let Some(s) = other_obj.sender() {
+                    s.blocking_send(super::WorldResponse::ServerPacket(
+                        move_packet.clone(),
                     ));
                 }
             }
