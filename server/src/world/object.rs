@@ -1,8 +1,8 @@
 //! This holds code generally used for all objects in the game
 
-use std::collections::{HashMap, HashSet};
+use std::{collections::{hash_set::Difference, HashMap, HashSet}, hash::RandomState};
 
-use crate::{character::FullCharacter, world::WorldObjectId};
+use crate::{character::FullCharacter, world::{World, WorldObjectId}};
 
 /// A helper struct for managin a list of objects known to a player
 #[derive(Debug)]
@@ -17,6 +17,11 @@ impl ObjectList {
         Self {
             items: HashSet::new(),
         }
+    }
+
+    /// The difference function, self - other
+    pub fn difference<'a>(&'a self, other: &'a Self) -> Difference<'a, WorldObjectId, RandomState> {
+        self.items.difference(&other.items)
     }
 
     /// Add an object to the list
@@ -111,7 +116,7 @@ pub trait ObjectTrait {
     }
 
     /// If applicable (only for Player objects), get the object for sending messages to the user
-    fn sender(&mut self) -> Option<tokio::sync::mpsc::Sender<crate::world::WorldResponse>> {
+    fn sender(&self) -> Option<tokio::sync::mpsc::Sender<crate::world::WorldResponse>> {
         None
     }
 

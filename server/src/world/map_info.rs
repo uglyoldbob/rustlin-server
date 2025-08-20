@@ -4,7 +4,7 @@ use std::{collections::HashMap, sync::Arc};
 
 use common::packet::{ServerPacket, ServerPacketSender};
 
-use crate::world::object::ObjectTrait;
+use crate::world::object::{ObjectList, ObjectTrait};
 
 use super::WorldObjectId;
 
@@ -119,72 +119,104 @@ impl MapInfo {
         self.objects.iter()
     }
 
+    /// The object specified is new, all objects around it are new
+    pub fn object_is_new_here(&self, r: super::ObjectRef,) {
+        let obj = self.objects.get(&r.id).unwrap();
+        let loc = obj.get_location();
+        if let Some(s) = obj.sender() {
+            for (id, o) in &self.objects {
+                if *id != r.id {
+                    if o.linear_distance(&loc) < 17.0 {
+                        if let Some(obj) = self.objects.get(id) {
+                            s.blocking_send(super::WorldResponse::ServerPacket(
+                                obj.build_put_object_packet(),
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     /// Move an object on the map
+    /// 1. Find all objects in range of the new location for the moving object
+    /// 2. Remove all old objects for the moving object
+    /// 3. Add all new objects for the moving object
     pub fn move_object(
         &mut self,
         r: super::ObjectRef,
         new_loc: super::Location,
     ) -> Result<(), super::ClientError> {
-        let mut object_list = super::ObjectList::new();
-        let thing_move_packet = {
-            self.get_object_mut(r).unwrap().set_location(new_loc);
-            let mut pw = self.get_object_mut(r).unwrap().sender();
-            for (id, o) in &mut self.objects {
-                if *id != r.id {
-                    if o.linear_distance(&new_loc) < 17.0 {
-                        object_list.add_object(*id);
-                    }
+        let mut old_object_list = ObjectList::new();
+        let mut new_object_list = ObjectList::new();
+        let old_loc = self.objects.get(&r.id).unwrap().get_location();
+        for (id, o) in &mut self.objects {
+            if *id != r.id {
+                if o.linear_distance(&old_loc) < 17.0 {
+                    old_object_list.add_object(*id);
                 }
             }
-            {
-                let mut old_objects = Vec::new();
-                let mut new_objects = Vec::new();
-                if let Some(ol) = self.get_object_mut(r).unwrap().get_known_objects() {
-                    ol.find_changes(&mut old_objects, &mut new_objects, &object_list);
+        }
+        self.get_object_mut(r).unwrap().set_location(new_loc);
+        for (id, o) in &mut self.objects {
+            if *id != r.id {
+                if o.linear_distance(&new_loc) < 17.0 {
+                    new_object_list.add_object(*id);
                 }
-                for objid in old_objects {
-                    if let Some(pw) = &mut pw {
-                        pw.blocking_send(super::WorldResponse::ServerPacket(
-                            ServerPacket::RemoveObject(objid.get_u32()),
-                        ));
-                    }
-
-                    if let Some(pw) = &mut pw {
-                        pw.blocking_send(super::WorldResponse::ServerPacket(
-                            ServerPacket::RemoveObject(objid.get_u32()),
-                        ));
-                    }
-                    self.get_object_mut(r).unwrap().remove_object(objid);
-                }
-                for objid in new_objects {
-                    if let Some(pw) = &mut pw {
-                        if let Some(obj) = self.objects.get_mut(&objid) {
-                            pw.blocking_send(super::WorldResponse::ServerPacket(
-                                obj.build_put_object_packet(),
-                            ));
-                        }
-                    }
-                    self.get_object_mut(r).unwrap().add_object(objid);
-                }
-                let thing_move_packet = self.get_object_mut(r).unwrap().build_move_object_packet();
-                thing_move_packet
             }
-        };
-        for o in object_list.get_objects() {
-            if r.id == *o {
-                log::error!("Triggering a bug?");
-                panic!();
+        }
+        let print = self.get_object(r).map(|o| {
+            o.sender().is_some()
+        }).unwrap_or(false);
+        if print {
+            for o in old_object_list.get_objects() {
+                log::info!("Old object {}", o.get_u32());
             }
-            let sender = if let Some(o) = self.objects.get_mut(o) {
-                let sender = { o.sender().map(|s| s.clone()) };
-                sender
-            } else {
-                None
-            };
-            if let Some(s) = sender {
-                s.blocking_send(super::WorldResponse::ServerPacket(
-                    thing_move_packet.clone(),
+            for o in new_object_list.get_objects() {
+                log::info!("New object {}", o.get_u32());
+            }
+        }
+        let mut moving_send = self.get_object_mut(r).unwrap().sender();
+        let remove_objects = old_object_list.difference(&new_object_list);
+        let add_objects = new_object_list.difference(&old_object_list);
+        
+        for obj in remove_objects {
+            if print {
+                log::info!("Removing object {}", obj.get_u32());
+            }
+            if let Some(moving_send) = &mut moving_send {
+                moving_send.blocking_send(super::WorldResponse::ServerPacket(
+                    ServerPacket::RemoveObject(obj.get_u32()),
                 ));
+            }
+            if let Some(other_obj) = self.objects.get(&obj) {
+                if let Some(s) = other_obj.sender() {
+                    log::info!("Object {} out of range of player", obj.get_u32());
+                    s.blocking_send(super::WorldResponse::ServerPacket(
+                        ServerPacket::RemoveObject(r.id.get_u32()),
+                    ));
+                }
+            }
+        }
+        let pop = self.objects.get(&r.id).unwrap().build_put_object_packet();
+        for obj in add_objects {
+            if print {
+                log::info!("Adding object {}", obj.get_u32());
+            }
+            if let Some(moving_send) = &mut moving_send {
+                if let Some(obj) = self.objects.get_mut(&obj) {
+                    moving_send.blocking_send(super::WorldResponse::ServerPacket(
+                        obj.build_put_object_packet(),
+                    ));
+                }
+            }
+            if let Some(other_obj) = self.objects.get(&obj) {
+                if let Some(s) = other_obj.sender() {
+                    log::info!("Object {} in range of player", obj.get_u32());
+                    s.blocking_send(super::WorldResponse::ServerPacket(
+                        pop.clone(),
+                    ));
+                }
             }
         }
         Ok(())

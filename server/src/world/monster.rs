@@ -241,7 +241,6 @@ impl MonsterRef {
             })
             .await;
         let mut myid = None;
-        log::info!("Starting monster loop");
         loop {
             while let Ok(msg) = chan.1.try_recv() {
                 match msg {
@@ -249,7 +248,6 @@ impl MonsterRef {
                         log::error!("Unhandled packet for monster {:?}: {:?}", myid, p);
                     }
                     super::WorldResponse::NewClientId(id) => {
-                        log::info!("Got a client id {}", id);
                         myid = Some(id);
                     }
                 }

@@ -579,8 +579,12 @@ impl World {
                                     }
                                 }
                                 if let Some(mut fc) = fco {
+                                    let id = fc.id();
+                                    self.characters.insert(sender, id);
                                     fc.add_sender(s.clone());
-                                    self.add_player(fc, &mut s);
+                                    if let Some(r) = self.add_player(fc, &mut s) {
+                                        self.object_ref_table.insert(id, r);
+                                    }
                                 }
                             } else {
                                 todo!();
@@ -606,9 +610,13 @@ impl World {
                             _ => (x, y),
                         };
                         if let Some(sender) = m.sender {
+                            log::info!("Move player 2");
                             if let Some(r) = self.characters.get(&sender) {
+                                log::info!("Move player 3");
                                 if let Some(re) = self.object_ref_table.get(r) {
+                                    log::info!("Move player 4");
                                     if let Some(map) = self.map_info.get_mut(&re.map) {
+                                        log::info!("Move player 5 {} {}", x2, y2);
                                         map.move_object(
                                             *re,
                                             crate::character::Location {
@@ -1092,7 +1100,7 @@ impl World {
             {
                 log::error!("Player knows about object {:?}", o);
             }
-            map.move_object(or, location).ok()?;
+            map.object_is_new_here(or);
             log::error!("add player 5");
             Some(or)
         } else {

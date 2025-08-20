@@ -195,7 +195,7 @@ impl crate::world::object::ObjectTrait for FullCharacter {
         Some(&mut self.items)
     }
 
-    fn sender(&mut self) -> Option<tokio::sync::mpsc::Sender<crate::world::WorldResponse>> {
+    fn sender(&self) -> Option<tokio::sync::mpsc::Sender<crate::world::WorldResponse>> {
         self.sender.clone()
     }
 
