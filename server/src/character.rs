@@ -343,7 +343,7 @@ impl FullCharacter {
     }
 
     /// Send all items the player has to the user
-    pub fn send_all_items(
+    pub async fn send_all_items(
         &self,
         s: &mut tokio::sync::mpsc::Sender<WorldResponse>,
     ) -> Result<(), crate::server::ClientError> {
@@ -353,9 +353,9 @@ impl FullCharacter {
                 elements.push(i.inventory_element());
             }
         }
-        s.blocking_send(WorldResponse::ServerPacket(
+        s.send(WorldResponse::ServerPacket(
             common::packet::ServerPacket::InventoryVec(elements),
-        ));
+        )).await;
         Ok(())
     }
 

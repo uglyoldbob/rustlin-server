@@ -296,27 +296,27 @@ impl World {
     }
 
     /// Run the login process, delivering news if applicable
-    fn login_with_news(
+    async fn login_with_news(
         &mut self,
         id: u32,
         username: String,
         s: &mut tokio::sync::mpsc::Sender<WorldResponse>,
     ) -> Result<(), ClientError> {
-        s.blocking_send(WorldResponse::ServerPacket(ServerPacket::LoginResult {
+        s.send(WorldResponse::ServerPacket(ServerPacket::LoginResult {
             code: 0,
-        }));
+        })).await;
         let news = self.config.get_news();
         if news.is_empty() {
-            self.after_news(id, s)?;
+            self.after_news(id, s).await?;
         } else {
-            s.blocking_send(WorldResponse::ServerPacket(ServerPacket::News(news)));
+            s.send(WorldResponse::ServerPacket(ServerPacket::News(news))).await;
         }
         Ok(())
     }
 
     /// Send the client details that happens after the news (if there was any news at all)
     /// This still should be called even if there was no news.
-    fn after_news(
+    async fn after_news(
         &mut self,
         id: u32,
         s: &mut tokio::sync::mpsc::Sender<WorldResponse>,
@@ -326,31 +326,31 @@ impl World {
             let chars = account.retrieve_chars(&mut conn)?;
             log::info!("Characters are {:?}", chars);
             let response = ServerPacket::NumberCharacters(chars.len() as u8, 8);
-            s.blocking_send(WorldResponse::ServerPacket(response));
+            s.send(WorldResponse::ServerPacket(response)).await;
 
             for c in &chars {
                 let response = c.get_details_packet();
-                s.blocking_send(WorldResponse::ServerPacket(response));
+                s.send(WorldResponse::ServerPacket(response)).await;
             }
         }
         Ok(())
     }
 
     /// Run the game world
-    pub fn run(mut self) {
-        while let Some(m) = self.recv.blocking_recv() {
+    pub async fn run(mut self) {
+        while let Some(m) = self.recv.recv().await {
             log::info!("World processing {:?}", m);
             match m.data {
                 WorldMessageData::RegisterMonster(monster) => {
                     let monster_id = m.sender.unwrap();
-                    if let Some(r) = self.add_monster(monster) {
+                    if let Some(r) = self.add_monster(monster).await {
                         self.object_ref_table.insert(r.world_id(), r);
                         self.characters.insert(monster_id, r.world_id());
                     }
                 }
                 WorldMessageData::RegisterSender(s) => {
                     let newid = self.client_ids.new_entry();
-                    s.blocking_send(WorldResponse::NewClientId(newid));
+                    s.send(WorldResponse::NewClientId(newid)).await;
                     self.object_senders.insert(newid, s);
                 }
                 WorldMessageData::UnregisterClient(id) => {
@@ -362,7 +362,7 @@ impl World {
                         if let Some(sender) = m.sender {
                             if let Some(myid) = self.characters.get(&sender) {
                                 if let Some(s) = self.object_senders.get_mut(&sender) {
-                                    s.blocking_send(WorldResponse::ServerPacket(
+                                    s.send(WorldResponse::ServerPacket(
                                         ServerPacket::Attack {
                                             attack_type: 3,
                                             id: myid.get_u32(),
@@ -371,7 +371,7 @@ impl World {
                                             direction: 2,
                                             effect: None,
                                         },
-                                    ));
+                                    )).await;
                                 }
                             }
                         }
@@ -415,9 +415,9 @@ impl World {
                         if let Some(sender) = m.sender {
                             self.characters.remove(&sender);
                             if let Some(s) = self.object_senders.get_mut(&sender) {
-                                s.blocking_send(WorldResponse::ServerPacket(
+                                s.send(WorldResponse::ServerPacket(
                                     ServerPacket::BackToCharacterSelect,
-                                ));
+                                )).await;
                             }
                         }
                     }
@@ -445,7 +445,7 @@ impl World {
                         };
                         if let Some(sender) = m.sender {
                             if let Some(s) = self.object_senders.get_mut(&sender) {
-                                s.blocking_send(WorldResponse::ServerPacket(response));
+                                s.send(WorldResponse::ServerPacket(response)).await;
                             }
                         }
                     }
@@ -477,11 +477,11 @@ impl World {
                                             log::info!("User login check is {}", password_success);
                                             if password_success {
                                                 self.account_table.insert(sender, us);
-                                                self.login_with_news(sender, u, &mut s);
+                                                self.login_with_news(sender, u, &mut s).await;
                                             } else {
-                                                s.blocking_send(WorldResponse::ServerPacket(
+                                                s.send(WorldResponse::ServerPacket(
                                                     ServerPacket::LoginResult { code: 8 },
-                                                ));
+                                                )).await;
                                             }
                                         }
                                         None => {
@@ -496,11 +496,11 @@ impl World {
                                                 if let Ok(mut mysql) = self.get_mysql_conn() {
                                                     newaccount.insert_into_db(&mut mysql);
                                                 }
-                                                self.login_with_news(sender, u, &mut s);
+                                                self.login_with_news(sender, u, &mut s).await;
                                             } else {
-                                                s.blocking_send(WorldResponse::ServerPacket(
+                                                s.send(WorldResponse::ServerPacket(
                                                     ServerPacket::LoginResult { code: 8 },
-                                                ));
+                                                )).await;
                                             }
                                         }
                                     }
@@ -515,7 +515,7 @@ impl World {
                         if let Some(sender) = m.sender {
                             if let Some(s) = self.object_senders.get(&sender) {
                                 let mut s = s.clone();
-                                self.after_news(sender, &mut s);
+                                self.after_news(sender, &mut s).await;
                             }
                         }
                     }
@@ -543,14 +543,14 @@ impl World {
                                             if let Some(char) = char {
                                                 if char.needs_delete_waiting() {
                                                     //TODO implement the actual delete in a scheduled async task
-                                                    s.blocking_send(WorldResponse::ServerPacket(
+                                                    s.send(WorldResponse::ServerPacket(
                                                         ServerPacket::DeleteCharacterWait,
-                                                    ));
+                                                    )).await;
                                                 } else {
                                                     //TODO actually delete the character
-                                                    s.blocking_send(WorldResponse::ServerPacket(
+                                                    s.send(WorldResponse::ServerPacket(
                                                         ServerPacket::DeleteCharacterOk,
-                                                    ));
+                                                    )).await;
                                                 }
                                             }
                                         }
@@ -574,9 +574,9 @@ impl World {
                                                     self.id_generator.new_id(),
                                                     &mut mysql,
                                                 ) {
-                                                    s.blocking_send(WorldResponse::ServerPacket(
+                                                    s.send(WorldResponse::ServerPacket(
                                                         ServerPacket::StartGame(0),
-                                                    ));
+                                                    )).await;
                                                     let fc = pc.into_full(&self.item_table);
                                                     fco = Some(fc);
                                                 } else {
@@ -589,7 +589,7 @@ impl World {
                                     let id = fc.id();
                                     self.characters.insert(sender, id);
                                     fc.add_sender(s.clone());
-                                    if let Some(r) = self.add_player(fc, &mut s) {
+                                    if let Some(r) = self.add_player(fc, &mut s).await {
                                         self.object_ref_table.insert(id, r);
                                     }
                                 }
@@ -628,7 +628,7 @@ impl World {
                                                 y: y2,
                                                 direction: heading,
                                             },
-                                        );
+                                        ).await;
                                     }
                                 }
                             }
@@ -663,12 +663,12 @@ impl World {
                                                 if let Some(se) =
                                                     self.object_senders.get(&id.get_u32())
                                                 {
-                                                    se.blocking_send(WorldResponse::ServerPacket(
+                                                    se.send(WorldResponse::ServerPacket(
                                                         ServerPacket::RegularChat {
                                                             id: 0,
                                                             msg: amsg.clone(),
                                                         },
-                                                    ));
+                                                    )).await;
                                                 }
                                             }
                                         }
@@ -690,14 +690,14 @@ impl World {
                                                 if let Some(se) =
                                                     self.object_senders.get(&id.get_u32())
                                                 {
-                                                    se.blocking_send(WorldResponse::ServerPacket(
+                                                    se.send(WorldResponse::ServerPacket(
                                                         ServerPacket::YellChat {
                                                             id: 0,
                                                             msg: amsg.clone(),
                                                             x: chatter_location.x,
                                                             y: chatter_location.y,
                                                         },
-                                                    ));
+                                                    )).await;
                                                 }
                                             }
                                         }
@@ -717,9 +717,9 @@ impl World {
                                         for (id, o) in map.objects_iter() {
                                             if let Some(se) = self.object_senders.get(&id.get_u32())
                                             {
-                                                se.blocking_send(WorldResponse::ServerPacket(
+                                                se.send(WorldResponse::ServerPacket(
                                                     ServerPacket::PartyChat(amsg.clone()),
-                                                ));
+                                                )).await;
                                             }
                                         }
                                     }
@@ -738,9 +738,9 @@ impl World {
                                         for (id, o) in map.objects_iter() {
                                             if let Some(se) = self.object_senders.get(&id.get_u32())
                                             {
-                                                se.blocking_send(WorldResponse::ServerPacket(
+                                                se.send(WorldResponse::ServerPacket(
                                                     ServerPacket::PledgeChat(amsg.clone()),
-                                                ));
+                                                )).await;
                                             }
                                         }
                                     }
@@ -763,14 +763,14 @@ impl World {
                                                     if let Some(se) =
                                                         self.object_senders.get(&id.get_u32())
                                                     {
-                                                        se.blocking_send(
+                                                        se.send(
                                                             WorldResponse::ServerPacket(
                                                                 ServerPacket::WhisperChat {
                                                                     name: sender_name,
                                                                     msg: msg.clone(),
                                                                 },
                                                             ),
-                                                        );
+                                                        ).await;
                                                         found_player = true;
                                                         break;
                                                     }
@@ -780,12 +780,12 @@ impl World {
                                         if !found_player {
                                             if let Some(sender) = m.sender {
                                                 if let Some(se) = self.object_senders.get(&sender) {
-                                                    se.blocking_send(WorldResponse::ServerPacket(
+                                                    se.send(WorldResponse::ServerPacket(
                                                         ServerPacket::Message {
                                                             ty: 73,
                                                             msgs: vec![n],
                                                         },
-                                                    ));
+                                                    )).await;
                                                 }
                                             }
                                         }
@@ -805,9 +805,9 @@ impl World {
                                         for (id, o) in map.objects_iter() {
                                             if let Some(se) = self.object_senders.get(&id.get_u32())
                                             {
-                                                se.blocking_send(WorldResponse::ServerPacket(
+                                                se.send(WorldResponse::ServerPacket(
                                                     ServerPacket::GlobalChat(amsg.clone()),
-                                                ));
+                                                )).await;
                                             }
                                         }
                                     }
@@ -830,7 +830,7 @@ impl World {
                                             log::info!("A shutdown command was received");
                                             if let Some(r) = self.characters.get(&sender) {
                                                 if let Some(re) = self.object_ref_table.get(r) {
-                                                    self.shutdown(re);
+                                                    self.shutdown(re).await;
                                                 }
                                             }
                                         }
@@ -838,15 +838,15 @@ impl World {
                                             log::info!("A restart command was received");
                                             if let Some(r) = self.characters.get(&sender) {
                                                 if let Some(re) = self.object_ref_table.get(r) {
-                                                    self.restart(re);
+                                                    self.restart(re).await;
                                                 }
                                             }
                                         }
                                         "quit" => {
                                             if let Some(s) = self.object_senders.get_mut(&sender) {
-                                                s.blocking_send(WorldResponse::ServerPacket(
+                                                s.send(WorldResponse::ServerPacket(
                                                     ServerPacket::Disconnect,
-                                                ));
+                                                )).await;
                                             }
                                         }
                                         "test" => {
@@ -854,52 +854,52 @@ impl World {
                                         }
                                         "chat" => {
                                             if let Some(s) = self.object_senders.get_mut(&sender) {
-                                                s.blocking_send(WorldResponse::ServerPacket(
+                                                s.send(WorldResponse::ServerPacket(
                                                     ServerPacket::SystemMessage(
                                                         "This is a test of the system message"
                                                             .to_string(),
                                                     ),
-                                                ));
-                                                s.blocking_send(WorldResponse::ServerPacket(
+                                                )).await;
+                                                s.send(WorldResponse::ServerPacket(
                                                     ServerPacket::NpcShout(
                                                         "NPC Shout test".to_string(),
                                                     ),
-                                                ));
-                                                s.blocking_send(WorldResponse::ServerPacket(
+                                                )).await;
+                                                s.send(WorldResponse::ServerPacket(
                                                     ServerPacket::RegularChat {
                                                         id: 0,
                                                         msg: "regular chat".to_string(),
                                                     },
-                                                ));
-                                                s.blocking_send(WorldResponse::ServerPacket(
+                                                )).await;
+                                                s.send(WorldResponse::ServerPacket(
                                                     ServerPacket::YellChat {
                                                         id: 0,
                                                         msg: "yelling".to_string(),
                                                         x: 32768,
                                                         y: 32768,
                                                     },
-                                                ));
-                                                s.blocking_send(WorldResponse::ServerPacket(
+                                                )).await;
+                                                s.send(WorldResponse::ServerPacket(
                                                     ServerPacket::GlobalChat(
                                                         "global chat".to_string(),
                                                     ),
-                                                ));
-                                                s.blocking_send(WorldResponse::ServerPacket(
+                                                )).await;
+                                                s.send(WorldResponse::ServerPacket(
                                                     ServerPacket::PledgeChat(
                                                         "pledge chat".to_string(),
                                                     ),
-                                                ));
-                                                s.blocking_send(WorldResponse::ServerPacket(
+                                                )).await;
+                                                s.send(WorldResponse::ServerPacket(
                                                     ServerPacket::PartyChat(
                                                         "party chat".to_string(),
                                                     ),
-                                                ));
-                                                s.blocking_send(WorldResponse::ServerPacket(
+                                                )).await;
+                                                s.send(WorldResponse::ServerPacket(
                                                     ServerPacket::WhisperChat {
                                                         name: "test".to_string(),
                                                         msg: "whisper message".to_string(),
                                                     },
-                                                ));
+                                                )).await;
                                             }
                                         }
                                         _ => {
@@ -933,19 +933,19 @@ impl World {
                                                 log::info!(
                                                     "User wants to change password and entered correct details"
                                                 );
-                                                s.blocking_send(WorldResponse::ServerPacket(
+                                                s.send(WorldResponse::ServerPacket(
                                                     ServerPacket::LoginResult { code: 0x30 },
-                                                ));
+                                                )).await;
                                             } else {
-                                                s.blocking_send(WorldResponse::ServerPacket(
+                                                s.send(WorldResponse::ServerPacket(
                                                     ServerPacket::LoginResult { code: 8 },
-                                                ));
+                                                )).await;
                                             }
                                         }
                                         _ => {
-                                            s.blocking_send(WorldResponse::ServerPacket(
+                                            s.send(WorldResponse::ServerPacket(
                                                 ServerPacket::LoginResult { code: 8 },
-                                            ));
+                                            )).await;
                                         }
                                     }
                                 }
@@ -976,7 +976,7 @@ impl World {
     }
 
     /// Shutdown the server if the player is authorized to do so
-    pub fn shutdown(&self, r: &ObjectRef) {
+    pub async fn shutdown(&self, r: &ObjectRef) {
         let shutdown = {
             let map = self.map_info.get(&r.map);
             if let Some(map) = map {
@@ -992,12 +992,12 @@ impl World {
         if shutdown {
             let _ = self
                 .server_s
-                .blocking_send(crate::server_message::ServerShutdownMessage::Shutdown);
+                .send(crate::server_message::ServerShutdownMessage::Shutdown).await;
         }
     }
 
     /// Restart the server if the player is authorized to do so
-    pub fn restart(&self, r: &ObjectRef) {
+    pub async fn restart(&self, r: &ObjectRef) {
         let shutdown = {
             let map = self.map_info.get(&r.map);
             if let Some(map) = map {
@@ -1013,7 +1013,7 @@ impl World {
         if shutdown {
             let _ = self
                 .server_s
-                .blocking_send(crate::server_message::ServerShutdownMessage::Restart);
+                .send(crate::server_message::ServerShutdownMessage::Restart).await;
         }
     }
 
@@ -1036,24 +1036,7 @@ impl World {
         }
     }
 
-    /// Send a new object packet with the given packet writer and object id
-    pub fn send_new_object(
-        &self,
-        location: crate::character::Location,
-        id: WorldObjectId,
-        pw: &mut common::packet::ServerPacketSender,
-    ) -> Result<(), ClientError> {
-        let map = self.map_info.get(&location.map);
-        if let Some(map) = map {
-            if let Some(obj) = map.get_object_from_id(id) {
-                let p = obj.build_put_object_packet();
-                pw.queue_packet(p);
-            }
-        }
-        Ok(())
-    }
-
-    fn add_object(&mut self, obj: object::Object) -> Option<ObjectRef> {
+    async fn add_object(&mut self, obj: object::Object) -> Option<ObjectRef> {
         let id = obj.id();
         let location = obj.get_location();
         let m2 = self.map_info.get_mut(&location.map);
@@ -1064,7 +1047,7 @@ impl World {
                 map: location.map,
                 id,
             };
-            map.object_is_new_here(or);
+            map.object_is_new_here(or).await;
             Some(or)
         } else {
             None
@@ -1072,29 +1055,29 @@ impl World {
     }
     
     /// Add a monster to the world
-    pub fn add_monster(&mut self, m: monster::Monster) -> Option<ObjectRef> {
+    pub async fn add_monster(&mut self, m: monster::Monster) -> Option<ObjectRef> {
         let obj: object::Object = m.into();
-        self.add_object(obj)
+        self.add_object(obj).await
     }
 
     /// Add a player to the world
-    pub fn add_player(
+    pub async fn add_player(
         &mut self,
         p: crate::character::FullCharacter,
         s: &mut tokio::sync::mpsc::Sender<WorldResponse>,
     ) -> Option<ObjectRef> {
-        s.blocking_send(WorldResponse::ServerPacket(p.details_packet()));
-        s.blocking_send(WorldResponse::ServerPacket(p.get_map_packet()));
-        s.blocking_send(WorldResponse::ServerPacket(p.get_object_packet()));
-        p.send_all_items(s).ok()?;
-        s.blocking_send(WorldResponse::ServerPacket(ServerPacket::CharSpMrBonus {
+        s.send(WorldResponse::ServerPacket(p.details_packet())).await;
+        s.send(WorldResponse::ServerPacket(p.get_map_packet())).await;
+        s.send(WorldResponse::ServerPacket(p.get_object_packet())).await;
+        p.send_all_items(s).await.ok()?;
+        s.send(WorldResponse::ServerPacket(ServerPacket::CharSpMrBonus {
             sp: 0,
             mr: 0,
-        }));
-        s.blocking_send(WorldResponse::ServerPacket(ServerPacket::Weather(0)));
+        })).await;
+        s.send(WorldResponse::ServerPacket(ServerPacket::Weather(0))).await;
 
         let obj: object::Object = p.into();
-        self.add_object(obj)
+        self.add_object(obj).await
     }
 
     /// Remove a player from the world

@@ -120,7 +120,7 @@ impl MapInfo {
     }
 
     /// The object specified is new, all objects around it are new
-    pub fn object_is_new_here(&self, r: super::ObjectRef,) {
+    pub async fn object_is_new_here(&self, r: super::ObjectRef,) {
         let obj = self.objects.get(&r.id).unwrap();
         let loc = obj.get_location();
         if let Some(s) = obj.sender() {
@@ -128,9 +128,9 @@ impl MapInfo {
                 if *id != r.id {
                     if o.linear_distance(&loc) < 17.0 {
                         if let Some(obj) = self.objects.get(id) {
-                            s.blocking_send(super::WorldResponse::ServerPacket(
+                            s.send(super::WorldResponse::ServerPacket(
                                 obj.build_put_object_packet(),
-                            ));
+                            )).await;
                         }
                     }
                 }
@@ -142,7 +142,7 @@ impl MapInfo {
     /// 1. Find all objects in range of the new location for the moving object
     /// 2. Remove all old objects for the moving object
     /// 3. Add all new objects for the moving object
-    pub fn move_object(
+    pub async fn move_object(
         &mut self,
         r: super::ObjectRef,
         new_loc: super::Location,
@@ -171,15 +171,15 @@ impl MapInfo {
         let add_objects = new_object_list.difference(&old_object_list);
         for obj in remove_objects {
             if let Some(moving_send) = &mut moving_send {
-                moving_send.blocking_send(super::WorldResponse::ServerPacket(
+                moving_send.send(super::WorldResponse::ServerPacket(
                     ServerPacket::RemoveObject(obj.get_u32()),
-                ));
+                )).await;
             }
             if let Some(other_obj) = self.objects.get(&obj) {
                 if let Some(s) = other_obj.sender() {
-                    s.blocking_send(super::WorldResponse::ServerPacket(
+                    s.send(super::WorldResponse::ServerPacket(
                         ServerPacket::RemoveObject(r.id.get_u32()),
-                    ));
+                    )).await;
                 }
             }
         }
@@ -187,16 +187,16 @@ impl MapInfo {
         for obj in add_objects {
             if let Some(moving_send) = &mut moving_send {
                 if let Some(obj) = self.objects.get_mut(&obj) {
-                    moving_send.blocking_send(super::WorldResponse::ServerPacket(
+                    moving_send.send(super::WorldResponse::ServerPacket(
                         obj.build_put_object_packet(),
-                    ));
+                    )).await;
                 }
             }
             if let Some(other_obj) = self.objects.get(&obj) {
                 if let Some(s) = other_obj.sender() {
-                    s.blocking_send(super::WorldResponse::ServerPacket(
+                    s.send(super::WorldResponse::ServerPacket(
                         pop.clone(),
-                    ));
+                    )).await;
                 }
             }
         }
@@ -206,9 +206,9 @@ impl MapInfo {
             if let Some(other_obj) = self.objects.get(&obj) {
                 if let Some(s) = other_obj.sender() {
                     log::info!("Sending move to {}", obj.get_u32());
-                    s.blocking_send(super::WorldResponse::ServerPacket(
+                    s.send(super::WorldResponse::ServerPacket(
                         move_packet.clone(),
-                    ));
+                    )).await;
                 }
             }
         }

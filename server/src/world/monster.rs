@@ -245,7 +245,7 @@ impl MonsterRef {
     /// Run the ai for the monster
     pub async fn run_ai(mut self, mut sender: tokio::sync::mpsc::Sender<super::WorldMessage>, m: Monster) {
         let mut m = Some(m);
-        let mut chan = tokio::sync::mpsc::channel(5);
+        let mut chan = tokio::sync::mpsc::channel(50);
         let _ = sender
             .send(WorldMessage {
                 data: crate::world::WorldMessageData::RegisterSender(chan.0),
