@@ -176,45 +176,59 @@ impl MonsterSpawn {
 pub struct MonsterRef {
     /// A reference to the monster on the world
     reference: ObjectRef,
+    ///Monster location
+    location: Location,
 }
 
 impl MonsterRef {
     ///move the monster randomly
-    pub async fn moving(&mut self) {
+    pub async fn moving(&mut self, sender: &mut tokio::sync::mpsc::Sender<super::WorldMessage>) {
         use rand::Rng;
         let direction = rand::thread_rng().gen_range(0..=7u8);
-        let myloc: Option<Location> = None;
-        if let Some(l) = myloc {
-            let (x, y) = (l.x, l.y);
-            let (x2, y2) = match direction {
-                0 => (x, y - 1),
-                1 => (x + 1, y - 1),
-                2 => (x + 1, y),
-                3 => (x + 1, y + 1),
-                4 => (x, y + 1),
-                5 => (x - 1, y + 1),
-                6 => (x - 1, y),
-                7 => (x - 1, y - 1),
-                _ => (x, y),
-            };
-            let new_loc = Location {
-                x: x2,
-                y: y2,
-                map: l.map,
-                direction,
-            };
-            if self.reference.id.get_u32() == 6431 {
-                log::info!("Moving the bear to {:?}", new_loc);
-            }
-            let mut list = crate::world::map_info::SendsToAnotherObject::new();
-            if self.reference.id.get_u32() == 6431 {
-                log::info!("Done moving the bear to {:?}", new_loc);
-            }
+        let (x, y) = (self.location.x, self.location.y);
+        let (x2, y2) = match direction {
+            0 => (x, y - 1),
+            1 => (x + 1, y - 1),
+            2 => (x + 1, y),
+            3 => (x + 1, y + 1),
+            4 => (x, y + 1),
+            5 => (x - 1, y + 1),
+            6 => (x - 1, y),
+            7 => (x - 1, y - 1),
+            _ => (x, y),
+        };
+        let new_loc = Location {
+            x: x2,
+            y: y2,
+            map: self.location.map,
+            direction,
+        };
+        if self.reference.id.get_u32() == 6431 {
+            log::info!("Moving the bear to {:?}", new_loc);
+        }
+        sender
+            .send(WorldMessage {
+                data: crate::world::WorldMessageData::ClientPacket(
+                    common::packet::ClientPacket::MoveFrom {
+                        x: new_loc.x,
+                        y: new_loc.y,
+                        heading: new_loc.direction,
+                    },
+                ),
+                sender: None,
+                peer: std::net::SocketAddr::V4(SocketAddrV4::new(
+                    Ipv4Addr::new(127, 0, 0, 1),
+                    1234,
+                )),
+            })
+            .await;
+        if self.reference.id.get_u32() == 6431 {
+            log::info!("Done moving the bear to {:?}", new_loc);
         }
     }
 
     /// Run the ai for the monster
-    pub async fn run_ai(&mut self, sender: tokio::sync::mpsc::Sender<super::WorldMessage>) {
+    pub async fn run_ai(&mut self, mut sender: tokio::sync::mpsc::Sender<super::WorldMessage>) {
         let mut chan = tokio::sync::mpsc::channel(5);
         let _ = sender
             .send(WorldMessage {
@@ -227,23 +241,21 @@ impl MonsterRef {
             })
             .await;
         let mut myid = None;
+        log::info!("Starting monster loop");
         loop {
-            use futures::FutureExt;
-            futures::select! {
-                msg = chan.1.recv().fuse() => {
-                    let p = msg.unwrap();
-                    match p {
-                        super::WorldResponse::ServerPacket(p) => {
-                            log::error!("Unhandled packet for monster {:?}: {:?}", myid, p);
-                        }
-                        super::WorldResponse::NewClientId(id) => {
-                            log::info!("Got a client id {}", id);
-                            myid = Some(id);
-                        }
+            while let Ok(msg) = chan.1.try_recv() {
+                match msg {
+                    super::WorldResponse::ServerPacket(p) => {
+                        log::error!("Unhandled packet for monster {:?}: {:?}", myid, p);
                     }
-
+                    super::WorldResponse::NewClientId(id) => {
+                        log::info!("Got a client id {}", id);
+                        myid = Some(id);
+                    }
                 }
             }
+            tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
+            self.moving(&mut sender).await;
         }
         log::info!("Exiting monster ai");
     }
@@ -283,6 +295,7 @@ impl Monster {
                 map: self.location.map,
                 id: self.id,
             },
+            location: self.location,
         }
     }
 }

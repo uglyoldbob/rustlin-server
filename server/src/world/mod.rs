@@ -1092,7 +1092,7 @@ impl World {
             {
                 log::error!("Player knows about object {:?}", o);
             }
-            //TODO map.move_object(or, location, Some(pw), list).ok()?;
+            map.move_object(or, location).ok()?;
             log::error!("add player 5");
             Some(or)
         } else {
