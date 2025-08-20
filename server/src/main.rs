@@ -57,7 +57,7 @@ async fn smain() -> Result<(), String> {
 
     let (iscs, mut iscr) = tokio::sync::mpsc::channel(5);
 
-    let (main_s, main_r) = tokio::sync::mpsc::channel(50000);
+    let (main_s, main_r) = tokio::sync::mpsc::channel(1000);
 
     let mut world = world::World::new(
         mysql_pool,

@@ -147,7 +147,6 @@ impl MapInfo {
         r: super::ObjectRef,
         new_loc: super::Location,
     ) -> Result<(), super::ClientError> {
-        log::info!("Moving object {}", r.id.get_u32());
         let mut old_object_list = ObjectList::new();
         let mut new_object_list = ObjectList::new();
         let old_loc = self.objects.get(&r.id).unwrap().get_location();
@@ -200,7 +199,6 @@ impl MapInfo {
                 }
             }
         }
-        log::info!("Moving object 5");
         let move_packet = self.objects.get(&r.id).unwrap().build_move_object_packet();
         for obj in new_object_list.get_objects() {
             if let Some(other_obj) = self.objects.get(&obj) {
@@ -212,7 +210,6 @@ impl MapInfo {
                 }
             }
         }
-        log::info!("Moving object 6");
         Ok(())
     }
 

@@ -217,9 +217,6 @@ impl MonsterRef {
             map: self.location.map,
             direction,
         };
-        if self.reference.id.get_u32() == 6431 {
-            log::info!("Moving the bear to {:?}", new_loc);
-        }
         sender
             .send(WorldMessage {
                 data: crate::world::WorldMessageData::ClientPacket(
@@ -237,15 +234,12 @@ impl MonsterRef {
             })
             .await;
         self.location = new_loc;
-        if self.reference.id.get_u32() == 6431 {
-            log::info!("Done moving the bear to {:?}", new_loc);
-        }
     }
 
     /// Run the ai for the monster
     pub async fn run_ai(mut self, mut sender: tokio::sync::mpsc::Sender<super::WorldMessage>, m: Monster) {
         let mut m = Some(m);
-        let mut chan = tokio::sync::mpsc::channel(5);
+        let mut chan = tokio::sync::mpsc::channel(50);
         let _ = sender
             .send(WorldMessage {
                 data: crate::world::WorldMessageData::RegisterSender(chan.0),

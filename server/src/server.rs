@@ -53,7 +53,7 @@ async fn process_client(
     let (reader, writer) = socket.into_split();
     let packet_writer = ServerPacketSender::new(writer);
 
-    let (t_s, t_r) = tokio::sync::mpsc::channel(10);
+    let (t_s, t_r) = tokio::sync::mpsc::channel(50);
     let peer = reader.peer_addr()?;
     let c = Client::new(packet_writer, world_sender, peer);
     c.event_loop(reader, t_r, t_s, end_rx).await?;
@@ -103,7 +103,7 @@ impl GameServer {
                 Ok((socket, addr)) = self.listener.accept() => {
                     log::info!("Received a client from {}", addr);
                     let sender2 = sender.clone();
-                    let (kill_s, kill_r) = tokio::sync::mpsc::channel(5);
+                    let (kill_s, kill_r) = tokio::sync::mpsc::channel(50);
                     let kills2 = self.kill.clone();
                     if let Some(c) = &mut self.clients {
                         c.spawn(async move {
