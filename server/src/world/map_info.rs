@@ -169,7 +169,6 @@ impl MapInfo {
         let mut moving_send = self.get_object_mut(r).unwrap().sender();
         let remove_objects = old_object_list.difference(&new_object_list);
         let add_objects = new_object_list.difference(&old_object_list);
-        
         for obj in remove_objects {
             if let Some(moving_send) = &mut moving_send {
                 moving_send.blocking_send(super::WorldResponse::ServerPacket(
@@ -201,16 +200,19 @@ impl MapInfo {
                 }
             }
         }
+        log::info!("Moving object 5");
         let move_packet = self.objects.get(&r.id).unwrap().build_move_object_packet();
         for obj in new_object_list.get_objects() {
             if let Some(other_obj) = self.objects.get(&obj) {
                 if let Some(s) = other_obj.sender() {
+                    log::info!("Sending move to {}", obj.get_u32());
                     s.blocking_send(super::WorldResponse::ServerPacket(
                         move_packet.clone(),
                     ));
                 }
             }
         }
+        log::info!("Moving object 6");
         Ok(())
     }
 

@@ -28,7 +28,7 @@ features = ["derive"]
 
 [dependencies.tokio]
 version = "1.47.1"
-features = ["tracing", "rt-multi-thread", "net", "time", "macros", "signal", "sync", "io-util"]
+features = ["tracing", "rt-multi-thread", "fs", "net", "time", "macros", "signal", "sync", "io-util"]
 
 [dependencies.common]
 version = "^0"

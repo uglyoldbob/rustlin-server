@@ -182,6 +182,18 @@ pub struct MonsterRef {
     id: Option<u32>,
 }
 
+impl Drop for MonsterRef {
+    fn drop(&mut self) {
+        log::error!("Dropping the monster ref {:?}", self.id);
+    }
+}
+
+impl std::future::AsyncDrop for MonsterRef {
+    async fn drop(mut self: std::pin::Pin<&mut Self>) {
+        log::info!("Async drop monster ref {:?}", self.id);
+    }
+}
+
 impl MonsterRef {
     ///move the monster randomly
     pub async fn moving(&mut self, sender: &mut tokio::sync::mpsc::Sender<super::WorldMessage>) {

@@ -339,6 +339,7 @@ impl World {
     /// Run the game world
     pub fn run(mut self) {
         while let Some(m) = self.recv.blocking_recv() {
+            log::info!("World processing {:?}", m);
             match m.data {
                 WorldMessageData::RegisterMonster(monster) => {
                     let monster_id = m.sender.unwrap();
