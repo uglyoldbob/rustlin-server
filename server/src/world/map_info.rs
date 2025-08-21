@@ -70,7 +70,7 @@ impl MapInfo {
     }
 
     /// The object specified is new, all objects around it are new
-    pub fn object_is_new_here(&self, r: super::ObjectRef,) {
+    pub fn object_is_new_here(&self, r: super::ObjectRef) {
         let obj = self.objects.get(&r.id).unwrap();
         let loc = obj.get_location();
         if let Some(s) = obj.sender() {
@@ -143,9 +143,7 @@ impl MapInfo {
             }
             if let Some(other_obj) = self.objects.get(&obj) {
                 if let Some(s) = other_obj.sender() {
-                    s.blocking_send(super::WorldResponse::ServerPacket(
-                        pop.clone(),
-                    ));
+                    s.blocking_send(super::WorldResponse::ServerPacket(pop.clone()));
                 }
             }
         }
@@ -154,9 +152,7 @@ impl MapInfo {
             if let Some(other_obj) = self.objects.get(&obj) {
                 if let Some(s) = other_obj.sender() {
                     log::info!("Sending move to {}", obj.get_u32());
-                    s.blocking_send(super::WorldResponse::ServerPacket(
-                        move_packet.clone(),
-                    ));
+                    s.blocking_send(super::WorldResponse::ServerPacket(move_packet.clone()));
                 }
             }
         }
@@ -165,6 +161,21 @@ impl MapInfo {
 
     /// Remove an object from the map
     pub fn remove_object(&mut self, id: WorldObjectId) {
+        let obj = self.objects.get(&id).unwrap();
+        let loc = obj.get_location();
+        for (localid, o) in &self.objects {
+            if *localid != id {
+                if o.linear_distance(&loc) < 17.0 {
+                    if let Some(obj) = self.objects.get(localid) {
+                        if let Some(s) = obj.sender() {
+                            s.blocking_send(super::WorldResponse::ServerPacket(
+                                ServerPacket::RemoveObject(id.get_u32()),
+                            ));
+                        }
+                    }
+                }
+            }
+        }
         self.objects.remove(&id);
         for o in &mut self.objects {
             o.1.remove_object(id);

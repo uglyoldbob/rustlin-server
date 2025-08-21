@@ -420,6 +420,13 @@ impl World {
                     ClientPacket::Restart => {
                         log::info!("Player restarts");
                         if let Some(sender) = m.sender {
+                            if let Some(r) = self.characters.get(&sender) {
+                                if let Some(re) = self.object_ref_table.get(r) {
+                                    if let Some(map) = self.map_info.get_mut(&re.map) {
+                                        map.remove_object(*r);
+                                    }
+                                }
+                            }
                             self.characters.remove(&sender);
                             if let Some(s) = self.object_senders.get_mut(&sender) {
                                 s.blocking_send(WorldResponse::ServerPacket(
@@ -1077,7 +1084,7 @@ impl World {
             None
         }
     }
-    
+
     /// Add a monster to the world
     pub fn add_monster(&mut self, m: monster::Monster) -> Option<ObjectRef> {
         let obj: object::Object = m.into();
@@ -1209,17 +1216,6 @@ impl World {
         Ok((hmaps, hdata))
     }
 
-    /// Insert a character id into the world
-    pub fn insert_id(&mut self, id: u32, account: String) -> Result<(), ClientError> {
-        self.users.insert(id, account);
-        Ok(())
-    }
-
-    /// lookup account name from user id
-    pub fn lookup_id(&self, id: u32) -> Option<String> {
-        self.users.get(&id).map(|e| e.to_owned())
-    }
-
     /// Get a new object id as part of a transaction.
     /// This prevents atomicity problems where two threads can get the same new id, and try to insert the same id into the database.
     /// # Arguments:
@@ -1239,27 +1235,5 @@ impl World {
     /// Get a connection to the database
     pub fn get_mysql_conn(&self) -> Result<mysql::PooledConn, mysql::Error> {
         self.mysql.get_conn()
-    }
-
-    /// Register a new user
-    pub fn register_user(&mut self) -> u32 {
-        self.client_ids.new_entry()
-    }
-
-    /// Save a new character into the database
-    pub fn save_new_character(&self, c: &mut Character) -> Result<(), ClientError> {
-        let mut conn = self.get_mysql_conn()?;
-        c.save_new_to_db(&mut conn)
-    }
-
-    /// Unregister a user
-    pub fn unregister_user(&mut self, uid: u32) {
-        self.client_ids.remove_entry(uid);
-        self.users.remove(&uid);
-    }
-
-    /// Get the number of players currently in the world
-    pub fn get_number_players(&self) -> u16 {
-        self.users.len() as u16
     }
 }

@@ -66,7 +66,7 @@ async fn process_client(
             log::error!("Client {} errored: {:?}", peer, e);
         }
     }
-    
+
     Ok(0)
 }
 

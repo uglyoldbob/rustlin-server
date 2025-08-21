@@ -57,6 +57,13 @@ impl Client {
         if let Some(id) = self.id {
             self.world_sender
                 .send(WorldMessage {
+                    data: crate::world::WorldMessageData::ClientPacket(ClientPacket::Restart),
+                    peer: self.peer,
+                    sender: Some(id),
+                })
+                .await;
+            self.world_sender
+                .send(WorldMessage {
                     data: crate::world::WorldMessageData::UnregisterClient(id),
                     peer: self.peer,
                     sender: Some(id),
