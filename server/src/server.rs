@@ -53,7 +53,7 @@ async fn process_client(
     let (reader, writer) = socket.into_split();
     let packet_writer = ServerPacketSender::new(writer);
 
-    let (t_s, t_r) = tokio::sync::mpsc::channel(50);
+    let (t_s, t_r) = tokio::sync::mpsc::channel(100);
     let peer = reader.peer_addr()?;
     let mut c = Client::new(packet_writer, world_sender, peer);
     match c.event_loop(reader, t_r, t_s, end_rx).await {
@@ -81,7 +81,7 @@ struct GameServer {
     /// kill triggers
     kill: Arc<tokio::sync::Mutex<HashMap<SocketAddr, tokio::sync::mpsc::Sender<u32>>>>,
     /// task list of all clients
-    clients: Option<tokio::task::JoinSet<()>>,
+    clients: Option<Vec<tokio::task::JoinHandle<()>>>,
 }
 
 impl Drop for GameServer {
@@ -99,8 +99,10 @@ impl GameServer {
             }
         }
         log::info!("Waiting for all clients to finish");
-        if let Some(t) = self.clients.take() {
-            t.join_all().await;
+        if let Some(tv) = self.clients.take() {
+            for t in tv {
+                let _ = t.await;
+            }
         }
         log::info!("Ending the server thread!");
     }
@@ -112,10 +114,10 @@ impl GameServer {
                 Ok((socket, addr)) = self.listener.accept() => {
                     log::info!("Received a client from {}", addr);
                     let sender2 = sender.clone();
-                    let (kill_s, kill_r) = tokio::sync::mpsc::channel(50);
+                    let (kill_s, kill_r) = tokio::sync::mpsc::channel(100);
                     let kills2 = self.kill.clone();
                     if let Some(c) = &mut self.clients {
-                        c.spawn(async move {
+                        let d = tokio::task::spawn(async move {
                             {
                                 let mut k = kills2.lock().await;
                                 k.insert(addr, kill_s);
@@ -129,6 +131,7 @@ impl GameServer {
                             }
                             log::info!("Exiting client task");
                         });
+                        c.push(d);
                     }
                 }
                 Ok(a) = (&mut self.update_rx) => {
@@ -157,7 +160,7 @@ pub async fn setup_game_server(
         listener: update_listener,
         config,
         update_rx,
-        clients: Some(tokio::task::JoinSet::new()),
+        clients: Some(Vec::new()),
         kill: Arc::new(tokio::sync::Mutex::new(HashMap::new())),
     };
     tasks.spawn(async move {

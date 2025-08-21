@@ -295,6 +295,26 @@ impl World {
         self.sender.clone()
     }
 
+    /// Get an object reference
+    pub fn get_object_ref(&self, r: WorldObjectId) -> Option<&object::Object> {
+        if let Some(re) = self.object_ref_table.get(&r) {
+            if let Some(map) = self.map_info.get(&re.map) {
+                return map.get_object(*re);
+            }
+        }
+        None
+    }
+
+    /// Get an object mutable
+    pub fn get_object_mut(&mut self, r: WorldObjectId) -> Option<&mut object::Object> {
+        if let Some(re) = self.object_ref_table.get(&r) {
+            if let Some(map) = self.map_info.get_mut(&re.map) {
+                return map.get_object_mut(*re);
+            }
+        }
+        None
+    }
+
     /// Run the login process, delivering news if applicable
     fn login_with_news(
         &mut self,
@@ -368,17 +388,19 @@ impl World {
                     ClientPacket::AttackObject { id, x, y } => {
                         if let Some(sender) = m.sender {
                             if let Some(myid) = self.characters.get(&sender) {
-                                if let Some(s) = self.object_senders.get_mut(&sender) {
-                                    s.blocking_send(WorldResponse::ServerPacket(
-                                        ServerPacket::Attack {
-                                            attack_type: 3,
-                                            id: myid.get_u32(),
-                                            id2: id,
-                                            impact: 1,
-                                            direction: 2,
-                                            effect: None,
-                                        },
-                                    ));
+                                if let Some(o) = self.get_object_ref(*myid) {
+                                    if let Some(s) = o.sender() {
+                                        s.blocking_send(WorldResponse::ServerPacket(
+                                            ServerPacket::Attack {
+                                                attack_type: 3,
+                                                id: myid.get_u32(),
+                                                id2: id,
+                                                impact: 1,
+                                                direction: 2,
+                                                effect: None,
+                                            },
+                                        ));
+                                    }
                                 }
                             }
                         }
@@ -392,22 +414,18 @@ impl World {
                         };
                         if let Some(sender) = m.sender {
                             if let Some(r) = self.characters.get(&sender) {
-                                if let Some(re) = self.object_ref_table.get(r) {
-                                    if let Some(map) = self.map_info.get_mut(&re.map) {
-                                        if let Some(obj) = map.get_object_mut(*re) {
-                                            match obj {
-                                                object::Object::Player(fc) => {
-                                                    // Can't use items when you are dead
-                                                    if fc.curr_hp() > 0 {
-                                                        //TODO fc.use_item(&id, p2, map);
-                                                    }
-                                                }
-                                                object::Object::GenericNpc(npc) => todo!(),
-                                                object::Object::Monster(monster) => todo!(),
-                                                object::Object::GroundItem(item_with_location) => {
-                                                    todo!()
-                                                }
+                                if let Some(obj) = self.get_object_mut(*r) {
+                                    match obj {
+                                        object::Object::Player(fc) => {
+                                            // Can't use items when you are dead
+                                            if fc.curr_hp() > 0 {
+                                                //TODO fc.use_item(&id, p2, map);
                                             }
+                                        }
+                                        object::Object::GenericNpc(npc) => todo!(),
+                                        object::Object::Monster(monster) => todo!(),
+                                        object::Object::GroundItem(item_with_location) => {
+                                            todo!()
                                         }
                                     }
                                 }
@@ -423,16 +441,18 @@ impl World {
                             if let Some(r) = self.characters.get(&sender) {
                                 if let Some(re) = self.object_ref_table.get(r) {
                                     if let Some(map) = self.map_info.get_mut(&re.map) {
+                                        if let Some(o) = map.get_object(*re) {
+                                            if let Some(s) = o.sender() {
+                                                s.blocking_send(WorldResponse::ServerPacket(
+                                                    ServerPacket::BackToCharacterSelect,
+                                                ));
+                                            }
+                                        }
                                         map.remove_object(*r);
                                     }
                                 }
                             }
                             self.characters.remove(&sender);
-                            if let Some(s) = self.object_senders.get_mut(&sender) {
-                                s.blocking_send(WorldResponse::ServerPacket(
-                                    ServerPacket::BackToCharacterSelect,
-                                ));
-                            }
                         }
                     }
                     ClientPacket::RemoveFriend(name) => {
@@ -651,15 +671,11 @@ impl World {
                     ClientPacket::ChangeDirection(d) => {
                         if let Some(sender) = m.sender {
                             if let Some(r) = self.characters.get(&sender) {
-                                if let Some(re) = self.object_ref_table.get(r) {
-                                    if let Some(map) = self.map_info.get_mut(&re.map) {
-                                        if let Some(o) = map.get_object_mut(*re) {
-                                            let mut loc = o.get_location();
-                                            loc.direction = d;
-                                            o.set_location(loc);
-                                            // TODO notify all visible parties of change in direction
-                                        }
-                                    }
+                                if let Some(o) = self.get_object_mut(*r) {
+                                    let mut loc = o.get_location();
+                                    loc.direction = d;
+                                    o.set_location(loc);
+                                    // TODO notify all visible parties of change in direction
                                 }
                             }
                         }
@@ -668,15 +684,18 @@ impl World {
                         if let Some(sender) = m.sender {
                             if let Some(r) = self.characters.get(&sender) {
                                 if let Some(re) = self.object_ref_table.get(r) {
+                                    log::info!("Chatter is {}", re.id.get_u32());
                                     if let Some(map) = self.map_info.get_mut(&re.map) {
+                                        log::info!("The chatter exists on a map yay!");
                                         let amsg =
                                             format!("[{}] {}", map.get_name(*re).unwrap(), msg);
                                         let chatter_location = map.get_location(*re).unwrap();
                                         for (id, o) in map.objects_iter() {
                                             if o.linear_distance(&chatter_location) < 30.0 {
-                                                if let Some(se) =
-                                                    self.object_senders.get(&id.get_u32())
+                                                log::info!("Object {} is in range", id.get_u32());
+                                                if let Some(se) = o.sender()
                                                 {
+                                                    log::info!("Sending chat to {}", id.get_u32());
                                                     se.blocking_send(WorldResponse::ServerPacket(
                                                         ServerPacket::RegularChat {
                                                             id: 0,
@@ -701,8 +720,7 @@ impl World {
                                         let chatter_location = map.get_location(*re).unwrap();
                                         for (id, o) in map.objects_iter() {
                                             if o.linear_distance(&chatter_location) < 60.0 {
-                                                if let Some(se) =
-                                                    self.object_senders.get(&id.get_u32())
+                                                if let Some(se) = o.sender()
                                                 {
                                                     se.blocking_send(WorldResponse::ServerPacket(
                                                         ServerPacket::YellChat {
@@ -729,7 +747,7 @@ impl World {
                                         let amsg = format!("[{}] {}", name, msg);
                                         let chatter_location = map.get_location(*re).unwrap();
                                         for (id, o) in map.objects_iter() {
-                                            if let Some(se) = self.object_senders.get(&id.get_u32())
+                                            if let Some(se) = o.sender()
                                             {
                                                 se.blocking_send(WorldResponse::ServerPacket(
                                                     ServerPacket::PartyChat(amsg.clone()),
@@ -750,7 +768,7 @@ impl World {
                                         let amsg = format!("[{}] {}", name, msg);
                                         let chatter_location = map.get_location(*re).unwrap();
                                         for (id, o) in map.objects_iter() {
-                                            if let Some(se) = self.object_senders.get(&id.get_u32())
+                                            if let Some(se) = o.sender()
                                             {
                                                 se.blocking_send(WorldResponse::ServerPacket(
                                                     ServerPacket::PledgeChat(amsg.clone()),
@@ -775,7 +793,7 @@ impl World {
                                             if let Some(receiver_name) = o.player_name() {
                                                 if receiver_name == n {
                                                     if let Some(se) =
-                                                        self.object_senders.get(&id.get_u32())
+                                                        o.sender()
                                                     {
                                                         se.blocking_send(
                                                             WorldResponse::ServerPacket(
@@ -817,7 +835,7 @@ impl World {
                                         let amsg = format!("[{}] {}", name, msg);
                                         let chatter_location = map.get_location(*re).unwrap();
                                         for (id, o) in map.objects_iter() {
-                                            if let Some(se) = self.object_senders.get(&id.get_u32())
+                                            if let Some(se) = o.sender()
                                             {
                                                 se.blocking_send(WorldResponse::ServerPacket(
                                                     ServerPacket::GlobalChat(amsg.clone()),
@@ -831,93 +849,93 @@ impl World {
                     }
                     ClientPacket::CommandChat(msg) => {
                         if let Some(sender) = m.sender {
-                            if let Some(s) = self.object_senders.get_mut(&sender) {
-                                let mut words = msg.split_whitespace();
-                                let first_word = words.next();
-                                if let Some(mw) = first_word {
-                                    /// TODO replace with a hashmap converting strings to functions
-                                    match mw {
-                                        "asdf" => {
-                                            log::info!("A command called asdf");
-                                        }
-                                        "shutdown" => {
-                                            log::info!("A shutdown command was received");
-                                            if let Some(r) = self.characters.get(&sender) {
-                                                if let Some(re) = self.object_ref_table.get(r) {
-                                                    self.shutdown(re);
+                            if let Some(r) = self.characters.get(&sender) {
+                                if let Some(o) = self.get_object_ref(*r) {
+                                    if let Some(s) = o.sender() {
+                                        let mut words = msg.split_whitespace();
+                                        let first_word = words.next();
+                                        if let Some(mw) = first_word {
+                                            /// TODO replace with a hashmap converting strings to functions
+                                            match mw {
+                                                "asdf" => {
+                                                    log::info!("A command called asdf");
+                                                }
+                                                "shutdown" => {
+                                                    log::info!("A shutdown command was received");
+                                                    if let Some(r) = self.characters.get(&sender) {
+                                                        if let Some(re) = self.object_ref_table.get(r) {
+                                                            self.shutdown(re);
+                                                        }
+                                                    }
+                                                }
+                                                "restart" => {
+                                                    log::info!("A restart command was received");
+                                                    if let Some(r) = self.characters.get(&sender) {
+                                                        if let Some(re) = self.object_ref_table.get(r) {
+                                                            self.restart(re);
+                                                        }
+                                                    }
+                                                }
+                                                "quit" => {
+                                                    s.blocking_send(WorldResponse::ServerPacket(
+                                                            ServerPacket::Disconnect,
+                                                        ));
+                                                }
+                                                "test" => {
+                                                    log::info!("Test requested");
+                                                }
+                                                "chat" => {
+                                                    s.blocking_send(WorldResponse::ServerPacket(
+                                                        ServerPacket::SystemMessage(
+                                                            "This is a test of the system message"
+                                                                .to_string(),
+                                                        ),
+                                                    ));
+                                                    s.blocking_send(WorldResponse::ServerPacket(
+                                                        ServerPacket::NpcShout(
+                                                            "NPC Shout test".to_string(),
+                                                        ),
+                                                    ));
+                                                    s.blocking_send(WorldResponse::ServerPacket(
+                                                        ServerPacket::RegularChat {
+                                                            id: 0,
+                                                            msg: "regular chat".to_string(),
+                                                        },
+                                                    ));
+                                                    s.blocking_send(WorldResponse::ServerPacket(
+                                                        ServerPacket::YellChat {
+                                                            id: 0,
+                                                            msg: "yelling".to_string(),
+                                                            x: 32768,
+                                                            y: 32768,
+                                                        },
+                                                    ));
+                                                    s.blocking_send(WorldResponse::ServerPacket(
+                                                        ServerPacket::GlobalChat(
+                                                            "global chat".to_string(),
+                                                        ),
+                                                    ));
+                                                    s.blocking_send(WorldResponse::ServerPacket(
+                                                        ServerPacket::PledgeChat(
+                                                            "pledge chat".to_string(),
+                                                        ),
+                                                    ));
+                                                    s.blocking_send(WorldResponse::ServerPacket(
+                                                        ServerPacket::PartyChat(
+                                                            "party chat".to_string(),
+                                                        ),
+                                                    ));
+                                                    s.blocking_send(WorldResponse::ServerPacket(
+                                                        ServerPacket::WhisperChat {
+                                                            name: "test".to_string(),
+                                                            msg: "whisper message".to_string(),
+                                                        },
+                                                    ));
+                                                }
+                                                _ => {
+                                                    log::info!("An unknown command {}", mw);
                                                 }
                                             }
-                                        }
-                                        "restart" => {
-                                            log::info!("A restart command was received");
-                                            if let Some(r) = self.characters.get(&sender) {
-                                                if let Some(re) = self.object_ref_table.get(r) {
-                                                    self.restart(re);
-                                                }
-                                            }
-                                        }
-                                        "quit" => {
-                                            if let Some(s) = self.object_senders.get_mut(&sender) {
-                                                s.blocking_send(WorldResponse::ServerPacket(
-                                                    ServerPacket::Disconnect,
-                                                ));
-                                            }
-                                        }
-                                        "test" => {
-                                            log::info!("Test requested");
-                                        }
-                                        "chat" => {
-                                            if let Some(s) = self.object_senders.get_mut(&sender) {
-                                                s.blocking_send(WorldResponse::ServerPacket(
-                                                    ServerPacket::SystemMessage(
-                                                        "This is a test of the system message"
-                                                            .to_string(),
-                                                    ),
-                                                ));
-                                                s.blocking_send(WorldResponse::ServerPacket(
-                                                    ServerPacket::NpcShout(
-                                                        "NPC Shout test".to_string(),
-                                                    ),
-                                                ));
-                                                s.blocking_send(WorldResponse::ServerPacket(
-                                                    ServerPacket::RegularChat {
-                                                        id: 0,
-                                                        msg: "regular chat".to_string(),
-                                                    },
-                                                ));
-                                                s.blocking_send(WorldResponse::ServerPacket(
-                                                    ServerPacket::YellChat {
-                                                        id: 0,
-                                                        msg: "yelling".to_string(),
-                                                        x: 32768,
-                                                        y: 32768,
-                                                    },
-                                                ));
-                                                s.blocking_send(WorldResponse::ServerPacket(
-                                                    ServerPacket::GlobalChat(
-                                                        "global chat".to_string(),
-                                                    ),
-                                                ));
-                                                s.blocking_send(WorldResponse::ServerPacket(
-                                                    ServerPacket::PledgeChat(
-                                                        "pledge chat".to_string(),
-                                                    ),
-                                                ));
-                                                s.blocking_send(WorldResponse::ServerPacket(
-                                                    ServerPacket::PartyChat(
-                                                        "party chat".to_string(),
-                                                    ),
-                                                ));
-                                                s.blocking_send(WorldResponse::ServerPacket(
-                                                    ServerPacket::WhisperChat {
-                                                        name: "test".to_string(),
-                                                        msg: "whisper message".to_string(),
-                                                    },
-                                                ));
-                                            }
-                                        }
-                                        _ => {
-                                            log::info!("An unknown command {}", mw);
                                         }
                                     }
                                 }
@@ -992,14 +1010,10 @@ impl World {
     /// Shutdown the server if the player is authorized to do so
     pub fn shutdown(&self, r: &ObjectRef) {
         let shutdown = {
-            let map = self.map_info.get(&r.map);
-            if let Some(map) = map {
-                if let Some(obj) = map.get_object_from_id(r.id) {
-                    obj.can_shutdown()
-                } else {
-                    false
-                }
-            } else {
+            if let Some(o) = self.get_object_ref(r.id) {
+                o.can_shutdown()
+            }
+            else {
                 false
             }
         };
@@ -1013,14 +1027,10 @@ impl World {
     /// Restart the server if the player is authorized to do so
     pub fn restart(&self, r: &ObjectRef) {
         let shutdown = {
-            let map = self.map_info.get(&r.map);
-            if let Some(map) = map {
-                if let Some(obj) = map.get_object_from_id(r.id) {
-                    obj.can_shutdown()
-                } else {
-                    false
-                }
-            } else {
+            if let Some(o) = self.get_object_ref(r.id) {
+                o.can_shutdown()
+            }
+            else {
                 false
             }
         };
@@ -1048,23 +1058,6 @@ impl World {
                 }
             }
         }
-    }
-
-    /// Send a new object packet with the given packet writer and object id
-    pub fn send_new_object(
-        &self,
-        location: crate::character::Location,
-        id: WorldObjectId,
-        pw: &mut common::packet::ServerPacketSender,
-    ) -> Result<(), ClientError> {
-        let map = self.map_info.get(&location.map);
-        if let Some(map) = map {
-            if let Some(obj) = map.get_object_from_id(id) {
-                let p = obj.build_put_object_packet();
-                pw.queue_packet(p);
-            }
-        }
-        Ok(())
     }
 
     fn add_object(&mut self, obj: object::Object) -> Option<ObjectRef> {

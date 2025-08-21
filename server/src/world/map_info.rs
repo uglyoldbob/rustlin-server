@@ -151,7 +151,6 @@ impl MapInfo {
         for obj in new_object_list.get_objects() {
             if let Some(other_obj) = self.objects.get(&obj) {
                 if let Some(s) = other_obj.sender() {
-                    log::info!("Sending move to {}", obj.get_u32());
                     s.blocking_send(super::WorldResponse::ServerPacket(move_packet.clone()));
                 }
             }

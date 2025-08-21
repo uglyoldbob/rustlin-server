@@ -235,7 +235,7 @@ impl MonsterRef {
         m: Monster,
     ) {
         let mut m = Some(m);
-        let mut chan = tokio::sync::mpsc::channel(50);
+        let mut chan = tokio::sync::mpsc::channel(100);
         let _ = sender
             .send(WorldMessage {
                 data: crate::world::WorldMessageData::RegisterSender(chan.0),
@@ -246,6 +246,9 @@ impl MonsterRef {
                 )),
             })
             .await;
+        use rand::Rng;
+        let random_wait = rand::thread_rng().gen_range(0..=1000u16);
+        tokio::time::sleep(std::time::Duration::from_millis(random_wait as u64)).await;
         loop {
             while let Ok(msg) = chan.1.try_recv() {
                 match msg {
@@ -269,7 +272,8 @@ impl MonsterRef {
                     }
                 }
             }
-            tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
+            let random_wait = rand::thread_rng().gen_range(500..=1000u16);
+            tokio::time::sleep(std::time::Duration::from_millis(random_wait as u64)).await;
             self.moving(&mut sender).await;
         }
         log::info!("Exiting monster ai");
