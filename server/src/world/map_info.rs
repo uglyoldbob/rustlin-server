@@ -15,56 +15,6 @@ pub struct MapInfo {
     objects: HashMap<WorldObjectId, super::object::Object>,
 }
 
-/// This object is used to collect all of the packets destined for other objects
-/// that have senders
-pub struct SendsToAnotherObject {
-    data: HashMap<WorldObjectId, (tokio::sync::mpsc::Sender<ServerPacket>, Vec<ServerPacket>)>,
-}
-
-impl Drop for SendsToAnotherObject {
-    fn drop(&mut self) {}
-}
-
-impl std::future::AsyncDrop for SendsToAnotherObject {
-    async fn drop(mut self: std::pin::Pin<&mut Self>) {
-        self.send_all().await
-    }
-}
-
-impl SendsToAnotherObject {
-    /// Construct an empty list
-    pub fn new() -> Self {
-        Self {
-            data: HashMap::new(),
-        }
-    }
-
-    /// Add to the list
-    pub fn add_to_list(
-        &mut self,
-        id: WorldObjectId,
-        s: tokio::sync::mpsc::Sender<ServerPacket>,
-        p: ServerPacket,
-    ) {
-        if let Some(a) = self.data.get_mut(&id) {
-            a.1.push(p);
-        } else {
-            let d = (s, vec![p]);
-            self.data.insert(id, d);
-        }
-    }
-
-    /// Send all packets
-    async fn send_all(&mut self) {
-        for (id, s) in &self.data {
-            for p in &s.1 {
-                let _ = s.0.send(p.clone()).await;
-            }
-        }
-        self.data.clear();
-    }
-}
-
 impl MapInfo {
     /// Construct a new map info object
     pub fn new() -> Self {

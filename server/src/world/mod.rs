@@ -1,6 +1,6 @@
 //! Represents the world in the server
 
-use std::{collections::HashMap, future::AsyncDrop, pin::Pin, sync::Arc};
+use std::{collections::HashMap, pin::Pin, sync::Arc};
 
 pub mod item;
 pub mod map_info;
@@ -336,8 +336,16 @@ impl World {
         Ok(())
     }
 
+    /// end the gameserver
+    pub fn end(&mut self) {
+        log::info!("Ending world");
+        if let Some(mut ms) = self.monster_set.take() {
+            ms.abort_all();
+        }
+    }
+
     /// Run the game world
-    pub fn run(mut self) {
+    pub fn run(&mut self) {
         while let Some(m) = self.recv.blocking_recv() {
             match m.data {
                 WorldMessageData::RegisterMonster(monster) => {

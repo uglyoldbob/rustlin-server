@@ -1,6 +1,5 @@
 #![deny(missing_docs)]
 #![deny(clippy::missing_docs_in_private_items)]
-#![feature(async_drop)]
 
 //! The server for the game
 
@@ -69,7 +68,10 @@ async fn smain() -> Result<(), String> {
     .map_err(|e| format!("{:?}", e))?;
     world.spawn_monsters();
 
-    std::thread::spawn(move || world.run());
+    std::thread::spawn(move || {
+        world.run();
+        world.end();
+    });
 
     let mut update_tx = Some(
         update::setup_update_server(&mut tasks)

@@ -184,13 +184,6 @@ pub struct MonsterRef {
 
 impl Drop for MonsterRef {
     fn drop(&mut self) {
-        log::error!("Dropping the monster ref {:?}", self.id);
-    }
-}
-
-impl std::future::AsyncDrop for MonsterRef {
-    async fn drop(mut self: std::pin::Pin<&mut Self>) {
-        log::info!("Async drop monster ref {:?}", self.id);
     }
 }
 
