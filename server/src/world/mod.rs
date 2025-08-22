@@ -390,6 +390,7 @@ impl World {
                             if let Some(myid) = self.characters.get(&sender) {
                                 if let Some(o) = self.get_object_ref(*myid) {
                                     if let Some(s) = o.sender() {
+                                        log::info!("Sending attack");
                                         s.blocking_send(WorldResponse::ServerPacket(
                                             ServerPacket::Attack {
                                                 attack_type: 3,
@@ -400,6 +401,7 @@ impl World {
                                                 effect: None,
                                             },
                                         ));
+                                        log::info!("Done sending attack");
                                     }
                                 }
                             }
@@ -684,18 +686,14 @@ impl World {
                         if let Some(sender) = m.sender {
                             if let Some(r) = self.characters.get(&sender) {
                                 if let Some(re) = self.object_ref_table.get(r) {
-                                    log::info!("Chatter is {}", re.id.get_u32());
                                     if let Some(map) = self.map_info.get_mut(&re.map) {
-                                        log::info!("The chatter exists on a map yay!");
                                         let amsg =
                                             format!("[{}] {}", map.get_name(*re).unwrap(), msg);
                                         let chatter_location = map.get_location(*re).unwrap();
                                         for (id, o) in map.objects_iter() {
                                             if o.linear_distance(&chatter_location) < 30.0 {
-                                                log::info!("Object {} is in range", id.get_u32());
                                                 if let Some(se) = o.sender()
                                                 {
-                                                    log::info!("Sending chat to {}", id.get_u32());
                                                     se.blocking_send(WorldResponse::ServerPacket(
                                                         ServerPacket::RegularChat {
                                                             id: 0,

@@ -17,7 +17,7 @@ mod world;
 use crate::clients::ClientList;
 
 fn main() -> Result<(), String> {
-    tokio::runtime::Builder::new_multi_thread()
+    tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .thread_stack_size(32 * 1024 * 1024)
         .build()
@@ -56,7 +56,17 @@ async fn smain() -> Result<(), String> {
 
     let (iscs, mut iscr) = tokio::sync::mpsc::channel(5);
 
-    let (main_s, main_r) = tokio::sync::mpsc::channel(1000);
+    // lag times for attack packet on multi-thread async runtime
+    //50000 - 8 seconds lag
+    //25000 - 6 seconds lag
+    //12500 - 4 seconds lag
+    // 6250 - 3 seconds lag
+    // 3100 - 1.5 seconds lag
+    // 2500 - 2 seconds lag
+    // 2000 - 1.33 seconds lag
+    // 1500 - 2 seconds lag
+    //  750 - 3 seconds lag
+    let (main_s, main_r) = tokio::sync::mpsc::channel(2000);
 
     let mut world = world::World::new(
         mysql_pool,

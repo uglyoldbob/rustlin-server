@@ -143,6 +143,7 @@ impl Client {
             futures::select! {
                 packet = packet_reader.read_packet().fuse() => {
                     let p = packet?;
+                    log::info!("Process packet {:?}", p);
                     self.process_packet(p).await?;
                     self.packet_writer.send_all_current_packets(Some(&mut packet_reader)).await?;
                 }
