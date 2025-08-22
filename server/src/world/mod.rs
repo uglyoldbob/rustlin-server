@@ -1060,7 +1060,7 @@ impl World {
                 monsters.push(m);
             }
             {
-                for m in monsters {
+                for mut m in monsters {
                     let monref = m.reference();
                     let s2 = self.sender.clone();
                     mset.spawn(async move { monref.run_ai(s2, m).await });

@@ -158,6 +158,8 @@ impl MonsterSpawn {
         if attempts_to_randomize == ATTEMPTS_MAX {
             location = self.location;
         }
+        
+        let chan = tokio::sync::mpsc::channel(1000);
 
         Monster {
             id,
@@ -168,6 +170,8 @@ impl MonsterSpawn {
             light_size: npc.light_size,
             spawn: self.clone(),
             old_location: None,
+            send: chan.0,
+            recv: Some(chan.1),
         }
     }
 }
@@ -180,6 +184,10 @@ pub struct MonsterRef {
     location: Location,
     /// monster id
     id: Option<u32>,
+    /// Sender of worldResponse
+    send: tokio::sync::mpsc::Sender<WorldResponse>,
+    /// The receiver from the world
+    recv: tokio::sync::mpsc::Receiver<WorldResponse>,
 }
 
 impl Drop for MonsterRef {
@@ -235,10 +243,9 @@ impl MonsterRef {
         m: Monster,
     ) {
         let mut m = Some(m);
-        let mut chan = tokio::sync::mpsc::channel(100);
         let _ = sender
             .send(WorldMessage {
-                data: crate::world::WorldMessageData::RegisterSender(chan.0),
+                data: crate::world::WorldMessageData::RegisterSender(self.send.clone()),
                 sender: self.id,
                 peer: std::net::SocketAddr::V4(SocketAddrV4::new(
                     Ipv4Addr::new(127, 0, 0, 1),
@@ -250,10 +257,17 @@ impl MonsterRef {
         let random_wait = rand::thread_rng().gen_range(0..=1000u16);
         tokio::time::sleep(std::time::Duration::from_millis(random_wait as u64)).await;
         loop {
-            while let Ok(msg) = chan.1.try_recv() {
+            while let Ok(msg) = self.recv.try_recv() {
                 match msg {
                     super::WorldResponse::ServerPacket(p) => {
-                        log::error!("Unhandled packet for monster {:?}: {:?}", self.id, p);
+                        match p {
+                            common::packet::ServerPacket::MoveObject { id, x, y, direction } => {}
+                            common::packet::ServerPacket::PutObject { x, y, id, icon, status, direction, light, speed, xp, alignment, name, title, status2, pledgeid, pledgename, owner_name, v1, hp_bar, v2, level } => {}
+                            common::packet::ServerPacket::RemoveObject(id) => {}
+                            _ => {
+                                log::error!("Unhandled packet for monster {:?}: {:?}", self.id, p);
+                            }
+                        }
                     }
                     super::WorldResponse::NewClientId(id) => {
                         if let Some(m) = m.take() {
@@ -282,7 +296,7 @@ impl MonsterRef {
 
 use crate::{
     character::Location,
-    world::{ObjectRef, WorldMessage},
+    world::{ObjectRef, WorldMessage, WorldResponse},
 };
 
 /// A monster on the world
@@ -304,11 +318,15 @@ pub struct Monster {
     icon: u16,
     /// The spawner
     spawn: MonsterSpawn,
+    /// Sender of worldResponse
+    send: tokio::sync::mpsc::Sender<WorldResponse>,
+    /// The temporary receiver from the world
+    recv: Option<tokio::sync::mpsc::Receiver<WorldResponse>>,
 }
 
 impl Monster {
     /// Get a reference to the monster
-    pub fn reference(&self) -> MonsterRef {
+    pub fn reference(&mut self) -> MonsterRef {
         MonsterRef {
             reference: ObjectRef {
                 map: self.location.map,
@@ -316,6 +334,8 @@ impl Monster {
             },
             location: self.location,
             id: None,
+            send: self.send.clone(),
+            recv: self.recv.take().unwrap(),
         }
     }
 }
@@ -332,6 +352,10 @@ impl super::ObjectTrait for Monster {
     fn set_location(&mut self, l: crate::character::Location) {
         self.old_location = Some(self.location);
         self.location = l;
+    }
+
+    fn sender(&self) -> Option<tokio::sync::mpsc::Sender<crate::world::WorldResponse>> {
+        Some(self.send.clone())
     }
 
     fn id(&self) -> super::WorldObjectId {
