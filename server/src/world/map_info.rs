@@ -97,26 +97,24 @@ impl MapInfo {
         r: super::ObjectRef,
         new_loc: super::Location,
     ) -> Result<(), super::ClientError> {
-        log::info!("Moving object {}", r.id.get_u32());
         let mut old_object_list = ObjectList::new();
         let mut new_object_list = ObjectList::new();
-        let old_loc = self.objects.get(&r.id).unwrap().get_location();
+        let (old_loc, mut moving_send, pop, move_packet) = {
+            let o = self.objects.get_mut(&r.id).unwrap();
+            let oldloc = o.get_location();
+            o.set_location(new_loc);
+            (oldloc, o.sender(), o.build_put_object_packet(), o.build_move_object_packet())
+        };
         for (id, o) in &mut self.objects {
             if *id != r.id {
                 if o.linear_distance(&old_loc) < 17.0 {
                     old_object_list.add_object(*id);
                 }
-            }
-        }
-        self.get_object_mut(r).unwrap().set_location(new_loc);
-        for (id, o) in &mut self.objects {
-            if *id != r.id {
                 if o.linear_distance(&new_loc) < 17.0 {
                     new_object_list.add_object(*id);
                 }
             }
         }
-        let mut moving_send = self.get_object_mut(r).unwrap().sender();
         let remove_objects = old_object_list.difference(&new_object_list);
         let add_objects = new_object_list.difference(&old_object_list);
         for obj in remove_objects {
@@ -133,7 +131,6 @@ impl MapInfo {
                 }
             }
         }
-        let pop = self.objects.get(&r.id).unwrap().build_put_object_packet();
         for obj in add_objects {
             if let Some(moving_send) = &mut moving_send {
                 if let Some(obj) = self.objects.get_mut(&obj) {
@@ -150,19 +147,15 @@ impl MapInfo {
                 }
             }
         }
-        log::info!("Moving object 5");
-        let move_packet = self.objects.get(&r.id).unwrap().build_move_object_packet();
         for obj in new_object_list.get_objects() {
             if let Some(other_obj) = self.objects.get(&obj) {
                 if let Some(s) = other_obj.sender() {
-                    log::info!("Sending move to {}", obj.get_u32());
                     s.send(super::WorldResponse::ServerPacket(
                         move_packet.clone(),
                     )).await;
                 }
             }
         }
-        log::info!("Moving object 6");
         Ok(())
     }
 

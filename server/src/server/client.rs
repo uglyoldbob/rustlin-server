@@ -57,6 +57,13 @@ impl Client {
         if let Some(id) = self.id {
             self.world_sender
                 .send(WorldMessage {
+                    data: crate::world::WorldMessageData::ClientPacket(ClientPacket::Restart),
+                    peer: self.peer,
+                    sender: Some(id),
+                })
+                .await;
+            self.world_sender
+                .send(WorldMessage {
                     data: crate::world::WorldMessageData::UnregisterClient(id),
                     peer: self.peer,
                     sender: Some(id),
@@ -116,7 +123,7 @@ impl Client {
 
     /// The main event loop for a client in a server.
     pub async fn event_loop(
-        mut self,
+        &mut self,
         reader: tokio::net::tcp::OwnedReadHalf,
         mut receiver: tokio::sync::mpsc::Receiver<WorldResponse>,
         sender: tokio::sync::mpsc::Sender<WorldResponse>,

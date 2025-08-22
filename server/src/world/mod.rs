@@ -342,8 +342,9 @@ impl World {
 
     /// Run the game world
     pub async fn run(&mut self) {
+        let mut count = 0;
+        let mut last_interval_time = std::time::Instant::now();
         while let Some(m) = self.recv.recv().await {
-            log::info!("World processing {:?}", m);
             match m.data {
                 WorldMessageData::RegisterMonster(monster) => {
                     let monster_id = m.sender.unwrap();
@@ -961,6 +962,16 @@ impl World {
                     }
                 },
             }
+            count += 1;
+            if count == 10000 {
+                count = 0;
+                let now = std::time::Instant::now();
+                let delta = now.duration_since(last_interval_time);
+                last_interval_time = now;
+                let im = delta.as_micros() as f32 / 10000.0;
+                log::info!("Interval time is {} microseconds, {} hz", im, 1000000.0/im);
+            }
+            
         }
         log::error!("Exiting world run instance");
     }

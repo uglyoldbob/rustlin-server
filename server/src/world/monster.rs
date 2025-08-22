@@ -184,7 +184,6 @@ pub struct MonsterRef {
 
 impl Drop for MonsterRef {
     fn drop(&mut self) {
-        log::error!("Dropping the monster ref {:?}", self.id);
     }
 }
 
@@ -239,7 +238,7 @@ impl MonsterRef {
     /// Run the ai for the monster
     pub async fn run_ai(mut self, mut sender: tokio::sync::mpsc::Sender<super::WorldMessage>, m: Monster) {
         let mut m = Some(m);
-        let mut chan = tokio::sync::mpsc::channel(50);
+        let mut chan = tokio::sync::mpsc::channel(100);
         let _ = sender
             .send(WorldMessage {
                 data: crate::world::WorldMessageData::RegisterSender(chan.0),
