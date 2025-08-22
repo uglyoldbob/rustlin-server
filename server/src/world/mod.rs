@@ -366,10 +366,9 @@ impl World {
 
     /// Run the game world
     pub fn run(&mut self) {
-        let mut iteration_time = 1.0;
         let mut count = 0;
+        let mut last_interval_time = std::time::Instant::now();
         while let Some(m) = self.recv.blocking_recv() {
-            let start_process = std::time::Instant::now();
             match m.data {
                 WorldMessageData::RegisterMonster(monster) => {
                     let monster_id = m.sender.unwrap();
@@ -990,13 +989,14 @@ impl World {
                     }
                 },
             }
-            let now = std::time::Instant::now();
-            let delta = now.duration_since(start_process);
-            iteration_time = (iteration_time * 0.99) + (0.01 + delta.as_micros() as f32);
             count += 1;
             if count == 10000 {
+                let now = std::time::Instant::now();
+                let interval_time = now.duration_since(last_interval_time);
+                last_interval_time = now;
                 count = 0;
-                log::info!("Time per iteration is {} microseconds, {} hz", iteration_time, 1000000.0 / iteration_time);
+                let im = interval_time.as_micros() as f32 / 10000.0;
+                log::info!("Interval time is {} microseconds, {} hz", im, 1000000.0/im);
             }
         }
         log::error!("Exiting world run instance");
