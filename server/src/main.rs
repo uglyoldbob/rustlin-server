@@ -1,6 +1,5 @@
 #![deny(missing_docs)]
 #![deny(clippy::missing_docs_in_private_items)]
-#![feature(async_drop)]
 
 //! The server for the game
 
@@ -18,7 +17,7 @@ mod world;
 use crate::clients::ClientList;
 
 fn main() -> Result<(), String> {
-    tokio::runtime::Builder::new_multi_thread()
+    tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .thread_stack_size(32 * 1024 * 1024)
         .build()
@@ -69,7 +68,10 @@ async fn smain() -> Result<(), String> {
     .map_err(|e| format!("{:?}", e))?;
     world.spawn_monsters();
 
-    tokio::task::spawn(async move { world.run().await });
+    tokio::task::spawn(async move { 
+        world.run().await;
+        world.end().await;
+    });
 
     let mut update_tx = Some(
         update::setup_update_server(&mut tasks)

@@ -32,23 +32,6 @@ impl Drop for Client {
     }
 }
 
-impl std::future::AsyncDrop for Client {
-    async fn drop(mut self: std::pin::Pin<&mut Self>) {
-        log::info!("Running async drop on client");
-        let _ = self.packet_writer.queue_packet(ServerPacket::Disconnect);
-        self.packet_writer.send_all_current_packets(None).await;
-        if let Some(id) = self.id {
-            self.world_sender
-                .send(WorldMessage {
-                    data: crate::world::WorldMessageData::UnregisterClient(id),
-                    peer: self.peer,
-                    sender: Some(id),
-                })
-                .await;
-        }
-    }
-}
-
 impl Client {
     /// Construct a new client
     pub fn new(
@@ -64,6 +47,21 @@ impl Client {
             world_sender,
             id: None,
             peer,
+        }
+    }
+
+    pub async fn end(&mut self) {
+        log::info!("Running end on client");
+        let _ = self.packet_writer.queue_packet(ServerPacket::Disconnect);
+        self.packet_writer.send_all_current_packets(None).await;
+        if let Some(id) = self.id {
+            self.world_sender
+                .send(WorldMessage {
+                    data: crate::world::WorldMessageData::UnregisterClient(id),
+                    peer: self.peer,
+                    sender: Some(id),
+                })
+                .await;
         }
     }
 

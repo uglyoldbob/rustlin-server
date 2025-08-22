@@ -1,6 +1,6 @@
 //! Represents the world in the server
 
-use std::{collections::HashMap, future::AsyncDrop, pin::Pin, sync::Arc};
+use std::{collections::HashMap, sync::Arc};
 
 pub mod item;
 pub mod map_info;
@@ -336,8 +336,12 @@ impl World {
         Ok(())
     }
 
+    pub async fn end(&mut self) {
+        log::info!("Ending the world");
+    }
+
     /// Run the game world
-    pub async fn run(mut self) {
+    pub async fn run(&mut self) {
         while let Some(m) = self.recv.recv().await {
             log::info!("World processing {:?}", m);
             match m.data {

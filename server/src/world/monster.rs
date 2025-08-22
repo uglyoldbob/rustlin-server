@@ -188,12 +188,6 @@ impl Drop for MonsterRef {
     }
 }
 
-impl std::future::AsyncDrop for MonsterRef {
-    async fn drop(mut self: std::pin::Pin<&mut Self>) {
-        log::info!("Async drop monster ref {:?}", self.id);
-    }
-}
-
 impl MonsterRef {
     ///move the monster randomly
     pub async fn moving(&mut self, sender: &mut tokio::sync::mpsc::Sender<super::WorldMessage>) {

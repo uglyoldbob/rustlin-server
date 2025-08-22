@@ -78,8 +78,9 @@ impl Drop for GameServer {
     fn drop(&mut self) {}
 }
 
-impl std::future::AsyncDrop for GameServer {
-    async fn drop(mut self: std::pin::Pin<&mut Self>) {
+impl GameServer {
+    /// End the game server gracefully
+    pub async fn end(&mut self) {
         {
             let k = self.kill.lock().await;
             for (addr, k) in k.iter() {
@@ -93,11 +94,9 @@ impl std::future::AsyncDrop for GameServer {
         }
         log::info!("Ending the server thread!");
     }
-}
 
-impl GameServer {
     /// Run the server
-    async fn run(mut self, sender: tokio::sync::mpsc::Sender<WorldMessage>) -> Result<(), u32> {
+    async fn run(&mut self, sender: tokio::sync::mpsc::Sender<WorldMessage>) -> Result<(), u32> {
         loop {
             tokio::select! {
                 Ok((socket, addr)) = self.listener.accept() => {
@@ -144,14 +143,18 @@ pub async fn setup_game_server(
 
     let config = std::sync::Arc::new(config.clone());
 
-    let server = GameServer {
+    let mut server = GameServer {
         listener: update_listener,
         config,
         update_rx,
         clients: Some(tokio::task::JoinSet::new()),
         kill: Arc::new(tokio::sync::Mutex::new(HashMap::new())),
     };
-    tasks.spawn(server.run(sender));
+    tasks.spawn(async move {
+        server.run(sender).await;
+        server.end().await;
+        Ok(())
+    });
 
     Ok(update_tx)
 }
