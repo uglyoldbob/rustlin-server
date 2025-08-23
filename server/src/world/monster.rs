@@ -209,9 +209,6 @@ impl MonsterRef {
             map: self.location.map,
             direction,
         };
-        if self.reference.id.get_u32() == 6431 {
-            log::info!("Moving the bear to {:?}", new_loc);
-        }
         sender
             .send(WorldMessage {
                 data: crate::world::WorldMessageData::ClientPacket(
@@ -229,9 +226,6 @@ impl MonsterRef {
             })
             .await;
         self.location = new_loc;
-        if self.reference.id.get_u32() == 6431 {
-            log::info!("Done moving the bear to {:?}", new_loc);
-        }
     }
 
     /// Run the ai for the monster

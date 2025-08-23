@@ -110,7 +110,7 @@ impl Client {
     /// Process a single packet from the game client
     pub async fn process_packet(&mut self, p: Packet) -> Result<(), ClientError> {
         let c = p.convert();
-        log::info!("Processing client packet {:?}", c);
+        //log::info!("Processing client packet {:?}", c);
         self.world_sender
             .send(WorldMessage {
                 data: crate::world::WorldMessageData::ClientPacket(c),
@@ -144,13 +144,13 @@ impl Client {
             futures::select! {
                 packet = packet_reader.read_packet().fuse() => {
                     let p = packet?;
-                    log::info!("Processing a packet {:?}", p);
+                    //log::info!("Processing a packet {:?}", p);
                     self.process_packet(p).await?;
                     self.packet_writer.send_all_current_packets(Some(&mut packet_reader)).await?;
                 }
                 msg = receiver.recv().fuse() => {
                     let p = msg.unwrap();
-                    log::info!("Got a async packet to send to client: {:?}", p);
+                    //log::info!("Got a async packet to send to client: {:?}", p);
                     match p {
                         WorldResponse::ServerPacket(p) => {
                             self.packet_writer.queue_packet(p);

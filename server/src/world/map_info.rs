@@ -113,10 +113,10 @@ impl MapInfo {
         };
         for (id, o) in &mut self.objects {
             if *id != r.id {
-                if o.linear_distance(&old_loc) < 17.0 {
+                if o.manhattan_distance(&old_loc) < 17 {
                     old_object_list.add_object(*id);
                 }
-                if o.linear_distance(&new_loc) < 17.0 {
+                if o.manhattan_distance(&new_loc) < 17 {
                     new_object_list.add_object(*id);
                 }
             }

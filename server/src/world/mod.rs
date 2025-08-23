@@ -1013,12 +1013,12 @@ impl World {
                 },
             }
             count += 1;
-            if count == 10000 {
+            if count == 20000 {
                 count = 0;
                 let now = std::time::Instant::now();
                 let delta = now.duration_since(last_interval_time);
                 last_interval_time = now;
-                let im = delta.as_micros() as f32 / 10000.0;
+                let im = delta.as_micros() as f32 / 20000.0;
                 log::info!(
                     "Interval time is {} microseconds, {} hz",
                     im,
