@@ -304,12 +304,14 @@ impl World {
     ) -> Result<(), ClientError> {
         s.send(WorldResponse::ServerPacket(ServerPacket::LoginResult {
             code: 0,
-        })).await;
+        }))
+        .await;
         let news = self.config.get_news();
         if news.is_empty() {
             self.after_news(id, s).await?;
         } else {
-            s.send(WorldResponse::ServerPacket(ServerPacket::News(news))).await;
+            s.send(WorldResponse::ServerPacket(ServerPacket::News(news)))
+                .await;
         }
         Ok(())
     }
@@ -340,6 +342,26 @@ impl World {
         log::info!("Ending the world");
     }
 
+    /// Get an object reference
+    pub fn get_object_ref(&self, r: WorldObjectId) -> Option<&object::Object> {
+        if let Some(re) = self.object_ref_table.get(&r) {
+            if let Some(map) = self.map_info.get(&re.map) {
+                return map.get_object(*re);
+            }
+        }
+        None
+    }
+
+    /// Get an object mutable
+    pub fn get_object_mut(&mut self, r: WorldObjectId) -> Option<&mut object::Object> {
+        if let Some(re) = self.object_ref_table.get(&r) {
+            if let Some(map) = self.map_info.get_mut(&re.map) {
+                return map.get_object_mut(*re);
+            }
+        }
+        None
+    }
+
     /// Run the game world
     pub async fn run(&mut self) {
         let mut count = 0;
@@ -366,17 +388,18 @@ impl World {
                     ClientPacket::AttackObject { id, x, y } => {
                         if let Some(sender) = m.sender {
                             if let Some(myid) = self.characters.get(&sender) {
-                                if let Some(s) = self.object_senders.get_mut(&sender) {
-                                    s.send(WorldResponse::ServerPacket(
-                                        ServerPacket::Attack {
+                                if let Some(o) = self.get_object_ref(*myid) {
+                                    if let Some(s) = o.sender() {
+                                        s.send(WorldResponse::ServerPacket(ServerPacket::Attack {
                                             attack_type: 3,
                                             id: myid.get_u32(),
                                             id2: id,
                                             impact: 1,
                                             direction: 2,
                                             effect: None,
-                                        },
-                                    )).await;
+                                        }))
+                                        .await;
+                                    }
                                 }
                             }
                         }
@@ -418,12 +441,17 @@ impl World {
                     ClientPacket::Restart => {
                         log::info!("Player restarts");
                         if let Some(sender) = m.sender {
-                            self.characters.remove(&sender);
-                            if let Some(s) = self.object_senders.get_mut(&sender) {
-                                s.send(WorldResponse::ServerPacket(
-                                    ServerPacket::BackToCharacterSelect,
-                                )).await;
+                            if let Some(r) = self.characters.get(&sender) {
+                                if let Some(o) = self.get_object_ref(*r) {
+                                    if let Some(s) = o.sender() {
+                                        s.send(WorldResponse::ServerPacket(
+                                            ServerPacket::BackToCharacterSelect,
+                                        ))
+                                        .await;
+                                    }
+                                }
                             }
+                            self.characters.remove(&sender);
                         }
                     }
                     ClientPacket::RemoveFriend(name) => {
@@ -486,7 +514,8 @@ impl World {
                                             } else {
                                                 s.send(WorldResponse::ServerPacket(
                                                     ServerPacket::LoginResult { code: 8 },
-                                                )).await;
+                                                ))
+                                                .await;
                                             }
                                         }
                                         None => {
@@ -505,7 +534,8 @@ impl World {
                                             } else {
                                                 s.send(WorldResponse::ServerPacket(
                                                     ServerPacket::LoginResult { code: 8 },
-                                                )).await;
+                                                ))
+                                                .await;
                                             }
                                         }
                                     }
@@ -550,12 +580,14 @@ impl World {
                                                     //TODO implement the actual delete in a scheduled async task
                                                     s.send(WorldResponse::ServerPacket(
                                                         ServerPacket::DeleteCharacterWait,
-                                                    )).await;
+                                                    ))
+                                                    .await;
                                                 } else {
                                                     //TODO actually delete the character
                                                     s.send(WorldResponse::ServerPacket(
                                                         ServerPacket::DeleteCharacterOk,
-                                                    )).await;
+                                                    ))
+                                                    .await;
                                                 }
                                             }
                                         }
@@ -581,7 +613,8 @@ impl World {
                                                 ) {
                                                     s.send(WorldResponse::ServerPacket(
                                                         ServerPacket::StartGame(0),
-                                                    )).await;
+                                                    ))
+                                                    .await;
                                                     let fc = pc.into_full(&self.item_table);
                                                     fco = Some(fc);
                                                 } else {
@@ -633,7 +666,8 @@ impl World {
                                                 y: y2,
                                                 direction: heading,
                                             },
-                                        ).await;
+                                        )
+                                        .await;
                                     }
                                 }
                             }
@@ -665,15 +699,14 @@ impl World {
                                         let chatter_location = map.get_location(*re).unwrap();
                                         for (id, o) in map.objects_iter() {
                                             if o.linear_distance(&chatter_location) < 30.0 {
-                                                if let Some(se) =
-                                                    self.object_senders.get(&id.get_u32())
-                                                {
+                                                if let Some(se) = o.sender() {
                                                     se.send(WorldResponse::ServerPacket(
                                                         ServerPacket::RegularChat {
                                                             id: 0,
                                                             msg: amsg.clone(),
                                                         },
-                                                    )).await;
+                                                    ))
+                                                    .await;
                                                 }
                                             }
                                         }
@@ -692,9 +725,7 @@ impl World {
                                         let chatter_location = map.get_location(*re).unwrap();
                                         for (id, o) in map.objects_iter() {
                                             if o.linear_distance(&chatter_location) < 60.0 {
-                                                if let Some(se) =
-                                                    self.object_senders.get(&id.get_u32())
-                                                {
+                                                if let Some(se) = o.sender() {
                                                     se.send(WorldResponse::ServerPacket(
                                                         ServerPacket::YellChat {
                                                             id: 0,
@@ -702,7 +733,8 @@ impl World {
                                                             x: chatter_location.x,
                                                             y: chatter_location.y,
                                                         },
-                                                    )).await;
+                                                    ))
+                                                    .await;
                                                 }
                                             }
                                         }
@@ -720,11 +752,11 @@ impl World {
                                         let amsg = format!("[{}] {}", name, msg);
                                         let chatter_location = map.get_location(*re).unwrap();
                                         for (id, o) in map.objects_iter() {
-                                            if let Some(se) = self.object_senders.get(&id.get_u32())
-                                            {
+                                            if let Some(se) = o.sender() {
                                                 se.send(WorldResponse::ServerPacket(
                                                     ServerPacket::PartyChat(amsg.clone()),
-                                                )).await;
+                                                ))
+                                                .await;
                                             }
                                         }
                                     }
@@ -741,11 +773,11 @@ impl World {
                                         let amsg = format!("[{}] {}", name, msg);
                                         let chatter_location = map.get_location(*re).unwrap();
                                         for (id, o) in map.objects_iter() {
-                                            if let Some(se) = self.object_senders.get(&id.get_u32())
-                                            {
+                                            if let Some(se) = o.sender() {
                                                 se.send(WorldResponse::ServerPacket(
                                                     ServerPacket::PledgeChat(amsg.clone()),
-                                                )).await;
+                                                ))
+                                                .await;
                                             }
                                         }
                                     }
@@ -765,17 +797,14 @@ impl World {
                                         for (id, o) in map.objects_iter() {
                                             if let Some(receiver_name) = o.player_name() {
                                                 if receiver_name == n {
-                                                    if let Some(se) =
-                                                        self.object_senders.get(&id.get_u32())
-                                                    {
-                                                        se.send(
-                                                            WorldResponse::ServerPacket(
-                                                                ServerPacket::WhisperChat {
-                                                                    name: sender_name,
-                                                                    msg: msg.clone(),
-                                                                },
-                                                            ),
-                                                        ).await;
+                                                    if let Some(se) = o.sender() {
+                                                        se.send(WorldResponse::ServerPacket(
+                                                            ServerPacket::WhisperChat {
+                                                                name: sender_name,
+                                                                msg: msg.clone(),
+                                                            },
+                                                        ))
+                                                        .await;
                                                         found_player = true;
                                                         break;
                                                     }
@@ -784,13 +813,18 @@ impl World {
                                         }
                                         if !found_player {
                                             if let Some(sender) = m.sender {
-                                                if let Some(se) = self.object_senders.get(&sender) {
-                                                    se.send(WorldResponse::ServerPacket(
-                                                        ServerPacket::Message {
-                                                            ty: 73,
-                                                            msgs: vec![n],
-                                                        },
-                                                    )).await;
+                                                if let Some(r) = self.characters.get(&sender) {
+                                                    if let Some(o) = self.get_object_ref(*r) {
+                                                        if let Some(s) = o.sender() {
+                                                            s.send(WorldResponse::ServerPacket(
+                                                                ServerPacket::Message {
+                                                                    ty: 73,
+                                                                    msgs: vec![n],
+                                                                },
+                                                            ))
+                                                            .await;
+                                                        }
+                                                    }
                                                 }
                                             }
                                         }
@@ -808,11 +842,11 @@ impl World {
                                         let amsg = format!("[{}] {}", name, msg);
                                         let chatter_location = map.get_location(*re).unwrap();
                                         for (id, o) in map.objects_iter() {
-                                            if let Some(se) = self.object_senders.get(&id.get_u32())
-                                            {
+                                            if let Some(se) = o.sender() {
                                                 se.send(WorldResponse::ServerPacket(
                                                     ServerPacket::GlobalChat(amsg.clone()),
-                                                )).await;
+                                                ))
+                                                .await;
                                             }
                                         }
                                     }
@@ -822,93 +856,106 @@ impl World {
                     }
                     ClientPacket::CommandChat(msg) => {
                         if let Some(sender) = m.sender {
-                            if let Some(s) = self.object_senders.get_mut(&sender) {
-                                let mut words = msg.split_whitespace();
-                                let first_word = words.next();
-                                if let Some(mw) = first_word {
-                                    /// TODO replace with a hashmap converting strings to functions
-                                    match mw {
-                                        "asdf" => {
-                                            log::info!("A command called asdf");
-                                        }
-                                        "shutdown" => {
-                                            log::info!("A shutdown command was received");
-                                            if let Some(r) = self.characters.get(&sender) {
-                                                if let Some(re) = self.object_ref_table.get(r) {
-                                                    self.shutdown(re).await;
+                            if let Some(r) = self.characters.get(&sender) {
+                                if let Some(o) = self.get_object_ref(*r) {
+                                    if let Some(s) = o.sender() {
+                                        let mut words = msg.split_whitespace();
+                                        let first_word = words.next();
+                                        if let Some(mw) = first_word {
+                                            /// TODO replace with a hashmap converting strings to functions
+                                            match mw {
+                                                "asdf" => {
+                                                    log::info!("A command called asdf");
+                                                }
+                                                "shutdown" => {
+                                                    log::info!("A shutdown command was received");
+                                                    if let Some(r) = self.characters.get(&sender) {
+                                                        if let Some(re) =
+                                                            self.object_ref_table.get(r)
+                                                        {
+                                                            self.shutdown(re).await;
+                                                        }
+                                                    }
+                                                }
+                                                "restart" => {
+                                                    log::info!("A restart command was received");
+                                                    if let Some(r) = self.characters.get(&sender) {
+                                                        if let Some(re) =
+                                                            self.object_ref_table.get(r)
+                                                        {
+                                                            self.restart(re).await;
+                                                        }
+                                                    }
+                                                }
+                                                "quit" => {
+                                                    s.send(WorldResponse::ServerPacket(
+                                                        ServerPacket::Disconnect,
+                                                    ))
+                                                    .await;
+                                                }
+                                                "test" => {
+                                                    log::info!("Test requested");
+                                                }
+                                                "chat" => {
+                                                    s.send(WorldResponse::ServerPacket(
+                                                        ServerPacket::SystemMessage(
+                                                            "This is a test of the system message"
+                                                                .to_string(),
+                                                        ),
+                                                    ))
+                                                    .await;
+                                                    s.send(WorldResponse::ServerPacket(
+                                                        ServerPacket::NpcShout(
+                                                            "NPC Shout test".to_string(),
+                                                        ),
+                                                    ))
+                                                    .await;
+                                                    s.send(WorldResponse::ServerPacket(
+                                                        ServerPacket::RegularChat {
+                                                            id: 0,
+                                                            msg: "regular chat".to_string(),
+                                                        },
+                                                    ))
+                                                    .await;
+                                                    s.send(WorldResponse::ServerPacket(
+                                                        ServerPacket::YellChat {
+                                                            id: 0,
+                                                            msg: "yelling".to_string(),
+                                                            x: 32768,
+                                                            y: 32768,
+                                                        },
+                                                    ))
+                                                    .await;
+                                                    s.send(WorldResponse::ServerPacket(
+                                                        ServerPacket::GlobalChat(
+                                                            "global chat".to_string(),
+                                                        ),
+                                                    ))
+                                                    .await;
+                                                    s.send(WorldResponse::ServerPacket(
+                                                        ServerPacket::PledgeChat(
+                                                            "pledge chat".to_string(),
+                                                        ),
+                                                    ))
+                                                    .await;
+                                                    s.send(WorldResponse::ServerPacket(
+                                                        ServerPacket::PartyChat(
+                                                            "party chat".to_string(),
+                                                        ),
+                                                    ))
+                                                    .await;
+                                                    s.send(WorldResponse::ServerPacket(
+                                                        ServerPacket::WhisperChat {
+                                                            name: "test".to_string(),
+                                                            msg: "whisper message".to_string(),
+                                                        },
+                                                    ))
+                                                    .await;
+                                                }
+                                                _ => {
+                                                    log::info!("An unknown command {}", mw);
                                                 }
                                             }
-                                        }
-                                        "restart" => {
-                                            log::info!("A restart command was received");
-                                            if let Some(r) = self.characters.get(&sender) {
-                                                if let Some(re) = self.object_ref_table.get(r) {
-                                                    self.restart(re).await;
-                                                }
-                                            }
-                                        }
-                                        "quit" => {
-                                            if let Some(s) = self.object_senders.get_mut(&sender) {
-                                                s.send(WorldResponse::ServerPacket(
-                                                    ServerPacket::Disconnect,
-                                                )).await;
-                                            }
-                                        }
-                                        "test" => {
-                                            log::info!("Test requested");
-                                        }
-                                        "chat" => {
-                                            if let Some(s) = self.object_senders.get_mut(&sender) {
-                                                s.send(WorldResponse::ServerPacket(
-                                                    ServerPacket::SystemMessage(
-                                                        "This is a test of the system message"
-                                                            .to_string(),
-                                                    ),
-                                                )).await;
-                                                s.send(WorldResponse::ServerPacket(
-                                                    ServerPacket::NpcShout(
-                                                        "NPC Shout test".to_string(),
-                                                    ),
-                                                )).await;
-                                                s.send(WorldResponse::ServerPacket(
-                                                    ServerPacket::RegularChat {
-                                                        id: 0,
-                                                        msg: "regular chat".to_string(),
-                                                    },
-                                                )).await;
-                                                s.send(WorldResponse::ServerPacket(
-                                                    ServerPacket::YellChat {
-                                                        id: 0,
-                                                        msg: "yelling".to_string(),
-                                                        x: 32768,
-                                                        y: 32768,
-                                                    },
-                                                )).await;
-                                                s.send(WorldResponse::ServerPacket(
-                                                    ServerPacket::GlobalChat(
-                                                        "global chat".to_string(),
-                                                    ),
-                                                )).await;
-                                                s.send(WorldResponse::ServerPacket(
-                                                    ServerPacket::PledgeChat(
-                                                        "pledge chat".to_string(),
-                                                    ),
-                                                )).await;
-                                                s.send(WorldResponse::ServerPacket(
-                                                    ServerPacket::PartyChat(
-                                                        "party chat".to_string(),
-                                                    ),
-                                                )).await;
-                                                s.send(WorldResponse::ServerPacket(
-                                                    ServerPacket::WhisperChat {
-                                                        name: "test".to_string(),
-                                                        msg: "whisper message".to_string(),
-                                                    },
-                                                )).await;
-                                            }
-                                        }
-                                        _ => {
-                                            log::info!("An unknown command {}", mw);
                                         }
                                     }
                                 }
@@ -940,17 +987,20 @@ impl World {
                                                 );
                                                 s.send(WorldResponse::ServerPacket(
                                                     ServerPacket::LoginResult { code: 0x30 },
-                                                )).await;
+                                                ))
+                                                .await;
                                             } else {
                                                 s.send(WorldResponse::ServerPacket(
                                                     ServerPacket::LoginResult { code: 8 },
-                                                )).await;
+                                                ))
+                                                .await;
                                             }
                                         }
                                         _ => {
                                             s.send(WorldResponse::ServerPacket(
                                                 ServerPacket::LoginResult { code: 8 },
-                                            )).await;
+                                            ))
+                                            .await;
                                         }
                                     }
                                 }
@@ -969,9 +1019,12 @@ impl World {
                 let delta = now.duration_since(last_interval_time);
                 last_interval_time = now;
                 let im = delta.as_micros() as f32 / 10000.0;
-                log::info!("Interval time is {} microseconds, {} hz", im, 1000000.0/im);
+                log::info!(
+                    "Interval time is {} microseconds, {} hz",
+                    im,
+                    1000000.0 / im
+                );
             }
-            
         }
         log::error!("Exiting world run instance");
     }
@@ -1007,7 +1060,8 @@ impl World {
         if shutdown {
             let _ = self
                 .server_s
-                .send(crate::server_message::ServerShutdownMessage::Shutdown).await;
+                .send(crate::server_message::ServerShutdownMessage::Shutdown)
+                .await;
         }
     }
 
@@ -1028,7 +1082,8 @@ impl World {
         if shutdown {
             let _ = self
                 .server_s
-                .send(crate::server_message::ServerShutdownMessage::Restart).await;
+                .send(crate::server_message::ServerShutdownMessage::Restart)
+                .await;
         }
     }
 
@@ -1068,7 +1123,7 @@ impl World {
             None
         }
     }
-    
+
     /// Add a monster to the world
     pub async fn add_monster(&mut self, m: monster::Monster) -> Option<ObjectRef> {
         let obj: object::Object = m.into();
@@ -1081,15 +1136,20 @@ impl World {
         p: crate::character::FullCharacter,
         s: &mut tokio::sync::mpsc::Sender<WorldResponse>,
     ) -> Option<ObjectRef> {
-        s.send(WorldResponse::ServerPacket(p.details_packet())).await;
-        s.send(WorldResponse::ServerPacket(p.get_map_packet())).await;
-        s.send(WorldResponse::ServerPacket(p.get_object_packet())).await;
+        s.send(WorldResponse::ServerPacket(p.details_packet()))
+            .await;
+        s.send(WorldResponse::ServerPacket(p.get_map_packet()))
+            .await;
+        s.send(WorldResponse::ServerPacket(p.get_object_packet()))
+            .await;
         p.send_all_items(s).await.ok()?;
         s.send(WorldResponse::ServerPacket(ServerPacket::CharSpMrBonus {
             sp: 0,
             mr: 0,
-        })).await;
-        s.send(WorldResponse::ServerPacket(ServerPacket::Weather(0))).await;
+        }))
+        .await;
+        s.send(WorldResponse::ServerPacket(ServerPacket::Weather(0)))
+            .await;
 
         let obj: object::Object = p.into();
         self.add_object(obj).await

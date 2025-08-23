@@ -1,8 +1,14 @@
 //! This holds code generally used for all objects in the game
 
-use std::{collections::{hash_set::Difference, HashMap, HashSet}, hash::RandomState};
+use std::{
+    collections::{hash_set::Difference, HashMap, HashSet},
+    hash::RandomState,
+};
 
-use crate::{character::FullCharacter, world::{World, WorldObjectId}};
+use crate::{
+    character::FullCharacter,
+    world::{World, WorldObjectId},
+};
 
 /// A helper struct for managin a list of objects known to a player
 #[derive(Debug)]

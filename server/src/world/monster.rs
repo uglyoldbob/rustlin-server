@@ -183,8 +183,7 @@ pub struct MonsterRef {
 }
 
 impl Drop for MonsterRef {
-    fn drop(&mut self) {
-    }
+    fn drop(&mut self) {}
 }
 
 impl MonsterRef {
@@ -236,7 +235,11 @@ impl MonsterRef {
     }
 
     /// Run the ai for the monster
-    pub async fn run_ai(mut self, mut sender: tokio::sync::mpsc::Sender<super::WorldMessage>, m: Monster) {
+    pub async fn run_ai(
+        mut self,
+        mut sender: tokio::sync::mpsc::Sender<super::WorldMessage>,
+        m: Monster,
+    ) {
         let mut m = Some(m);
         let mut chan = tokio::sync::mpsc::channel(100);
         let _ = sender

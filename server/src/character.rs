@@ -355,7 +355,8 @@ impl FullCharacter {
         }
         s.send(WorldResponse::ServerPacket(
             common::packet::ServerPacket::InventoryVec(elements),
-        )).await;
+        ))
+        .await;
         Ok(())
     }
 

@@ -68,7 +68,7 @@ async fn smain() -> Result<(), String> {
     .map_err(|e| format!("{:?}", e))?;
     world.spawn_monsters();
 
-    tokio::task::spawn(async move { 
+    tokio::task::spawn(async move {
         world.run().await;
         world.end().await;
     });
