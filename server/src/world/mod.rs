@@ -542,8 +542,6 @@ impl World {
                                             }
                                         }
                                     }
-                                } else {
-                                    todo!();
                                 }
                             }
                         }
@@ -568,7 +566,44 @@ impl World {
                         charisma,
                         intelligence,
                     } => {
-                        todo!();
+                        if let Some(sender) = m.sender {
+                            if let Some(s) = self.object_senders.get(&sender) {
+                                if let Some(account) = self.account_table.get(&sender) {
+                                    if let Some(mut c) = crate::character::Character::new(
+                                        account.account_name().to_string(),
+                                        sender, //TODO validate this
+                                        name,
+                                        class,
+                                        gender,
+                                        strength,
+                                        dexterity,
+                                        constitution,
+                                        wisdom,
+                                        charisma,
+                                        intelligence,
+                                    ) {
+                                        if let Ok(mut mysql) = self.get_mysql_conn() {
+                                            c.save_new_to_db(&mut mysql);
+                                            s.blocking_send(WorldResponse::ServerPacket(
+                                                ServerPacket::CharacterCreationStatus(0),
+                                            ));
+                                            s.blocking_send(WorldResponse::ServerPacket(
+                                                c.get_new_char_details_packet(),
+                                            ));
+                                        }
+                                        else {
+                                            s.blocking_send(WorldResponse::ServerPacket(
+                                                ServerPacket::CharacterCreationStatus(1),
+                                            ));
+                                        }
+                                    } else {
+                                        s.blocking_send(WorldResponse::ServerPacket(
+                                                ServerPacket::CharacterCreationStatus(1),
+                                            ));
+                                    }
+                                }
+                            }
+                        }
                     }
                     ClientPacket::DeleteCharacter(n) => {
                         if let Some(sender) = m.sender {
@@ -631,8 +666,6 @@ impl World {
                                         self.object_ref_table.insert(id, r);
                                     }
                                 }
-                            } else {
-                                todo!();
                             }
                         }
                     }
@@ -990,12 +1023,12 @@ impl World {
                 },
             }
             count += 1;
-            if count == 10000 {
+            if count == 20000 {
                 let now = std::time::Instant::now();
                 let interval_time = now.duration_since(last_interval_time);
                 last_interval_time = now;
                 count = 0;
-                let im = interval_time.as_micros() as f32 / 10000.0;
+                let im = interval_time.as_micros() as f32 / 20000.0;
                 log::info!("Interval time is {} microseconds, {} hz", im, 1000000.0/im);
             }
         }

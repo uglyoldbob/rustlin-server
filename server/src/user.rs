@@ -101,6 +101,11 @@ impl UserAccount {
         }
     }
 
+    /// Get the account name
+    pub fn account_name(&self) -> &str {
+        &self.name
+    }
+
     /// Retrieve characters for user account from database
     pub fn retrieve_chars(
         &self,

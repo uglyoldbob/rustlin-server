@@ -605,6 +605,8 @@ pub struct Character {
     charisma: u8,
     /// Character intelligence
     intelligence: u8,
+    /// Character location
+    location: Location,
 }
 
 /// The possible classes for a character
@@ -638,6 +640,54 @@ impl Class {
             Class::DarkElf => 12,
             Class::DragonKnight => 15,
             Class::Illusionist => 15,
+        }
+    }
+
+    /// Get the starting location
+    fn starting_location(&self) -> Location {
+        match self {
+            Class::Royal => Location {
+                x: 32780,
+                y: 32781,
+                map: 68,
+                direction: 5,
+            },
+            Class::Knight => Location {
+                x: 32714,
+                y: 32877,
+                map: 69,
+                direction: 5,
+            },
+            Class::Elf => Location {
+                x: 32714,
+                y: 32877,
+                map: 69,
+                direction: 5,
+            },
+            Class::Wizard => Location {
+                x: 32780,
+                y: 32781,
+                map: 68,
+                direction: 5,
+            },
+            Class::DarkElf => Location {
+                x: 32714,
+                y: 32877,
+                map: 69,
+                direction: 5,
+            },
+            Class::DragonKnight => Location {
+                x: 32780,
+                y: 32781,
+                map: 68,
+                direction: 5,
+            },
+            Class::Illusionist => Location {
+                x: 32714,
+                y: 32877,
+                map: 69,
+                direction: 5,
+            },
         }
     }
 
@@ -711,9 +761,6 @@ impl std::convert::TryFrom<u8> for Class {
 }
 
 impl Character {
-    /// A query for selecting characters in a player account
-    pub const QUERY: &str = "SELECT account_name, char_name, objid, Lawful, level, Clanname, Class, Sex, MaxHp, MaxMp, Ac, Str, Dex, Con, Wis, Cha, Intel, AccessLevel from characters WHERE account_name=?";
-
     /// Is the player name valid?
     pub fn valid_name(n: &str) -> bool {
         !n.is_empty()
@@ -870,7 +917,7 @@ impl Character {
         mysql: &mut mysql::PooledConn,
     ) -> Result<Vec<crate::character::Character>, crate::server::ClientError> {
         use mysql::prelude::Queryable;
-        let query = crate::character::Character::QUERY;
+        let query = "SELECT * from characters WHERE account_name=?";
         log::info!("Checking for account {}", account_name);
         let s = mysql.prep(query)?;
         let asdf = mysql.exec_map(s, (account_name.clone(),), |a: Character| a)?;
@@ -914,6 +961,7 @@ impl Character {
             wisdom: wis,
             charisma: cha,
             intelligence: int,
+            location: class.starting_location(),
         })
     }
 }
@@ -946,26 +994,31 @@ impl mysql::prelude::FromRow for Character {
     where
         Self: Sized,
     {
-        let c: u16 = row.get(6).ok_or(mysql::FromRowError(row.clone()))?;
+        let c: u16 = row.get(17).ok_or(mysql::FromRowError(row.clone()))?;
+        let x : u16 = row.get(21).ok_or(mysql::FromRowError(row.clone()))?;
+        let y : u16 = row.get(22).ok_or(mysql::FromRowError(row.clone()))?;
+        let direction : u8 = row.get(20).ok_or(mysql::FromRowError(row.clone()))?;
+        let map: u16 = row.get(23).ok_or(mysql::FromRowError(row.clone()))?;
         Ok(Self {
             account_name: row.get(0).ok_or(mysql::FromRowError(row.clone()))?,
-            name: row.get(1).ok_or(mysql::FromRowError(row.clone()))?,
-            id: row.get(2).ok_or(mysql::FromRowError(row.clone()))?,
-            alignment: row.get(3).ok_or(mysql::FromRowError(row.clone()))?,
-            level: row.get(4).ok_or(mysql::FromRowError(row.clone()))?,
-            pledge: row.get(5).ok_or(mysql::FromRowError(row.clone()))?,
+            name: row.get(2).ok_or(mysql::FromRowError(row.clone()))?,
+            id: row.get(1).ok_or(mysql::FromRowError(row.clone()))?,
+            alignment: row.get(25).ok_or(mysql::FromRowError(row.clone()))?,
+            level: row.get(3).ok_or(mysql::FromRowError(row.clone()))?,
+            pledge: row.get(28).ok_or(mysql::FromRowError(row.clone()))?,
             class: c.try_into().map_err(|_| mysql::FromRowError(row.clone()))?,
-            gender: row.get(7).ok_or(mysql::FromRowError(row.clone()))?,
-            hp_max: row.get(8).ok_or(mysql::FromRowError(row.clone()))?,
-            mp_max: row.get(9).ok_or(mysql::FromRowError(row.clone()))?,
-            ac: row.get(10).ok_or(mysql::FromRowError(row.clone()))?,
-            strength: row.get(11).ok_or(mysql::FromRowError(row.clone()))?,
-            dexterity: row.get(12).ok_or(mysql::FromRowError(row.clone()))?,
-            constitution: row.get(13).ok_or(mysql::FromRowError(row.clone()))?,
-            wisdom: row.get(14).ok_or(mysql::FromRowError(row.clone()))?,
-            charisma: row.get(15).ok_or(mysql::FromRowError(row.clone()))?,
-            intelligence: row.get(16).ok_or(mysql::FromRowError(row.clone()))?,
-            access_level: row.get(17).ok_or(mysql::FromRowError(row.clone()))?,
+            gender: row.get(18).ok_or(mysql::FromRowError(row.clone()))?,
+            hp_max: row.get(5).ok_or(mysql::FromRowError(row.clone()))?,
+            mp_max: row.get(7).ok_or(mysql::FromRowError(row.clone()))?,
+            ac: row.get(9).ok_or(mysql::FromRowError(row.clone()))?,
+            strength: row.get(10).ok_or(mysql::FromRowError(row.clone()))?,
+            dexterity: row.get(11).ok_or(mysql::FromRowError(row.clone()))?,
+            constitution: row.get(12).ok_or(mysql::FromRowError(row.clone()))?,
+            wisdom: row.get(13).ok_or(mysql::FromRowError(row.clone()))?,
+            charisma: row.get(14).ok_or(mysql::FromRowError(row.clone()))?,
+            intelligence: row.get(15).ok_or(mysql::FromRowError(row.clone()))?,
+            access_level: row.get(36).ok_or(mysql::FromRowError(row.clone()))?,
+            location: Location { x, y, map, direction, },
         })
     }
 }
