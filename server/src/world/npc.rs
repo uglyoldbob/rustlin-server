@@ -113,7 +113,6 @@ impl NpcSpawn {
         Npc {
             id,
             location: self.location,
-            old_location: None,
             alignment: npc.alignment,
             icon: npc.graphics_id,
             name: npc.name.clone(),
@@ -129,8 +128,6 @@ pub struct Npc {
     id: super::WorldObjectId,
     /// Where the npc currently exists
     location: crate::character::Location,
-    /// The last place the npc was
-    old_location: Option<crate::character::Location>,
     /// The npc name
     name: String,
     /// the npc alignment
@@ -146,12 +143,7 @@ impl super::object::ObjectTrait for Npc {
         self.location
     }
 
-    fn get_prev_location(&self) -> crate::character::Location {
-        self.old_location.unwrap_or(self.location)
-    }
-
     fn set_location(&mut self, l: crate::character::Location) {
-        self.old_location = Some(self.location);
         self.location = l;
     }
 

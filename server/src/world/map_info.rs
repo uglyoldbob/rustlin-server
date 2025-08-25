@@ -103,7 +103,12 @@ impl MapInfo {
             let o = self.objects.get_mut(&r.id).unwrap();
             let oldloc = o.get_location();
             o.set_location(new_loc);
-            (oldloc, o.sender(), o.build_put_object_packet(), o.build_move_object_packet())
+            (
+                oldloc,
+                o.sender(),
+                o.build_put_object_packet(),
+                o.build_move_object_packet(),
+            )
         };
         for (id, o) in &mut self.objects {
             if *id != r.id {

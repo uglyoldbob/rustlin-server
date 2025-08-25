@@ -63,6 +63,8 @@ pub struct FullCharacter {
     known_objects: ObjectList,
     /// How to send messages to the async task for this character
     sender: Option<tokio::sync::mpsc::Sender<crate::world::WorldResponse>>,
+    /// Character location
+    location: Location,
 }
 
 /// Represents a partial playable character in the game
@@ -110,6 +112,8 @@ pub struct PartialCharacter {
     details: ExtraCharacterDetails,
     /// All the items the character holds
     items: HashMap<u32, crate::world::item::ItemInstanceWithoutDefinition>,
+    /// Character location
+    location: Location,
 }
 
 impl PartialCharacter {
@@ -145,17 +149,14 @@ impl PartialCharacter {
             items,
             known_objects: ObjectList::new(),
             sender: None,
+            location: self.location,
         }
     }
 }
 
 impl crate::world::object::ObjectTrait for FullCharacter {
     fn get_location(&self) -> crate::character::Location {
-        self.details.location
-    }
-
-    fn get_prev_location(&self) -> crate::character::Location {
-        self.details.old_location.unwrap_or(self.details.location)
+        self.location
     }
 
     fn can_shutdown(&self) -> bool {
@@ -163,8 +164,7 @@ impl crate::world::object::ObjectTrait for FullCharacter {
     }
 
     fn set_location(&mut self, l: crate::character::Location) {
-        self.details.old_location = Some(self.details.location);
-        self.details.location = l;
+        self.location = l;
     }
 
     fn id(&self) -> super::world::WorldObjectId {
@@ -201,10 +201,10 @@ impl crate::world::object::ObjectTrait for FullCharacter {
 
     fn build_put_object_packet(&self) -> common::packet::ServerPacket {
         ServerPacket::PutObject {
-            x: self.details.location.x,
-            y: self.details.location.y,
+            x: self.location.x,
+            y: self.location.y,
             id: self.world_id.get_u32(),
-            icon: 29,
+            icon: self.class.graphics_class(self.gender != 0),
             status: 0,
             direction: 1,
             light: 7,
@@ -228,7 +228,7 @@ impl crate::world::object::ObjectTrait for FullCharacter {
 impl FullCharacter {
     /// Get a reference to the location of the character
     pub fn location_ref(&self) -> &Location {
-        &self.details.location
+        &self.location
     }
 
     pub fn add_sender(&mut self, s: tokio::sync::mpsc::Sender<crate::world::WorldResponse>) {
@@ -361,7 +361,7 @@ impl FullCharacter {
 
     /// Get a mutable reference to the location of the character
     pub fn location_mut(&mut self) -> &mut Location {
-        &mut self.details.location
+        &mut self.location
     }
 
     /// Get the details packet for sending to the user
@@ -395,10 +395,10 @@ impl FullCharacter {
     /// Get a put object packet
     pub fn get_object_packet(&self) -> ServerPacket {
         ServerPacket::PutObject {
-            x: self.details.location.x,
-            y: self.details.location.y,
+            x: self.location.x,
+            y: self.location.y,
             id: self.world_id.get_u32(),
-            icon: 1,
+            icon: self.class.graphics_class(self.gender != 0),
             status: 0,
             direction: 0,
             light: 5,
@@ -420,7 +420,7 @@ impl FullCharacter {
 
     /// Get a map location packet
     pub fn get_map_packet(&self) -> ServerPacket {
-        ServerPacket::MapId(self.details.location.map, 0)
+        ServerPacket::MapId(self.location.map, 0)
     }
 }
 
@@ -533,10 +533,6 @@ pub struct ExtraCharacterDetails {
     wind_resist: u8,
     /// Earth resist
     earth_resist: u8,
-    /// Location
-    location: Location,
-    /// The last place the npc was
-    old_location: Option<crate::character::Location>,
 }
 
 impl mysql::prelude::FromRow for ExtraCharacterDetails {
@@ -555,13 +551,6 @@ impl mysql::prelude::FromRow for ExtraCharacterDetails {
             water_resist: row.get(7).ok_or(mysql::FromRowError(row.clone()))?,
             wind_resist: row.get(8).ok_or(mysql::FromRowError(row.clone()))?,
             earth_resist: row.get(9).ok_or(mysql::FromRowError(row.clone()))?,
-            location: Location {
-                x: row.get(10).ok_or(mysql::FromRowError(row.clone()))?,
-                y: row.get(11).ok_or(mysql::FromRowError(row.clone()))?,
-                map: row.get(12).ok_or(mysql::FromRowError(row.clone()))?,
-                direction: 5,
-            },
-            old_location: None,
         })
     }
 }
@@ -640,6 +629,31 @@ impl Class {
             Class::DarkElf => 12,
             Class::DragonKnight => 15,
             Class::Illusionist => 15,
+        }
+    }
+
+    /// Get the graphics value for the class
+    fn graphics_class(&self, female: bool) -> u16 {
+        if female {
+            match self {
+                Class::Royal => 1,
+                Class::Knight => 48,
+                Class::Elf => 37,
+                Class::Wizard => 1186,
+                Class::DarkElf => 2796,
+                Class::DragonKnight => 6661,
+                Class::Illusionist => 6650,
+            }
+        } else {
+            match self {
+                Class::Royal => 0,
+                Class::Knight => 61,
+                Class::Elf => 138,
+                Class::Wizard => 734,
+                Class::DarkElf => 2786,
+                Class::DragonKnight => 6658,
+                Class::Illusionist => 6671,
+            }
         }
     }
 
@@ -842,7 +856,7 @@ impl Character {
         mysql: &mut mysql::PooledConn,
     ) -> Result<PartialCharacter, crate::server::ClientError> {
         use mysql::prelude::Queryable;
-        let query = "SELECT Exp, CurHp, CurMp, 1, Food, 32, 1, 2, 3, 4, LocX, LocY, MapID from characters WHERE account_name=? and char_name=?";
+        let query = "SELECT Exp, CurHp, CurMp, 1, Food, 32, 1, 2, 3, 4 from characters WHERE account_name=? and char_name=?";
         log::info!(
             "Checking for account {} -  player {}",
             self.account_name,
@@ -882,26 +896,8 @@ impl Character {
             intelligence: self.intelligence,
             details,
             items: item_map,
+            location: self.location,
         })
-    }
-
-    /// Save a new character into the database, updating the id of the character to a new valid id
-    pub fn save_new_to_db(
-        &mut self,
-        mysql: &mut mysql::PooledConn,
-    ) -> Result<(), crate::server::ClientError> {
-        use mysql::prelude::Queryable;
-        let mut t = mysql.start_transaction(mysql::TxOpts::default())?;
-        let id = crate::world::World::get_new_id(&mut t)?;
-        if let Some(id) = id {
-            self.id = id;
-        } else {
-            self.id = 2;
-        }
-        let query = "INSERT INTO characters SET account_name=?,objid=?,char_name=?,level=?,MaxHp=?,MaxMp=?,Class=?,Sex=?,Ac=?,Str=?,Dex=?,Con=?,Wis=?,Cha=?,Intel=?";
-        t.exec_drop(query, self)?;
-        t.commit()?;
-        Ok(())
     }
 
     /// Delete the character from the database
@@ -964,6 +960,25 @@ impl Character {
             location: class.starting_location(),
         })
     }
+
+    /// Save a new character into the database, updating the id of the character to a new valid id
+    pub fn save_new_to_db(
+        &mut self,
+        mysql: &mut mysql::PooledConn,
+    ) -> Result<(), crate::server::ClientError> {
+        use mysql::prelude::Queryable;
+        let mut t = mysql.start_transaction(mysql::TxOpts::default())?;
+        let id = crate::world::World::get_new_id(&mut t)?;
+        if let Some(id) = id {
+            self.id = id;
+        } else {
+            self.id = 2;
+        }
+        let query = "INSERT INTO characters SET account_name=?,objid=?,char_name=?,level=?,MaxHp=?,MaxMp=?,Class=?,Sex=?,Ac=?,Str=?,Dex=?,Con=?,Wis=?,Cha=?,Intel=?,LocX=?,LocY=?,MapID=?";
+        t.exec_drop(query, self)?;
+        t.commit()?;
+        Ok(())
+    }
 }
 
 impl From<&mut Character> for Params {
@@ -975,7 +990,7 @@ impl From<&mut Character> for Params {
             value.level.into(),
             value.hp_max.into(),
             value.mp_max.into(),
-            (value.class as u16).into(),
+            value.class.graphics_class(value.gender != 0).into(),
             value.gender.into(),
             value.ac.into(),
             value.strength.into(),
@@ -984,6 +999,9 @@ impl From<&mut Character> for Params {
             value.wisdom.into(),
             value.charisma.into(),
             value.intelligence.into(),
+            value.location.x.into(),
+            value.location.y.into(),
+            value.location.map.into(),
         ];
         Params::Positional(p)
     }
@@ -994,31 +1012,44 @@ impl mysql::prelude::FromRow for Character {
     where
         Self: Sized,
     {
-        let c: u16 = row.get(17).ok_or(mysql::FromRowError(row.clone()))?;
-        let x : u16 = row.get(21).ok_or(mysql::FromRowError(row.clone()))?;
-        let y : u16 = row.get(22).ok_or(mysql::FromRowError(row.clone()))?;
-        let direction : u8 = row.get(20).ok_or(mysql::FromRowError(row.clone()))?;
-        let map: u16 = row.get(23).ok_or(mysql::FromRowError(row.clone()))?;
+        let c: u16 = row.get("Class").ok_or(mysql::FromRowError(row.clone()))?;
+        let x: u16 = row.get("LocX").ok_or(mysql::FromRowError(row.clone()))?;
+        let y: u16 = row.get("LocY").ok_or(mysql::FromRowError(row.clone()))?;
+        let direction: u8 = row.get("Heading").ok_or(mysql::FromRowError(row.clone()))?;
+        let map: u16 = row.get("MapID").ok_or(mysql::FromRowError(row.clone()))?;
         Ok(Self {
-            account_name: row.get(0).ok_or(mysql::FromRowError(row.clone()))?,
-            name: row.get(2).ok_or(mysql::FromRowError(row.clone()))?,
-            id: row.get(1).ok_or(mysql::FromRowError(row.clone()))?,
-            alignment: row.get(25).ok_or(mysql::FromRowError(row.clone()))?,
-            level: row.get(3).ok_or(mysql::FromRowError(row.clone()))?,
-            pledge: row.get(28).ok_or(mysql::FromRowError(row.clone()))?,
+            account_name: row
+                .get("account_name")
+                .ok_or(mysql::FromRowError(row.clone()))?,
+            name: row
+                .get("char_name")
+                .ok_or(mysql::FromRowError(row.clone()))?,
+            id: row.get("objid").ok_or(mysql::FromRowError(row.clone()))?,
+            alignment: row.get("Lawful").ok_or(mysql::FromRowError(row.clone()))?,
+            level: row.get("level").ok_or(mysql::FromRowError(row.clone()))?,
+            pledge: row
+                .get("Clanname")
+                .ok_or(mysql::FromRowError(row.clone()))?,
             class: c.try_into().map_err(|_| mysql::FromRowError(row.clone()))?,
-            gender: row.get(18).ok_or(mysql::FromRowError(row.clone()))?,
-            hp_max: row.get(5).ok_or(mysql::FromRowError(row.clone()))?,
-            mp_max: row.get(7).ok_or(mysql::FromRowError(row.clone()))?,
-            ac: row.get(9).ok_or(mysql::FromRowError(row.clone()))?,
-            strength: row.get(10).ok_or(mysql::FromRowError(row.clone()))?,
-            dexterity: row.get(11).ok_or(mysql::FromRowError(row.clone()))?,
-            constitution: row.get(12).ok_or(mysql::FromRowError(row.clone()))?,
-            wisdom: row.get(13).ok_or(mysql::FromRowError(row.clone()))?,
-            charisma: row.get(14).ok_or(mysql::FromRowError(row.clone()))?,
-            intelligence: row.get(15).ok_or(mysql::FromRowError(row.clone()))?,
-            access_level: row.get(36).ok_or(mysql::FromRowError(row.clone()))?,
-            location: Location { x, y, map, direction, },
+            gender: row.get("Sex").ok_or(mysql::FromRowError(row.clone()))?,
+            hp_max: row.get("MaxHp").ok_or(mysql::FromRowError(row.clone()))?,
+            mp_max: row.get("MaxMp").ok_or(mysql::FromRowError(row.clone()))?,
+            ac: row.get("Ac").ok_or(mysql::FromRowError(row.clone()))?,
+            strength: row.get("Str").ok_or(mysql::FromRowError(row.clone()))?,
+            dexterity: row.get("Dex").ok_or(mysql::FromRowError(row.clone()))?,
+            constitution: row.get("Con").ok_or(mysql::FromRowError(row.clone()))?,
+            wisdom: row.get("Wis").ok_or(mysql::FromRowError(row.clone()))?,
+            charisma: row.get("Cha").ok_or(mysql::FromRowError(row.clone()))?,
+            intelligence: row.get("Intel").ok_or(mysql::FromRowError(row.clone()))?,
+            access_level: row
+                .get("AccessLevel")
+                .ok_or(mysql::FromRowError(row.clone()))?,
+            location: Location {
+                x,
+                y,
+                map,
+                direction,
+            },
         })
     }
 }

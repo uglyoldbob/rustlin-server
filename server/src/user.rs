@@ -86,6 +86,12 @@ impl UserAccount {
         hash == self.password
     }
 
+    /// Delete the specified character from the account
+    pub fn delete_char(&mut self, name: &str, mysql: &mut mysql::PooledConn) {
+        let query = "DELETE FROM characters WHERE account_name=? AND char_name=?";
+        let _ = mysql.exec_drop(query, (&self.name, name));
+    }
+
     /// Construct a new user account
     pub fn new(name: String, pass: String, ip: String, salt: String) -> Self {
         let hashpass = hash_password(&name, &salt, &pass);

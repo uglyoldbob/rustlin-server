@@ -158,7 +158,7 @@ impl MonsterSpawn {
         if attempts_to_randomize == ATTEMPTS_MAX {
             location = self.location;
         }
-        
+
         let chan = tokio::sync::mpsc::channel(1000);
 
         Monster {
@@ -169,7 +169,6 @@ impl MonsterSpawn {
             name: npc.name.clone(),
             light_size: npc.light_size,
             spawn: self.clone(),
-            old_location: None,
             send: chan.0,
             recv: Some(chan.1),
         }
@@ -259,16 +258,40 @@ impl MonsterRef {
         loop {
             while let Ok(msg) = self.recv.try_recv() {
                 match msg {
-                    super::WorldResponse::ServerPacket(p) => {
-                        match p {
-                            common::packet::ServerPacket::MoveObject { id, x, y, direction } => {}
-                            common::packet::ServerPacket::PutObject { x, y, id, icon, status, direction, light, speed, xp, alignment, name, title, status2, pledgeid, pledgename, owner_name, v1, hp_bar, v2, level } => {}
-                            common::packet::ServerPacket::RemoveObject(id) => {}
-                            _ => {
-                                log::error!("Unhandled packet for monster {:?}: {:?}", self.id, p);
-                            }
+                    super::WorldResponse::ServerPacket(p) => match p {
+                        common::packet::ServerPacket::MoveObject {
+                            id,
+                            x,
+                            y,
+                            direction,
+                        } => {}
+                        common::packet::ServerPacket::PutObject {
+                            x,
+                            y,
+                            id,
+                            icon,
+                            status,
+                            direction,
+                            light,
+                            speed,
+                            xp,
+                            alignment,
+                            name,
+                            title,
+                            status2,
+                            pledgeid,
+                            pledgename,
+                            owner_name,
+                            v1,
+                            hp_bar,
+                            v2,
+                            level,
+                        } => {}
+                        common::packet::ServerPacket::RemoveObject(id) => {}
+                        _ => {
+                            log::error!("Unhandled packet for monster {:?}: {:?}", self.id, p);
                         }
-                    }
+                    },
                     super::WorldResponse::NewClientId(id) => {
                         if let Some(m) = m.take() {
                             self.id = Some(id);
@@ -306,8 +329,6 @@ pub struct Monster {
     id: super::WorldObjectId,
     /// Where the npc currently exists
     location: crate::character::Location,
-    /// The last place the object was
-    old_location: Option<crate::character::Location>,
     /// The npc name
     name: String,
     /// the npc alignment
@@ -345,12 +366,7 @@ impl super::ObjectTrait for Monster {
         self.location
     }
 
-    fn get_prev_location(&self) -> crate::character::Location {
-        self.old_location.unwrap_or(self.location)
-    }
-
     fn set_location(&mut self, l: crate::character::Location) {
-        self.old_location = Some(self.location);
         self.location = l;
     }
 

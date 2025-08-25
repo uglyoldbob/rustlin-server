@@ -352,10 +352,6 @@ impl ObjectTrait for ItemWithLocation {
         self.location
     }
 
-    fn get_prev_location(&self) -> crate::character::Location {
-        self.location
-    }
-
     fn set_location(&mut self, l: crate::character::Location) {
         self.location = l;
     }

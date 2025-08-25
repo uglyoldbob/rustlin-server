@@ -590,16 +590,15 @@ impl World {
                                             s.blocking_send(WorldResponse::ServerPacket(
                                                 c.get_new_char_details_packet(),
                                             ));
-                                        }
-                                        else {
+                                        } else {
                                             s.blocking_send(WorldResponse::ServerPacket(
                                                 ServerPacket::CharacterCreationStatus(1),
                                             ));
                                         }
                                     } else {
                                         s.blocking_send(WorldResponse::ServerPacket(
-                                                ServerPacket::CharacterCreationStatus(1),
-                                            ));
+                                            ServerPacket::CharacterCreationStatus(1),
+                                        ));
                                     }
                                 }
                             }
@@ -610,7 +609,7 @@ impl World {
                             if let Ok(mut mysql) = self.get_mysql_conn() {
                                 if let Some(s) = self.object_senders.get(&sender) {
                                     let s = s.clone();
-                                    if let Some(account) = self.account_table.get(&sender) {
+                                    if let Some(account) = self.account_table.get_mut(&sender) {
                                         if let Ok(chars) = account.retrieve_chars(&mut mysql) {
                                             let char = chars.iter().find(|a| a.name() == n);
                                             if let Some(char) = char {
@@ -621,6 +620,7 @@ impl World {
                                                     ));
                                                 } else {
                                                     //TODO actually delete the character
+                                                    account.delete_char(&n, &mut mysql);
                                                     s.blocking_send(WorldResponse::ServerPacket(
                                                         ServerPacket::DeleteCharacterOk,
                                                     ));
@@ -727,8 +727,7 @@ impl World {
                                         let chatter_location = map.get_location(*re).unwrap();
                                         for (id, o) in map.objects_iter() {
                                             if o.linear_distance(&chatter_location) < 30.0 {
-                                                if let Some(se) = o.sender()
-                                                {
+                                                if let Some(se) = o.sender() {
                                                     se.blocking_send(WorldResponse::ServerPacket(
                                                         ServerPacket::RegularChat {
                                                             id: 0,
@@ -753,8 +752,7 @@ impl World {
                                         let chatter_location = map.get_location(*re).unwrap();
                                         for (id, o) in map.objects_iter() {
                                             if o.linear_distance(&chatter_location) < 60.0 {
-                                                if let Some(se) = o.sender()
-                                                {
+                                                if let Some(se) = o.sender() {
                                                     se.blocking_send(WorldResponse::ServerPacket(
                                                         ServerPacket::YellChat {
                                                             id: 0,
@@ -780,8 +778,7 @@ impl World {
                                         let amsg = format!("[{}] {}", name, msg);
                                         let chatter_location = map.get_location(*re).unwrap();
                                         for (id, o) in map.objects_iter() {
-                                            if let Some(se) = o.sender()
-                                            {
+                                            if let Some(se) = o.sender() {
                                                 se.blocking_send(WorldResponse::ServerPacket(
                                                     ServerPacket::PartyChat(amsg.clone()),
                                                 ));
@@ -801,8 +798,7 @@ impl World {
                                         let amsg = format!("[{}] {}", name, msg);
                                         let chatter_location = map.get_location(*re).unwrap();
                                         for (id, o) in map.objects_iter() {
-                                            if let Some(se) = o.sender()
-                                            {
+                                            if let Some(se) = o.sender() {
                                                 se.blocking_send(WorldResponse::ServerPacket(
                                                     ServerPacket::PledgeChat(amsg.clone()),
                                                 ));
@@ -825,9 +821,7 @@ impl World {
                                         for (id, o) in map.objects_iter() {
                                             if let Some(receiver_name) = o.player_name() {
                                                 if receiver_name == n {
-                                                    if let Some(se) =
-                                                        o.sender()
-                                                    {
+                                                    if let Some(se) = o.sender() {
                                                         se.blocking_send(
                                                             WorldResponse::ServerPacket(
                                                                 ServerPacket::WhisperChat {
@@ -868,8 +862,7 @@ impl World {
                                         let amsg = format!("[{}] {}", name, msg);
                                         let chatter_location = map.get_location(*re).unwrap();
                                         for (id, o) in map.objects_iter() {
-                                            if let Some(se) = o.sender()
-                                            {
+                                            if let Some(se) = o.sender() {
                                                 se.blocking_send(WorldResponse::ServerPacket(
                                                     ServerPacket::GlobalChat(amsg.clone()),
                                                 ));
@@ -896,7 +889,9 @@ impl World {
                                                 "shutdown" => {
                                                     log::info!("A shutdown command was received");
                                                     if let Some(r) = self.characters.get(&sender) {
-                                                        if let Some(re) = self.object_ref_table.get(r) {
+                                                        if let Some(re) =
+                                                            self.object_ref_table.get(r)
+                                                        {
                                                             self.shutdown(re);
                                                         }
                                                     }
@@ -904,15 +899,17 @@ impl World {
                                                 "restart" => {
                                                     log::info!("A restart command was received");
                                                     if let Some(r) = self.characters.get(&sender) {
-                                                        if let Some(re) = self.object_ref_table.get(r) {
+                                                        if let Some(re) =
+                                                            self.object_ref_table.get(r)
+                                                        {
                                                             self.restart(re);
                                                         }
                                                     }
                                                 }
                                                 "quit" => {
                                                     s.blocking_send(WorldResponse::ServerPacket(
-                                                            ServerPacket::Disconnect,
-                                                        ));
+                                                        ServerPacket::Disconnect,
+                                                    ));
                                                 }
                                                 "test" => {
                                                     log::info!("Test requested");
@@ -1029,7 +1026,11 @@ impl World {
                 last_interval_time = now;
                 count = 0;
                 let im = interval_time.as_micros() as f32 / 20000.0;
-                log::info!("Interval time is {} microseconds, {} hz", im, 1000000.0/im);
+                log::info!(
+                    "Interval time is {} microseconds, {} hz",
+                    im,
+                    1000000.0 / im
+                );
             }
         }
         log::error!("Exiting world run instance");
@@ -1054,8 +1055,7 @@ impl World {
         let shutdown = {
             if let Some(o) = self.get_object_ref(r.id) {
                 o.can_shutdown()
-            }
-            else {
+            } else {
                 false
             }
         };
@@ -1071,8 +1071,7 @@ impl World {
         let shutdown = {
             if let Some(o) = self.get_object_ref(r.id) {
                 o.can_shutdown()
-            }
-            else {
+            } else {
                 false
             }
         };

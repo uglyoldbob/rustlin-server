@@ -69,9 +69,6 @@ impl ObjectList {
 /// The generic object trait for the server
 #[enum_dispatch::enum_dispatch]
 pub trait ObjectTrait {
-    /// Get the previous location of the object
-    fn get_prev_location(&self) -> crate::character::Location;
-
     /// Get the location of the object
     fn get_location(&self) -> crate::character::Location;
 
