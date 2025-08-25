@@ -968,16 +968,25 @@ impl Character {
     ) -> Result<(), crate::server::ClientError> {
         use mysql::prelude::Queryable;
         let mut t = mysql.start_transaction(mysql::TxOpts::default())?;
-        let id = crate::world::World::get_new_id(&mut t)?;
-        if let Some(id) = id {
-            self.id = id;
+        let p = mysql::Params::Positional(vec![self.name.as_str().into()]);
+        let row: Option<mysql::Row> =
+            t.exec_first("SELECT * FROM characters WHERE char_name=?", p)?;
+        let exists = row.is_some();
+        if !exists {
+            let id = crate::world::World::get_new_id(&mut t)?;
+            if let Some(id) = id {
+                self.id = id;
+            } else {
+                self.id = 2;
+            }
+            let query = "INSERT INTO characters SET account_name=?,objid=?,char_name=?,level=?,MaxHp=?,MaxMp=?,Class=?,Sex=?,Ac=?,Str=?,Dex=?,Con=?,Wis=?,Cha=?,Intel=?,LocX=?,LocY=?,MapID=?";
+            t.exec_drop(query, self)?;
+            t.commit()?;
+            Ok(())
         } else {
-            self.id = 2;
+            t.rollback()?;
+            Err(ClientError::CharacterExists)
         }
-        let query = "INSERT INTO characters SET account_name=?,objid=?,char_name=?,level=?,MaxHp=?,MaxMp=?,Class=?,Sex=?,Ac=?,Str=?,Dex=?,Con=?,Wis=?,Cha=?,Intel=?,LocX=?,LocY=?,MapID=?";
-        t.exec_drop(query, self)?;
-        t.commit()?;
-        Ok(())
     }
 }
 

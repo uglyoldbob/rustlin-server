@@ -23,6 +23,8 @@ pub enum ClientError {
     MysqlError(mysql::Error),
     /// The user selected an invalid character
     InvalidCharSelection,
+    /// The character already exists when trying to create a new character
+    CharacterExists,
 }
 
 impl From<PacketError> for ClientError {

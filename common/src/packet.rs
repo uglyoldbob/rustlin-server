@@ -283,6 +283,8 @@ pub enum ServerPacket {
     News(String),
     /// The status of creating a new character
     CharacterCreationStatus(u8),
+    /// New character name already exists
+    CharacterNameAlreadyExists,
     /// The details of a new chracter just created
     NewCharacterDetails {
         /// character name
@@ -719,6 +721,9 @@ impl ServerPacket {
             }
             ServerPacket::LoginResult { code } => {
                 p.add_u8(21).add_u8(code).add_u32(0);
+            }
+            ServerPacket::CharacterNameAlreadyExists => {
+                p.add_u8(21).add_u8(6).add_u32(0);
             }
             ServerPacket::News(news) => {
                 p.add_u8(90).add_string(&news);

@@ -523,7 +523,10 @@ impl World {
                                             }
                                         }
                                         None => {
-                                            log::info!("User {} does not exist!", u.clone());
+                                            log::info!(
+                                                "User account {} does not exist!",
+                                                u.clone()
+                                            );
                                             if self.config.automatic_account_creation {
                                                 let newaccount = UserAccount::new(
                                                     u.clone(),
@@ -583,13 +586,18 @@ impl World {
                                         intelligence,
                                     ) {
                                         if let Ok(mut mysql) = self.get_mysql_conn() {
-                                            c.save_new_to_db(&mut mysql);
-                                            s.blocking_send(WorldResponse::ServerPacket(
-                                                ServerPacket::CharacterCreationStatus(0),
-                                            ));
-                                            s.blocking_send(WorldResponse::ServerPacket(
-                                                c.get_new_char_details_packet(),
-                                            ));
+                                            if c.save_new_to_db(&mut mysql).is_ok() {
+                                                s.blocking_send(WorldResponse::ServerPacket(
+                                                    ServerPacket::CharacterCreationStatus(0),
+                                                ));
+                                                s.blocking_send(WorldResponse::ServerPacket(
+                                                    c.get_new_char_details_packet(),
+                                                ));
+                                            } else {
+                                                s.blocking_send(WorldResponse::ServerPacket(
+                                                    ServerPacket::CharacterNameAlreadyExists,
+                                                ));
+                                            }
                                         } else {
                                             s.blocking_send(WorldResponse::ServerPacket(
                                                 ServerPacket::CharacterCreationStatus(1),
