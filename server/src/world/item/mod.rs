@@ -360,6 +360,10 @@ impl ObjectTrait for ItemWithLocation {
         ItemTrait::world_id(&self.item)
     }
 
+    fn object_name(&self) -> String {
+        "".to_string()
+    }
+
     fn build_put_object_packet(&self) -> common::packet::ServerPacket {
         common::packet::ServerPacket::PutObject {
             x: self.location.x,

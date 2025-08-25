@@ -187,6 +187,10 @@ impl crate::world::object::ObjectTrait for FullCharacter {
         Some(self.name.clone())
     }
 
+    fn object_name(&self) -> String {
+        self.name.clone()
+    }
+
     fn get_items(&self) -> Option<&HashMap<u32, crate::world::item::ItemInstance>> {
         Some(&self.items)
     }

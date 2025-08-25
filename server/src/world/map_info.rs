@@ -4,7 +4,10 @@ use std::{collections::HashMap, sync::Arc};
 
 use common::packet::{ServerPacket, ServerPacketSender};
 
-use crate::world::object::{ObjectList, ObjectTrait};
+use crate::world::{
+    object::{ObjectList, ObjectTrait},
+    ObjectRef,
+};
 
 use super::WorldObjectId;
 
@@ -39,7 +42,7 @@ impl MapInfo {
     /// Get the name of an object reference
     pub fn get_name(&self, r: super::ObjectRef) -> Option<String> {
         if let Some(o) = self.get_object(r) {
-            return o.player_name();
+            return Some(o.object_name());
         }
         None
     }
@@ -86,6 +89,18 @@ impl MapInfo {
                 }
             }
         }
+    }
+
+    /// Get an iterator for all objects near the specified object, including the specified object
+    pub fn objects_near(
+        &mut self,
+        r: &ObjectRef,
+    ) -> Result<impl Iterator<Item = (&WorldObjectId, &super::object::Object)>, ()> {
+        let mloc = self.objects.get(&r.id).ok_or(())?.get_location();
+        Ok(self
+            .objects
+            .iter()
+            .filter(move |a| mloc.manhattan_distance(&a.1.get_location()) < 17))
     }
 
     /// Move an object on the map

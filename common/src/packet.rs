@@ -54,6 +54,27 @@ pub enum ClientPacket {
     ChangeDirection(u8),
     /// a plain chat message
     Chat(String),
+    /// An npc chat message
+    NpcChat {
+        /// The npc id
+        id: u32,
+        /// The message
+        message: String,
+    },
+    /// A SHOUTING NPC
+    NpcShout {
+        /// The npc id
+        id: u32,
+        /// The message
+        message: String,
+    },
+    /// An npc talking globally
+    NpcGlobalChat {
+        /// The npc id
+        id: u32,
+        /// The message
+        message: String,
+    },
     /// A YELLING MESSAGE FROM THE USER
     YellChat(String),
     /// A party level chat message
@@ -473,8 +494,27 @@ pub enum ServerPacket {
     Weather(u8),
     /// A system message for the player
     SystemMessage(String),
-    /// an npc shout message
-    NpcShout(String),
+    /// An npc chat message
+    NpcChat {
+        /// The npc id
+        id: u32,
+        /// The message
+        message: String,
+    },
+    /// An npc shout message
+    NpcShout {
+        /// The npc id
+        id: u32,
+        /// The message
+        message: String,
+    },
+    /// An npc doing global chat
+    NpcGlobalChat {
+        /// The npc id
+        id: u32,
+        /// The message
+        message: String,
+    },
     /// regular chat
     RegularChat {
         /// object id?
@@ -618,6 +658,30 @@ impl ServerPacket {
     pub fn build(self) -> Packet {
         let mut p = Packet::new();
         match self {
+            ServerPacket::NpcChat { id, message } => {
+                p.add_u8(42)
+                    .add_u8(0)
+                    .add_u32(id)
+                    .add_string(&message)
+                    .add_u16(0)
+                    .add_u16(0);
+            }
+            ServerPacket::NpcShout { id, message } => {
+                p.add_u8(42)
+                    .add_u8(2)
+                    .add_u32(id)
+                    .add_string(&message)
+                    .add_u16(0)
+                    .add_u16(0);
+            }
+            ServerPacket::NpcGlobalChat { id, message } => {
+                p.add_u8(42)
+                    .add_u8(3)
+                    .add_u32(id)
+                    .add_string(&message)
+                    .add_u16(0)
+                    .add_u16(0);
+            }
             ServerPacket::EncryptionKey(k) => {
                 p.add_u8(65).add_u32(k);
             }
@@ -922,14 +986,6 @@ impl ServerPacket {
             }
             ServerPacket::SystemMessage(m) => {
                 p.add_u8(105).add_u8(9).add_string(&m);
-            }
-            ServerPacket::NpcShout(m) => {
-                p.add_u8(42)
-                    .add_u8(2)
-                    .add_u32(0)
-                    .add_string(&m)
-                    .add_u16(1)
-                    .add_u16(2);
             }
             ServerPacket::RegularChat { id, msg } => {
                 p.add_u8(8).add_u8(0).add_u32(id).add_string(&msg);

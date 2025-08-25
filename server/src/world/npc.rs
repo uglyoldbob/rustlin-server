@@ -155,6 +155,10 @@ impl super::object::ObjectTrait for Npc {
         None
     }
 
+    fn object_name(&self) -> String {
+        self.name.clone()
+    }
+
     fn get_items(&self) -> Option<&HashMap<u32, super::item::ItemInstance>> {
         None
     }

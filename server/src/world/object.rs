@@ -128,6 +128,9 @@ pub trait ObjectTrait {
         None
     }
 
+    /// Returns the name of the object
+    fn object_name(&self) -> String;
+
     /// Get the list of objects known to this object, if it matters for this object
     fn get_known_objects(&self) -> Option<&ObjectList> {
         None

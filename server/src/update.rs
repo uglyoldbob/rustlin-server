@@ -1,10 +1,8 @@
 //! Code specific to the update portion of the server
 //! This update server operates for the classic update client
 
-use futures::FutureExt;
 use std::collections::HashMap;
 use std::error::Error;
-use std::panic::AssertUnwindSafe;
 use tokio::net::TcpListener;
 
 use std::fmt;

@@ -1,7 +1,7 @@
 //! Monster related code for the world
 
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     net::{Ipv4Addr, SocketAddrV4},
 };
 
@@ -187,6 +187,10 @@ pub struct MonsterRef {
     send: tokio::sync::mpsc::Sender<WorldResponse>,
     /// The receiver from the world
     recv: tokio::sync::mpsc::Receiver<WorldResponse>,
+    /// Objects the monster knows about
+    objects: HashMap<WorldObjectId, Location>,
+    /// Objects the monster will attack on sight
+    attacks: HashSet<WorldObjectId>,
 }
 
 impl Drop for MonsterRef {
@@ -233,6 +237,29 @@ impl MonsterRef {
             })
             .await;
         self.location = new_loc;
+        let random_wait = rand::thread_rng().gen_range(500..=1000u16);
+        tokio::time::sleep(std::time::Duration::from_millis(random_wait as u64)).await;
+    }
+
+    /// Find a target to attack, return true if it did something
+    pub async fn find_target(
+        &mut self,
+        sender: &mut tokio::sync::mpsc::Sender<super::WorldMessage>,
+    ) -> bool {
+        let mut found_target = None;
+        for pt in self.attacks.iter() {
+            if self.objects.contains_key(pt) {
+                found_target = Some(pt);
+                break;
+            }
+        }
+        if let Some(target) = found_target {
+            log::info!("Im going to attack {}", target.get_u32());
+            use rand::Rng;
+            let random_wait = rand::thread_rng().gen_range(1000..=2000u16);
+            tokio::time::sleep(std::time::Duration::from_millis(random_wait as u64)).await;
+        }
+        found_target.is_some()
     }
 
     /// Run the ai for the monster
@@ -259,12 +286,49 @@ impl MonsterRef {
             while let Ok(msg) = self.recv.try_recv() {
                 match msg {
                     super::WorldResponse::ServerPacket(p) => match p {
+                        common::packet::ServerPacket::Attack {
+                            attack_type,
+                            id,
+                            id2,
+                            impact,
+                            direction,
+                            effect,
+                        } => {
+                            if self.reference.id.get_u32() == id2 {
+                                self.attacks.insert(WorldObjectId(id));
+                                let _ = sender
+                                    .send(WorldMessage {
+                                        data: crate::world::WorldMessageData::ClientPacket(
+                                            common::packet::ClientPacket::NpcChat {
+                                                id: self.reference.id.get_u32(),
+                                                message: "I'm being attacked".to_string(),
+                                            },
+                                        ),
+                                        sender: self.id,
+                                        peer: std::net::SocketAddr::V4(SocketAddrV4::new(
+                                            Ipv4Addr::new(127, 0, 0, 1),
+                                            1234,
+                                        )),
+                                    })
+                                    .await;
+                            }
+                        }
                         common::packet::ServerPacket::MoveObject {
                             id,
                             x,
                             y,
                             direction,
-                        } => {}
+                        } => {
+                            self.objects.insert(
+                                WorldObjectId(id),
+                                Location {
+                                    x,
+                                    y,
+                                    map: self.location.map,
+                                    direction,
+                                },
+                            );
+                        }
                         common::packet::ServerPacket::PutObject {
                             x,
                             y,
@@ -286,8 +350,20 @@ impl MonsterRef {
                             hp_bar,
                             v2,
                             level,
-                        } => {}
-                        common::packet::ServerPacket::RemoveObject(id) => {}
+                        } => {
+                            self.objects.insert(
+                                WorldObjectId(id),
+                                Location {
+                                    x,
+                                    y,
+                                    map: self.location.map,
+                                    direction,
+                                },
+                            );
+                        }
+                        common::packet::ServerPacket::RemoveObject(id) => {
+                            self.objects.remove(&WorldObjectId(id));
+                        }
                         _ => {
                             log::error!("Unhandled packet for monster {:?}: {:?}", self.id, p);
                         }
@@ -309,9 +385,9 @@ impl MonsterRef {
                     }
                 }
             }
-            let random_wait = rand::thread_rng().gen_range(500..=1000u16);
-            tokio::time::sleep(std::time::Duration::from_millis(random_wait as u64)).await;
-            self.moving(&mut sender).await;
+            if !self.find_target(&mut sender).await {
+                self.moving(&mut sender).await;
+            }
         }
         log::info!("Exiting monster ai");
     }
@@ -319,7 +395,7 @@ impl MonsterRef {
 
 use crate::{
     character::Location,
-    world::{ObjectRef, WorldMessage, WorldResponse},
+    world::{ObjectRef, WorldMessage, WorldObjectId, WorldResponse},
 };
 
 /// A monster on the world
@@ -357,6 +433,8 @@ impl Monster {
             id: None,
             send: self.send.clone(),
             recv: self.recv.take().unwrap(),
+            objects: HashMap::new(),
+            attacks: HashSet::new(),
         }
     }
 }
@@ -372,6 +450,10 @@ impl super::ObjectTrait for Monster {
 
     fn sender(&self) -> Option<tokio::sync::mpsc::Sender<crate::world::WorldResponse>> {
         Some(self.send.clone())
+    }
+
+    fn object_name(&self) -> String {
+        self.name.clone()
     }
 
     fn id(&self) -> super::WorldObjectId {
