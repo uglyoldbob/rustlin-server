@@ -16,7 +16,7 @@ use crate::{
     user::UserAccount,
     world::{
         item::ItemTrait,
-        object::{ObjectList, ObjectTrait},
+        object::{Damage, ObjectList, ObjectTrait},
     },
 };
 
@@ -463,21 +463,38 @@ impl World {
                     ClientPacket::AttackObject { id, x, y } => {
                         if let Some(sender) = m.sender {
                             if let Some(myid) = self.characters.get(&sender) {
-                                if let Some(re) = self.object_ref_table.get(myid) {
-                                    if let Some(map) = self.map_info.get_mut(&re.map) {
-                                        if let Ok(objs) = map.objects_near(re) {
-                                            for o in objs {
-                                                if let Some(s) = o.1.sender() {
-                                                    s.blocking_send(WorldResponse::ServerPacket(
-                                                        ServerPacket::Attack {
-                                                            attack_type: 3,
-                                                            id: myid.get_u32(),
-                                                            id2: id,
-                                                            impact: 1,
-                                                            direction: 2,
-                                                            effect: None,
-                                                        },
-                                                    ));
+                                let damage = self.get_object_ref(*myid).map(|o| Damage::new(o));
+                                if let Some(mut dmg) = damage {
+                                    if let Some(re) = self.object_ref_table.get(myid) {
+                                        if let Some(map) = self.map_info.get_mut(&re.map) {
+                                            let result_dmg = if let Some(o) =
+                                                map.get_object_mut_from_id(WorldObjectId(id))
+                                            {
+                                                dmg.run_damage(o)
+                                            } else {
+                                                None
+                                            };
+                                            if let Ok(objs) = map.objects_near_mut(re) {
+                                                for o in objs {
+                                                    if let Some(s) = o.1.sender() {
+                                                        s.blocking_send(
+                                                            WorldResponse::ServerPacket(
+                                                                ServerPacket::Attack {
+                                                                    attack_type: 3,
+                                                                    id: myid.get_u32(),
+                                                                    id2: id,
+                                                                    impact: if result_dmg.is_some()
+                                                                    {
+                                                                        1
+                                                                    } else {
+                                                                        0
+                                                                    },
+                                                                    direction: 2,
+                                                                    effect: None,
+                                                                },
+                                                            ),
+                                                        );
+                                                    }
                                                 }
                                             }
                                         }
@@ -1229,17 +1246,6 @@ impl World {
 
         let obj: object::Object = p.into();
         self.add_object(obj)
-    }
-
-    /// Remove a player from the world
-    pub fn remove_player(&mut self, r: &mut Option<ObjectRef>) {
-        if let Some(r) = &r {
-            let map = self.map_info.get_mut(&r.map);
-            if let Some(map) = map {
-                map.remove_object(r.id);
-            }
-        }
-        *r = None;
     }
 
     /// (Re)load the weapons table

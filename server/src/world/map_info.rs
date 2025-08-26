@@ -65,6 +65,17 @@ impl MapInfo {
         None
     }
 
+    /// Get an object, mutably, from the object id
+    pub fn get_object_mut_from_id(
+        &mut self,
+        id: WorldObjectId,
+    ) -> Option<&mut super::object::Object> {
+        if let Some(o) = self.objects.get_mut(&id) {
+            return Some(o);
+        }
+        None
+    }
+
     /// Get an iterator over all objects
     pub fn objects_iter(
         &self,
@@ -92,8 +103,20 @@ impl MapInfo {
     }
 
     /// Get an iterator for all objects near the specified object, including the specified object
-    pub fn objects_near(
+    pub fn objects_near_mut(
         &mut self,
+        r: &ObjectRef,
+    ) -> Result<impl Iterator<Item = (&WorldObjectId, &mut super::object::Object)>, ()> {
+        let mloc = self.objects.get(&r.id).ok_or(())?.get_location();
+        Ok(self
+            .objects
+            .iter_mut()
+            .filter(move |a| mloc.manhattan_distance(&a.1.get_location()) < 17))
+    }
+
+    /// Get an iterator for all objects near the specified object, including the specified object
+    pub fn objects_near(
+        &self,
         r: &ObjectRef,
     ) -> Result<impl Iterator<Item = (&WorldObjectId, &super::object::Object)>, ()> {
         let mloc = self.objects.get(&r.id).ok_or(())?.get_location();

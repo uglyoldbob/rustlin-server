@@ -50,7 +50,9 @@ impl mysql::prelude::FromRow for Weapon {
             unidentified: row.get(2).ok_or(mysql::FromRowError(row.clone()))?,
             identified: row.get(3).ok_or(mysql::FromRowError(row.clone()))?,
             max_use_time: row.get(44).ok_or(mysql::FromRowError(row.clone()))?,
-            hit_rate_bonus: row.get("hitmodifier").ok_or(mysql::FromRowError(row.clone()))?,
+            hit_rate_bonus: row
+                .get("hitmodifier")
+                .ok_or(mysql::FromRowError(row.clone()))?,
         })
     }
 }

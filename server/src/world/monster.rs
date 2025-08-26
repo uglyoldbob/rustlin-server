@@ -444,6 +444,38 @@ impl super::ObjectTrait for Monster {
         self.location
     }
 
+    fn other_hit_rate_bonus(&self) -> i16 {
+        0
+    }
+
+    fn critical_hit_miss_values(&self) -> (i16, i16) {
+        (0, 19)
+    }
+
+    fn str_attack_hit_bonus(&self) -> i8 {
+        0
+    }
+
+    fn dex_attack_hit_bonus(&self) -> i8 {
+        0
+    }
+
+    fn weapon(&self) -> Option<&crate::world::item::WeaponInstance> {
+        None
+    }
+
+    fn hit_rate_bonus(&self) -> i16 {
+        0
+    }
+
+    fn ranged_hit_rate_bonus(&self) -> i16 {
+        0
+    }
+
+    fn base_attack_rate(&self) -> i16 {
+        1
+    }
+
     fn armor_class(&self) -> i8 {
         0
     }

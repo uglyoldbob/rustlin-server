@@ -159,12 +159,21 @@ impl crate::world::object::ObjectTrait for FullCharacter {
         self.location
     }
 
+    fn other_hit_rate_bonus(&self) -> i16 {
+        0
+    }
+
+    fn critical_hit_miss_values(&self) -> (i16, i16) {
+        (-9, 10)
+    }
+
     fn armor_class(&self) -> i8 {
         self.ac
     }
 
     fn max_weight(&self) -> u32 {
-        let base : u32 = 150 + (0.6 * self.strength as f32 + 0.4 * self.constitution as f32 + 1.0).floor() as u32;
+        let base: u32 = 150
+            + (0.6 * self.strength as f32 + 0.4 * self.constitution as f32 + 1.0).floor() as u32;
         base
     }
 
@@ -178,7 +187,7 @@ impl crate::world::object::ObjectTrait for FullCharacter {
         }
         None
     }
-    
+
     fn attack_type(&self) -> crate::world::object::BasicObjectType {
         crate::world::object::BasicObjectType::Player
     }
@@ -195,13 +204,13 @@ impl crate::world::object::ObjectTrait for FullCharacter {
                 0..=12 => 0,
                 13..=15 => 2,
                 16.. => 3,
-            }
+            },
             Class::Wizard => 0,
             Class::DarkElf => match self.dexterity {
                 0..=16 => 0,
                 17 => 1,
                 18.. => 2,
-            }
+            },
             Class::DragonKnight => 0,
             Class::Illusionist => 0,
         }
@@ -213,39 +222,39 @@ impl crate::world::object::ObjectTrait for FullCharacter {
                 0..=15 => 0,
                 16..=18 => 1,
                 19.. => 2,
-            }
+            },
             Class::Knight => match self.strength {
                 0..=16 => 0,
                 17..=18 => 2,
                 19.. => 4,
-            }
+            },
             Class::Elf => match self.strength {
                 0..=12 => 0,
                 13..=14 => 1,
                 15.. => 2,
-            }
+            },
             Class::Wizard => match self.strength {
                 0..=10 => 0,
                 11..=12 => 1,
                 13.. => 2,
-            }
+            },
             Class::DarkElf => match self.strength {
                 0..=14 => 0,
                 15..=17 => 1,
                 18.. => 2,
-            }
+            },
             Class::DragonKnight => match self.strength {
                 0..=13 => 0,
                 14..=16 => 1,
                 17.. => 3,
-            }
+            },
             Class::Illusionist => match self.strength {
                 0..=11 => 0,
                 12..=13 => 1,
                 14..=15 => 2,
                 16 => 3,
                 17.. => 4,
-            }
+            },
         }
     }
 
