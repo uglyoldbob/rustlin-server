@@ -444,6 +444,18 @@ impl super::ObjectTrait for Monster {
         self.location
     }
 
+    fn armor_class(&self) -> i8 {
+        0
+    }
+
+    fn max_weight(&self) -> u32 {
+        1
+    }
+
+    fn attack_type(&self) -> super::object::BasicObjectType {
+        super::object::BasicObjectType::Monster
+    }
+
     fn set_location(&mut self, l: crate::character::Location) {
         self.location = l;
     }

@@ -143,6 +143,18 @@ impl super::object::ObjectTrait for Npc {
         self.location
     }
 
+    fn max_weight(&self) -> u32 {
+        1
+    }
+
+    fn armor_class(&self) -> i8 {
+        0
+    }
+
+    fn attack_type(&self) -> super::object::BasicObjectType {
+        super::object::BasicObjectType::Npc
+    }
+
     fn set_location(&mut self, l: crate::character::Location) {
         self.location = l;
     }

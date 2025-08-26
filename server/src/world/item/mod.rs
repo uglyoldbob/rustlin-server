@@ -30,6 +30,8 @@ pub trait ItemTrait {
     fn usage(&self) -> ItemUsage;
     /// Get the ground icon for this particular item
     fn ground_icon(&self) -> u16;
+    /// Get the weight of the item
+    fn weight(&self) -> u32;
 }
 
 /// The elemental types that an item can be enchanted with
@@ -223,6 +225,16 @@ impl ItemInstance {
         self.stuff.item_id
     }
 
+    /// Is the item equipped
+    pub fn equipped(&self) -> bool {
+        self.stuff.equipped
+    }
+
+    /// Get the weight of the item
+    pub fn weight(&self) -> u32 {
+        self.definition.weight()
+    }
+
     /// Toggle if the item is equipped or not
     pub fn toggle_equip(&mut self) {
         self.stuff.equipped = !self.stuff.equipped;
@@ -350,6 +362,18 @@ pub struct ItemWithLocation {
 impl ObjectTrait for ItemWithLocation {
     fn get_location(&self) -> crate::character::Location {
         self.location
+    }
+
+    fn armor_class(&self) -> i8 {
+        0
+    }
+
+    fn max_weight(&self) -> u32 {
+        1
+    }
+
+    fn attack_type(&self) -> super::object::BasicObjectType {
+        super::object::BasicObjectType::Other
     }
 
     fn set_location(&mut self, l: crate::character::Location) {

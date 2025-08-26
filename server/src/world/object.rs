@@ -7,7 +7,7 @@ use std::{
 
 use crate::{
     character::FullCharacter,
-    world::{World, WorldObjectId},
+    world::{item::Weapon, World, WorldObjectId},
 };
 
 /// A helper struct for managin a list of objects known to a player
@@ -146,6 +146,52 @@ pub trait ObjectTrait {
     fn can_shutdown(&self) -> bool {
         false
     }
+
+    /// The weapon the object is wielding, if there is one
+    fn weapon(&self) -> Option<&crate::world::item::WeaponInstance> { None }
+
+    /// Get the object type for attacking and being attacked
+    fn attack_type(&self) -> BasicObjectType;
+
+    /// The base attack rate
+    fn base_attack_rate(&self) -> i16 { 0 }
+
+    /// The bonus/penalty to attacking success rate based on object strength
+    fn str_attack_hit_bonus(&self) -> i8 { 0 }
+
+    /// The bonus/penalty to attacking success rate based on object dexterity
+    fn dex_attack_hit_bonus(&self) -> i8 { 0 }
+
+    /// The bonus/penalty a player has for attacks
+    fn hit_rate_bonus(&self) -> i16 { 0 }
+
+    /// The bonus/penalty a player has for ranged weapons
+    fn ranged_hit_rate_bonus(&self) -> i16 { 0 }
+
+    /// Get the total weight the object carries
+    fn get_weight(&self) -> u32 {
+        if let Some(items) = self.get_items() {
+            let mut total = 0;
+            for i in items {
+                total += i.1.weight();
+            }
+            total
+        }
+        else {
+            0
+        }
+    }
+
+    /// Get the armor class of the object
+    fn armor_class(&self) -> i8;
+
+    /// Get the max weight that can be carried
+    fn max_weight(&self) -> u32;
+
+    /// The percentage of weight being carried
+    fn weight_percentage(&self) -> f32 {
+        (self.get_weight() as f32 / self.max_weight() as f32).min(1.0)
+    }
 }
 
 /// The things that an object can be
@@ -171,4 +217,174 @@ impl Object {
             false
         }
     }
+}
+
+/// The types of attacked for damage
+pub enum BasicObjectType {
+    /// The object is a user playing a character
+    Player,
+    /// The object is an npc
+    Npc,
+    /// The object is a monster
+    Monster,
+    /// The object is something else
+    Other,
+}
+
+impl Damage {
+    /// Construct a new attack
+    pub fn new(attacker: &Object) -> Self {
+        let mut roll_bonus = attacker.base_attack_rate();
+        roll_bonus += attacker.str_attack_hit_bonus() as i16;
+        roll_bonus += attacker.dex_attack_hit_bonus() as i16;
+        if let Some(weapon) = attacker.weapon() {
+            roll_bonus += weapon.hit_rate_bonus();
+            if weapon.is_ranged() {
+                roll_bonus += attacker.ranged_hit_rate_bonus();
+            }
+            else {
+                roll_bonus += attacker.hit_rate_bonus();
+            }
+            let carrying = attacker.weight_percentage();
+            if carrying <= 1.0/3.0 {
+                //nothing
+            } else if carrying < 0.5 {
+                roll_bonus -= 1;
+            } else if carrying < 2.0/3.0 {
+                roll_bonus -= 3;
+            } else if carrying < 5.0/6.0 {
+                roll_bonus -= 5;
+            } else {
+                roll_bonus -= 5;
+            }
+        }
+        use rand::Rng;
+        let roll = rand::thread_rng().gen_range(0..20i16) + 1 + roll_bonus as i16 - 10;
+        let special = if roll <= (roll_bonus - 9) {
+            SpecialAttack::CriticalMiss
+        } else if roll >= roll_bonus + 10 {
+            SpecialAttack::CriticalHit
+        } else {
+            SpecialAttack::Normal
+        };
+        Self {
+            origin: attacker.get_location(),
+            atype: attacker.attack_type(),
+            attack_roll: roll,
+            special,
+        }
+    }
+
+    /// Calculate the damage that might be applied, return true if the attack hit
+    fn run_damage(&self, attacked: &mut Object) -> Option<u16> {
+        if !self.should_hit(attacked) {
+            return None;
+        }
+        match self.atype {
+            BasicObjectType::Player => {
+                match attacked.attack_type() {
+                    BasicObjectType::Player => {
+                        None
+                    }
+                    BasicObjectType::Npc => todo!(),
+                    BasicObjectType::Monster => todo!(),
+                    BasicObjectType::Other => None,
+                }
+            }
+            BasicObjectType::Npc => {
+                match attacked.attack_type() {
+                    BasicObjectType::Player => todo!(),
+                    BasicObjectType::Npc => todo!(),
+                    BasicObjectType::Monster => todo!(),
+                    BasicObjectType::Other => None,
+                }
+            }
+            BasicObjectType::Monster => {
+                match attacked.attack_type() {
+                    BasicObjectType::Player => todo!(),
+                    BasicObjectType::Npc => todo!(),
+                    BasicObjectType::Monster => todo!(),
+                    BasicObjectType::Other => None,
+                }
+            }
+            BasicObjectType::Other => {
+                None
+            }
+        }
+    }
+
+    ///Calculate if the attacked object is hit
+    fn should_hit(&self, attacked: &Object) -> bool {
+        use rand::Rng;
+        match self.atype {
+            BasicObjectType::Player => {
+                match attacked.attack_type() {
+                    BasicObjectType::Player => {
+                        let ac = attacked.armor_class() as i16;
+                        let roll = if ac >= 0 {
+                            10 - ac
+                        } else {
+                            let max_roll = (ac as f32 * -1.5).round() as i16;
+                            10 - rand::thread_rng().gen_range(0..max_roll) + 1
+                        };
+                        let hit_percent : u8 = match self.special {
+                            SpecialAttack::Normal => if self.attack_roll > roll {
+                                100
+                            } else {
+                                0
+                            }
+                            SpecialAttack::CriticalMiss => 0,
+                            SpecialAttack::CriticalHit => 100,
+                        };
+                        let hit_roll: u8 = rand::thread_rng().gen_range(1..=100);
+                        hit_percent > hit_roll
+                    }
+                    BasicObjectType::Npc => todo!(),
+                    BasicObjectType::Monster => todo!(),
+                    BasicObjectType::Other => false,
+                }
+            }
+            BasicObjectType::Npc => {
+                match attacked.attack_type() {
+                    BasicObjectType::Player => todo!(),
+                    BasicObjectType::Npc => todo!(),
+                    BasicObjectType::Monster => todo!(),
+                    BasicObjectType::Other => false,
+                }
+            }
+            BasicObjectType::Monster => {
+                match attacked.attack_type() {
+                    BasicObjectType::Player => todo!(),
+                    BasicObjectType::Npc => todo!(),
+                    BasicObjectType::Monster => todo!(),
+                    BasicObjectType::Other => false,
+                }
+            }
+            BasicObjectType::Other => {
+                false
+            }
+        }
+    }
+}
+
+/// Specifies if the attack is normal, always misses, or always hits
+enum SpecialAttack {
+    /// Normal
+    Normal,
+    /// Chance of hitting is none
+    CriticalMiss,
+    /// Chance of hitting is maximum
+    CriticalHit,
+}
+
+/// The damage that can be applied to an object
+pub struct Damage {
+    /// Where the damage originated from
+    origin: super::Location,
+    /// The type of object doing the damage
+    atype: BasicObjectType,
+    /// The roll for attack by the attacker
+    attack_roll: i16,
+    /// The special attack rate
+    special: SpecialAttack,
 }

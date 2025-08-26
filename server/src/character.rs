@@ -8,7 +8,7 @@ use mysql::{prelude::Queryable, Params};
 use crate::{
     server::ClientError,
     world::{
-        item::{ItemInstanceWithoutDefinition, ItemUsage},
+        item::{ItemInstance, ItemInstanceWithoutDefinition, ItemUsage, Weapon},
         object::ObjectList,
         Map, WorldObjectId, WorldResponse,
     },
@@ -157,6 +157,147 @@ impl PartialCharacter {
 impl crate::world::object::ObjectTrait for FullCharacter {
     fn get_location(&self) -> crate::character::Location {
         self.location
+    }
+
+    fn armor_class(&self) -> i8 {
+        self.ac
+    }
+
+    fn max_weight(&self) -> u32 {
+        let base : u32 = 150 + (0.6 * self.strength as f32 + 0.4 * self.constitution as f32 + 1.0).floor() as u32;
+        base
+    }
+
+    fn weapon(&self) -> Option<&crate::world::item::WeaponInstance> {
+        for i in self.items.iter() {
+            if let crate::world::item::Item::Weapon(w) = i.1.definition() {
+                if i.1.equipped() {
+                    return Some(w);
+                }
+            }
+        }
+        None
+    }
+    
+    fn attack_type(&self) -> crate::world::object::BasicObjectType {
+        crate::world::object::BasicObjectType::Player
+    }
+
+    fn base_attack_rate(&self) -> i16 {
+        self.level as i16
+    }
+
+    fn ranged_hit_rate_bonus(&self) -> i16 {
+        match self.class {
+            Class::Royal => 0,
+            Class::Knight => 0,
+            Class::Elf => match self.dexterity {
+                0..=12 => 0,
+                13..=15 => 2,
+                16.. => 3,
+            }
+            Class::Wizard => 0,
+            Class::DarkElf => match self.dexterity {
+                0..=16 => 0,
+                17 => 1,
+                18.. => 2,
+            }
+            Class::DragonKnight => 0,
+            Class::Illusionist => 0,
+        }
+    }
+
+    fn hit_rate_bonus(&self) -> i16 {
+        match self.class {
+            Class::Royal => match self.strength {
+                0..=15 => 0,
+                16..=18 => 1,
+                19.. => 2,
+            }
+            Class::Knight => match self.strength {
+                0..=16 => 0,
+                17..=18 => 2,
+                19.. => 4,
+            }
+            Class::Elf => match self.strength {
+                0..=12 => 0,
+                13..=14 => 1,
+                15.. => 2,
+            }
+            Class::Wizard => match self.strength {
+                0..=10 => 0,
+                11..=12 => 1,
+                13.. => 2,
+            }
+            Class::DarkElf => match self.strength {
+                0..=14 => 0,
+                15..=17 => 1,
+                18.. => 2,
+            }
+            Class::DragonKnight => match self.strength {
+                0..=13 => 0,
+                14..=16 => 1,
+                17.. => 3,
+            }
+            Class::Illusionist => match self.strength {
+                0..=11 => 0,
+                12..=13 => 1,
+                14..=15 => 2,
+                16 => 3,
+                17.. => 4,
+            }
+        }
+    }
+
+    fn str_attack_hit_bonus(&self) -> i8 {
+        match self.strength {
+            0 => -2,
+            1..=8 => -2,
+            9..=10 => -1,
+            11..=12 => 0,
+            13..=14 => 1,
+            15..=16 => 2,
+            17..=18 => 3,
+            19..=20 => 4,
+            21..=23 => 5,
+            24..=26 => 6,
+            27..=29 => 7,
+            30..=32 => 8,
+            33..=35 => 9,
+            36..=38 => 10,
+            39..=41 => 11,
+            42..=44 => 12,
+            45..=47 => 13,
+            49..=50 => 14,
+            51..=53 => 15,
+            54..=55 => 16,
+            56..=58 => 17,
+            _ => 17,
+        }
+    }
+
+    fn dex_attack_hit_bonus(&self) -> i8 {
+        match self.dexterity {
+            0 => -2,
+            1..=6 => -2,
+            7..=8 => -1,
+            9..=10 => 0,
+            11..=12 => 1,
+            13..=14 => 2,
+            15..=16 => 3,
+            17..=18 => 4,
+            19..=32 => (self.dexterity - 14) as i8,
+            33..=35 => 19,
+            36..=38 => 20,
+            39..=41 => 21,
+            42..=44 => 22,
+            45..=47 => 23,
+            48..=50 => 24,
+            51..=53 => 25,
+            54..=56 => 26,
+            57..=59 => 27,
+            _ => 28,
+        }
     }
 
     fn can_shutdown(&self) -> bool {

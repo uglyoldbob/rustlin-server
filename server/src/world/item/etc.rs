@@ -175,6 +175,10 @@ impl ItemTrait for EtcItemInstance {
         self.world_id
     }
 
+    fn weight(&self) -> u32 {
+        self.definition.weight
+    }
+
     fn db_id(&self) -> u32 {
         self.definition.id
     }

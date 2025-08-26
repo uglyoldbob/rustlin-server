@@ -20,14 +20,19 @@ pub struct Weapon {
     identified: String,
     /// Maximum use time
     max_use_time: u32,
+    /// hit rate bonus
+    hit_rate_bonus: i16,
 }
 
 impl Weapon {
     /// Make a weapon instance
+    /// TODO eliminate this function
     pub fn get_instance(&self, world_id: WorldObjectId) -> WeaponInstance {
         WeaponInstance {
             world_id,
             definition: self.clone(),
+            bonus: WeaponStatus::Normal,
+            enchanted: 0,
         }
     }
 }
@@ -45,7 +50,56 @@ impl mysql::prelude::FromRow for Weapon {
             unidentified: row.get(2).ok_or(mysql::FromRowError(row.clone()))?,
             identified: row.get(3).ok_or(mysql::FromRowError(row.clone()))?,
             max_use_time: row.get(44).ok_or(mysql::FromRowError(row.clone()))?,
+            hit_rate_bonus: row.get("hitmodifier").ok_or(mysql::FromRowError(row.clone()))?,
         })
+    }
+}
+
+/// Temporary enchantments that can be applied to a weapon
+#[derive(Clone, Debug)]
+pub enum WeaponStatus {
+    /// The item is holy
+    Holy,
+    /// The item is enchanted with enchant weapon
+    Enchant,
+    /// The item is blessed
+    Blessed,
+    /// The item benefits from shadow fang
+    ShadowFang,
+    /// There are no benefits applied
+    Normal,
+}
+
+impl WeaponStatus {
+    /// Lookup the hit bonus due to temporary enchantments
+    fn hit_bonus(&self) -> i16 {
+        match self {
+            WeaponStatus::Holy => 1,
+            WeaponStatus::Enchant => 0,
+            WeaponStatus::Blessed => 2,
+            WeaponStatus::ShadowFang => 0,
+            WeaponStatus::Normal => 0,
+        }
+    }
+
+    /// Lookup the magical damage bonus due to temporary enchantments
+    fn dmg_bonus(&self) -> i16 {
+        match self {
+            WeaponStatus::Holy => 0,
+            WeaponStatus::Enchant => 2,
+            WeaponStatus::Blessed => 2,
+            WeaponStatus::ShadowFang => 5,
+            WeaponStatus::Normal => 0,
+        }
+    }
+
+    /// Lookup if the weapon applies any holy damage
+    fn holy_damage(&self) -> i16 {
+        if let WeaponStatus::Holy = self {
+            1
+        } else {
+            0
+        }
     }
 }
 
@@ -56,11 +110,32 @@ pub struct WeaponInstance {
     definition: Weapon,
     /// World object id
     world_id: WorldObjectId,
+    /// Temporary bonus
+    bonus: WeaponStatus,
+    /// Enchantment level
+    enchanted: i8,
+}
+
+impl WeaponInstance {
+    /// Calculate the bonus to hit rate for the weapon
+    pub fn hit_rate_bonus(&self) -> i16 {
+        self.definition.hit_rate_bonus + self.bonus.hit_bonus() + self.enchanted as i16 / 2
+    }
+
+    /// Is the weapon a ranged weapon
+    pub fn is_ranged(&self) -> bool {
+        /// TODO
+        false
+    }
 }
 
 impl ItemTrait for WeaponInstance {
     fn world_id(&self) -> WorldObjectId {
         self.world_id
+    }
+
+    fn weight(&self) -> u32 {
+        self.definition.weight
     }
 
     fn db_id(&self) -> u32 {

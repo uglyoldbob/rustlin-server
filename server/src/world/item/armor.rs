@@ -63,6 +63,10 @@ impl ItemTrait for ArmorInstance {
         self.world_id
     }
 
+    fn weight(&self) -> u32 {
+        self.definition.weight
+    }
+
     fn db_id(&self) -> u32 {
         self.definition.id
     }
