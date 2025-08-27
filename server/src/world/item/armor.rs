@@ -39,11 +39,11 @@ impl From<String> for ArmorType {
     fn from(value: String) -> Self {
         match value.as_str() {
             "none" => Self::None,
-            "helmet" => Self::Helmet,
+            "helm" => Self::Helmet,
             "armor" => Self::Plain,
             "T" => Self::T,
             "cloak" => Self::Cloak,
-            "gloves" => Self::Gloves,
+            "glove" => Self::Gloves,
             "boots" => Self::Boots,
             "shield" => Self::Shield,
             "amulet" => Self::Amulet,

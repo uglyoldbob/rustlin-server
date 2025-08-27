@@ -146,8 +146,22 @@ impl super::object::ObjectTrait for Npc {
         self.location
     }
 
+    fn apply_damage(&mut self, dmg: u16) {}
+
+    fn compute_max_attack_damage(
+        &self,
+        weapon: Option<&crate::world::item::WeaponInstance>,
+    ) -> (u16, u16) {
+        (0, 0)
+    }
+
     fn get_polymorph(&self) -> Option<u32> {
         None
+    }
+
+    fn compute_received_damage(&self, d: (u16, u16)) -> u16 {
+        ///TODO
+        d.0
     }
 
     fn apply_required_polymorph(&self, poly: Option<u32>, rate: &mut u8) {}

@@ -7,7 +7,10 @@ use std::{
 
 use crate::{
     character::FullCharacter,
-    world::{item::ItemTrait, WorldObjectId},
+    world::{
+        item::{ItemTrait, Weapon, WeaponType},
+        WorldObjectId,
+    },
 };
 
 /// The effects that can be on an object
@@ -412,6 +415,18 @@ pub trait ObjectTrait {
 
     /// Get the polymorph if applicable for the object
     fn get_polymorph(&self) -> Option<u32>;
+
+    /// Compute the maximum damage for the weapon being wielded
+    fn compute_max_attack_damage(
+        &self,
+        weapon: Option<&crate::world::item::WeaponInstance>,
+    ) -> (u16, u16);
+
+    /// Compute the damage received for the object being attacked
+    fn compute_received_damage(&self, d: (u16, u16)) -> u16;
+
+    /// Apply damage to the object
+    fn apply_damage(&mut self, dmg: u16);
 }
 
 /// The things that an object can be
@@ -458,7 +473,8 @@ impl Damage {
         let mut dmg_bonus = 0;
         roll_bonus += attacker.str_attack_hit_bonus() as i16;
         roll_bonus += attacker.dex_attack_hit_bonus() as i16;
-        let (wtype, range) = if let Some(weapon) = attacker.weapon() {
+        let (wtype, range, mdmg) = if let Some(weapon) = attacker.weapon() {
+            let mdmg = weapon.compute_max_attack_damage();
             roll_bonus += weapon.hit_rate_bonus();
             if weapon.is_ranged() {
                 dmg_bonus += attacker.dex_attack_dmg_bonus();
@@ -468,16 +484,17 @@ impl Damage {
                 roll_bonus += attacker.hit_rate_bonus();
             }
             if let crate::world::item::ItemType::Weapon(wt) = weapon.get_type() {
-                (Some(wt), weapon.range())
+                (Some(wt), weapon.range(), mdmg)
             } else {
-                (None, 1)
+                (None, 1, mdmg)
             }
         } else {
+            let mdmg = attacker.compute_max_attack_damage(None);
             if let Object::Monster(_m) = attacker {
                 /// TODO actually get the range from the monster
-                (None, 17)
+                (None, 17, mdmg)
             } else {
-                (None, 1)
+                (None, 1, mdmg)
             }
         };
         if !attacker.use_weapon_ammunition() {
@@ -501,7 +518,9 @@ impl Damage {
         Some(Self {
             origin: attacker.get_location(),
             range,
-            atype: attacker.attack_type(),
+            damage: mdmg,
+            critical_damage: 25,
+            ///TODO
             attacker_poly: attacker.get_polymorph(),
             effects: attacker.get_effects().to_owned(),
             attack_roll_bonus: roll_bonus,
@@ -511,33 +530,75 @@ impl Damage {
         })
     }
 
-    /// Calculate the damage that might be applied, return true if the attack hit
+    /// Calculate the damage that might be applied, return Some if the attack hit
     pub fn run_damage(&mut self, attacked: &mut Object) -> Option<u16> {
+        use rand::Rng;
         if !self.should_hit(attacked) {
             return None;
         }
-        match self.atype {
-            BasicObjectType::Player => match attacked.attack_type() {
-                BasicObjectType::Player => {
-                    todo!()
-                }
-                BasicObjectType::Npc => todo!(),
-                BasicObjectType::Monster => todo!(),
-                BasicObjectType::Other => None,
-            },
-            BasicObjectType::Npc => match attacked.attack_type() {
-                BasicObjectType::Player => todo!(),
-                BasicObjectType::Npc => todo!(),
-                BasicObjectType::Monster => todo!(),
-                BasicObjectType::Other => None,
-            },
-            BasicObjectType::Monster => match attacked.attack_type() {
-                BasicObjectType::Player => todo!(),
-                BasicObjectType::Npc => todo!(),
-                BasicObjectType::Monster => todo!(),
-                BasicObjectType::Other => None,
-            },
-            BasicObjectType::Other => None,
+        let max_damage = attacked.compute_received_damage(self.damage) as i32;
+        let mut actual_damage = if Some(WeaponType::Claw) == self.weapon_type
+            && (rand::thread_rng().gen_range(1..=100) > self.critical_damage)
+        {
+            ///TODO apply sound effect 3671 for claw doing max damage
+            max_damage
+        } else if self.effects.contains(&Effect::SoulOfFlame) {
+            max_damage
+        } else if max_damage > 0 {
+            rand::thread_rng().gen_range(1..=max_damage)
+        } else {
+            0
+        };
+        /// TODO apply other weapon damage bonuses here
+        if Some(WeaponType::Edoryu) == self.weapon_type
+            && rand::thread_rng().gen_range(1..=100) > self.critical_damage
+        {
+            //TODO use sound effect 3398 for edoryu double damage
+            actual_damage *= 2;
+        }
+        /// TODO add weapon enchants damage
+        if self.effects.contains(&Effect::DoubleBreak)
+            && (Some(WeaponType::Edoryu) == self.weapon_type
+                || Some(WeaponType::Claw) == self.weapon_type)
+        {
+            if rand::thread_rng().gen_range(1..=100) <= 33 {
+                actual_damage *= 2;
+            }
+        }
+        // TODO Calculate destruction for great sword of destruction (item 262)
+        actual_damage = (actual_damage as i16 + self.damage_bonus as i16) as i32;
+        ///TODO calculate damage for bow vs now bow
+        ///TODO calculate damage for ammunition expended
+        let defender_effects = attacked.get_effects();
+        if defender_effects.contains(&Effect::DragonSkin) {
+            actual_damage -= 2;
+        }
+        if defender_effects.contains(&Effect::Patience) {
+            actual_damage -= 2;
+        }
+        if defender_effects.contains(&Effect::ImmuneToHarm) {
+            actual_damage /= 2;
+        }
+        if defender_effects.contains(&Effect::AbsoluteBarrier) {
+            actual_damage = 0;
+        }
+        if defender_effects.contains(&Effect::IceLance) {
+            actual_damage = 0;
+        }
+        if defender_effects.contains(&Effect::FreezingBlizzard) {
+            actual_damage = 0;
+        }
+        if defender_effects.contains(&Effect::FreezingBreath) {
+            actual_damage = 0;
+        }
+        if defender_effects.contains(&Effect::EarthBind) {
+            actual_damage = 0;
+        }
+        if actual_damage > 0 {
+            attacked.apply_damage(actual_damage as u16);
+            Some(actual_damage as u16)
+        } else {
+            None
         }
     }
 
@@ -633,8 +694,6 @@ pub struct Damage {
     origin: super::Location,
     /// The range of the attack
     range: u8,
-    /// The type of object doing the damage
-    atype: BasicObjectType,
     /// The roll for attack bonus by the attacker
     attack_roll_bonus: i16,
     /// The polymorph, if applicable of the attacker
@@ -643,8 +702,12 @@ pub struct Damage {
     effects: HashSet<Effect>,
     /// Damage bonus for the attacker
     damage_bonus: i8,
+    /// Critical damage rate
+    critical_damage: u8,
     /// Attacker crititical hit and miss values
     critical: (i16, i16),
     /// The weapon type
     weapon_type: Option<crate::world::item::WeaponType>,
+    /// The max damange for small and large objects
+    damage: (u16, u16),
 }

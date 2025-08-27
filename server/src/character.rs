@@ -165,6 +165,29 @@ impl crate::world::object::ObjectTrait for FullCharacter {
         self.location
     }
 
+    fn apply_damage(&mut self, dmg: u16) {
+        if self.details.curr_hp > dmg {
+            self.details.curr_hp -= dmg;
+        } else {
+            self.details.curr_hp = 0;
+        }
+    }
+
+    fn compute_received_damage(&self, d: (u16, u16)) -> u16 {
+        d.0
+    }
+
+    fn compute_max_attack_damage(
+        &self,
+        weapon: Option<&crate::world::item::WeaponInstance>,
+    ) -> (u16, u16) {
+        if let Some(w) = weapon {
+            w.compute_max_attack_damage()
+        } else {
+            (1, 1)
+        }
+    }
+
     fn get_polymorph(&self) -> Option<u32> {
         /// TODO
         None

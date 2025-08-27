@@ -378,6 +378,19 @@ impl ObjectTrait for ItemWithLocation {
         self.location
     }
 
+    fn compute_max_attack_damage(
+        &self,
+        _weapon: Option<&crate::world::item::WeaponInstance>,
+    ) -> (u16, u16) {
+        (0, 0)
+    }
+
+    fn apply_damage(&mut self, dmg: u16) {}
+
+    fn compute_received_damage(&self, d: (u16, u16)) -> u16 {
+        d.0
+    }
+
     fn get_polymorph(&self) -> Option<u32> {
         None
     }

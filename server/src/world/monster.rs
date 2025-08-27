@@ -287,6 +287,11 @@ impl MonsterRef {
             while let Ok(msg) = self.recv.try_recv() {
                 match msg {
                     super::WorldResponse::ServerPacket(p) => match p {
+                        common::packet::ServerPacket::NpcChat { id, message } => {}
+                        common::packet::ServerPacket::RegularChat { id, msg } => {}
+                        common::packet::ServerPacket::GlobalChat(m) => {}
+                        common::packet::ServerPacket::PartyChat(m) => {}
+                        common::packet::ServerPacket::PledgeChat(m) => {}
                         common::packet::ServerPacket::Attack {
                             attack_type,
                             id,
@@ -297,21 +302,6 @@ impl MonsterRef {
                         } => {
                             if self.reference.id.get_u32() == id2 {
                                 self.attacks.insert(WorldObjectId(id));
-                                let _ = sender
-                                    .send(WorldMessage {
-                                        data: crate::world::WorldMessageData::ClientPacket(
-                                            common::packet::ClientPacket::NpcChat {
-                                                id: self.reference.id.get_u32(),
-                                                message: "I'm being attacked".to_string(),
-                                            },
-                                        ),
-                                        sender: self.id,
-                                        peer: std::net::SocketAddr::V4(SocketAddrV4::new(
-                                            Ipv4Addr::new(127, 0, 0, 1),
-                                            1234,
-                                        )),
-                                    })
-                                    .await;
                             }
                         }
                         common::packet::ServerPacket::MoveObject {
@@ -469,8 +459,25 @@ impl super::ObjectTrait for Monster {
         self.location
     }
 
+    fn apply_damage(&mut self, dmg: u16) {
+        log::info!("Taking {} damage", dmg);
+    }
+
     fn get_polymorph(&self) -> Option<u32> {
         None
+    }
+
+    fn compute_max_attack_damage(
+        &self,
+        weapon: Option<&crate::world::item::WeaponInstance>,
+    ) -> (u16, u16) {
+        /// TODO
+        (1, 2)
+    }
+
+    fn compute_received_damage(&self, d: (u16, u16)) -> u16 {
+        ///TODO
+        d.0
     }
 
     fn apply_required_polymorph(&self, poly: Option<u32>, rate: &mut u8) {

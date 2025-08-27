@@ -4,7 +4,7 @@ use super::super::{ItemTrait, WorldObjectId};
 use super::{ElementalEnchantType, ItemStuff, ItemUsage};
 
 /// The types of weapons
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 #[repr(u8)]
 pub enum WeaponType {
     /// sword
@@ -212,6 +212,12 @@ impl WeaponInstance {
     /// Calculate the bonus to hit rate for the weapon
     pub fn hit_rate_bonus(&self) -> i16 {
         self.definition.hit_rate_bonus + self.bonus.hit_bonus() + self.enchanted as i16 / 2
+    }
+
+    /// compute the maximum damage for the weapon with small and large objects
+    pub fn compute_max_attack_damage(&self) -> (u16, u16) {
+        /// TODO
+        (1, 1)
     }
 
     /// Is the weapon a ranged weapon
