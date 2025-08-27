@@ -1,6 +1,6 @@
 //! NPC related code
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::character::Location;
 
@@ -117,6 +117,7 @@ impl NpcSpawn {
             icon: npc.graphics_id,
             name: npc.name.clone(),
             light_size: npc.light_size,
+            effects: HashSet::new(),
         }
     }
 }
@@ -136,11 +137,17 @@ pub struct Npc {
     light_size: u8,
     /// the icon for displaying the npc
     icon: u16,
+    /// The list of current effects
+    effects: HashSet<crate::world::object::Effect>,
 }
 
 impl super::object::ObjectTrait for Npc {
     fn get_location(&self) -> crate::character::Location {
         self.location
+    }
+
+    fn get_effects(&self) -> &HashSet<crate::world::object::Effect> {
+        &self.effects
     }
 
     fn other_hit_rate_bonus(&self) -> i16 {

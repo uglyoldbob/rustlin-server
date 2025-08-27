@@ -5,10 +5,194 @@ use std::{
     hash::RandomState,
 };
 
-use crate::{
-    character::FullCharacter,
-    world::{item::Weapon, World, WorldObjectId},
-};
+use crate::{character::FullCharacter, world::WorldObjectId};
+
+/// The effects that can be on an object
+#[derive(PartialEq, Eq, Hash, Debug)]
+pub enum Effect {
+    // absolute barrier
+    AbsoluteBarrier,
+    /// Additional fire
+    AdditionalFire,
+    /// area of silence
+    AreaSilence,
+    /// Barlog?
+    Barlog,
+    /// Berserkers
+    Berserkers,
+    /// Blind
+    Blind,
+    /// Blind hiding
+    BlindHiding,
+    /// bloodlust
+    BloodLust,
+    /// blue potion
+    BluePotion,
+    /// bounce attack
+    BounceAttack,
+    // brave
+    Brave,
+    /// Burning spirit
+    BurningSpirit,
+    /// burning weapon
+    BurningWeapon,
+    /// concentration
+    Concentration,
+    /// cooking
+    Cooking,
+    /// cooking
+    Cooking1N,
+    //// cooking
+    Cooking1S,
+    /// cooking
+    Cooking2N,
+    //// cooking
+    Cooking2S,
+    /// cooking
+    Cooking3N,
+    //// cooking
+    Cooking3S,
+    /// Counter barrier
+    CounterBarrier,
+    /// Counter magic
+    CounterMagic,
+    /// cube stuff
+    CubeBalance,
+    /// cube stuff
+    CubeIgnition,
+    /// cube stuff
+    CubeQuake,
+    /// cube stuff
+    CubeShock,
+    /// Darkness
+    Darkness,
+    /// Decay potion
+    DecayPotion,
+    /// Decrease weight
+    DecreaseWeight,
+    /// double break
+    DoubleBreak,
+    /// dragon skin
+    DragonSkin,
+    /// dress evasion
+    DressEvasion,
+    /// earth bind
+    EarthBind,
+    /// elemental fire
+    ElementalFire,
+    /// elemental protection
+    ElementalProtection,
+    /// elf brave
+    ElfBrave,
+    /// enchant venom
+    EnchantVenom,
+    /// Entangle
+    Entangle,
+    /// Erase magic
+    EraseMagic,
+    /// Exotic vitalize
+    ExoticVitalize,
+    /// Fire bless
+    FireBless,
+    /// fire weapon
+    FireWeapon,
+    /// Floating eye
+    FloatingEye,
+    /// freeze
+    Freeze,
+    /// freezing blizzard
+    FreezingBlizzard,
+    /// freezing breath
+    FreezingBreath,
+    /// greater haste
+    GreaterHaste,
+    /// Haste
+    Haste,
+    /// holy mithril powder
+    HolyMithrilPowder,
+    /// holy walk
+    HolyWalk,
+    /// Holy water
+    HolyWater,
+    /// Holy water of eva
+    HolyWaterEva,
+    /// ice lance
+    IceLance,
+    /// illisionist avatar
+    IllusionistAvatar,
+    /// immune to harm
+    ImmuneToHarm,
+    /// invisibility
+    Invisibility,
+    /// joy of pain
+    JoyOfPain,
+    /// light
+    Light,
+    /// mass slow
+    MassSlow,
+    /// meditation
+    Meditation,
+    /// Mirror image
+    MirrorImage,
+    /// mortal body
+    MortalBody,
+    /// moving acceleration
+    MovingAcceleration,
+    // Natures touch
+    NaturesTouch,
+    /// No chat allowed
+    NoChat,
+    /// patience
+    Patience,
+    /// poison
+    Poison,
+    /// poison paralyzed
+    PoisonParalyzed,
+    /// poison paralyzing
+    PoisonParalyzing,
+    /// poison silence
+    PoisonSilence,
+    /// pollute water
+    PolluteWater,
+    /// poly effect
+    PolyEffect,
+    /// Polymorph
+    Polymorph,
+    /// Reduction armor
+    ReductionArmor,
+    /// resist fear
+    ResistFear,
+    /// ri brave?
+    RiBrave,
+    /// shock stun
+    ShockStun,
+    /// silence
+    Silence,
+    /// Slow
+    Slow,
+    /// Solid carriage
+    SolidCarriage,
+    /// soul of flame
+    SoulOfFlame,
+    // Striker gale
+    StrikerGale,
+    /// uncanny dodge
+    UncannyDodge,
+    /// UnderwaterBreath
+    UnderwaterBreath,
+    /// venom resist
+    VenomResist,
+    /// water life
+    WaterLife,
+    /// wind walk
+    WindWalk,
+    /// Wind shackle
+    WindShackle,
+    /// Wisdom potion
+    WisdomPotion,
+    /// Yahee
+    Yahee,
+}
 
 /// A helper struct for managin a list of objects known to a player
 #[derive(Debug)]
@@ -197,6 +381,9 @@ pub trait ObjectTrait {
     fn weight_percentage(&self) -> f32 {
         (self.get_weight() as f32 / self.max_weight() as f32).min(1.0)
     }
+
+    /// The list of effects currently in place for the object
+    fn get_effects(&self) -> &HashSet<Effect>;
 }
 
 /// The things that an object can be

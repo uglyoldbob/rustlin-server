@@ -14,12 +14,6 @@ pub struct Client {
     packet_writer: ServerPacketSender,
     /// The id for the game client
     id: Option<u32>,
-    /// The account for the client
-    account: Option<UserAccount>,
-    /// The possible characters for the client
-    chars: Vec<crate::character::Character>,
-    /// The player reference
-    char_ref: Option<ObjectRef>,
     /// The world object sender
     world_sender: tokio::sync::mpsc::Sender<WorldMessage>,
     /// The remote peer
@@ -41,9 +35,6 @@ impl Client {
     ) -> Self {
         Self {
             packet_writer,
-            account: None,
-            chars: Vec::new(),
-            char_ref: None,
             world_sender,
             id: None,
             peer,
@@ -70,41 +61,6 @@ impl Client {
                 })
                 .await;
         }
-    }
-
-    /// Send a packet to the client
-    pub fn queue_packet(&mut self, data: ServerPacket) {
-        self.packet_writer.queue_packet(data)
-    }
-
-    /// Delete the character with the specified name
-    pub fn delete_char(
-        &mut self,
-        name: &str,
-        mysql: &mut mysql::PooledConn,
-    ) -> Result<(), mysql::Error> {
-        let mut i = None;
-        for (index, c) in self.chars.iter_mut().enumerate() {
-            if c.name() == name {
-                c.delete_char(mysql)?;
-                i = Some(index);
-                break;
-            }
-        }
-        if let Some(i) = i {
-            self.chars.remove(i);
-        }
-        Ok(())
-    }
-
-    /// find a character by name, returning the character index
-    pub fn find_char(&self, name: &str) -> Option<usize> {
-        for (i, c) in self.chars.iter().enumerate() {
-            if c.name() == name {
-                return Some(i);
-            }
-        }
-        None
     }
 
     /// Process a single packet from the game client

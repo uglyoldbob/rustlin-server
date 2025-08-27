@@ -171,6 +171,7 @@ impl MonsterSpawn {
             spawn: self.clone(),
             send: chan.0,
             recv: Some(chan.1),
+            effects: HashSet::new(),
         }
     }
 }
@@ -419,6 +420,8 @@ pub struct Monster {
     send: tokio::sync::mpsc::Sender<WorldResponse>,
     /// The temporary receiver from the world
     recv: Option<tokio::sync::mpsc::Receiver<WorldResponse>>,
+    /// The list of current effects
+    effects: HashSet<crate::world::object::Effect>,
 }
 
 impl Monster {
@@ -442,6 +445,10 @@ impl Monster {
 impl super::ObjectTrait for Monster {
     fn get_location(&self) -> crate::character::Location {
         self.location
+    }
+
+    fn get_effects(&self) -> &HashSet<crate::world::object::Effect> {
+        &self.effects
     }
 
     fn other_hit_rate_bonus(&self) -> i16 {

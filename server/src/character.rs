@@ -1,6 +1,9 @@
 //! Code for representing characters played by users
 
-use std::{collections::HashMap, convert::TryInto};
+use std::{
+    collections::{HashMap, HashSet},
+    convert::TryInto,
+};
 
 use common::packet::{ServerPacket, ServerPacketSender};
 use mysql::{prelude::Queryable, Params};
@@ -65,6 +68,8 @@ pub struct FullCharacter {
     sender: Option<tokio::sync::mpsc::Sender<crate::world::WorldResponse>>,
     /// Character location
     location: Location,
+    /// The list of current effects
+    effects: HashSet<crate::world::object::Effect>,
 }
 
 /// Represents a partial playable character in the game
@@ -150,6 +155,7 @@ impl PartialCharacter {
             known_objects: ObjectList::new(),
             sender: None,
             location: self.location,
+            effects: HashSet::new(),
         }
     }
 }
@@ -157,6 +163,10 @@ impl PartialCharacter {
 impl crate::world::object::ObjectTrait for FullCharacter {
     fn get_location(&self) -> crate::character::Location {
         self.location
+    }
+
+    fn get_effects(&self) -> &HashSet<crate::world::object::Effect> {
+        &self.effects
     }
 
     fn other_hit_rate_bonus(&self) -> i16 {

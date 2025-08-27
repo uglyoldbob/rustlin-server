@@ -9,7 +9,7 @@ pub use etc::*;
 mod weapon;
 pub use weapon::*;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::world::{object::ObjectTrait, WorldObjectId};
 
@@ -357,11 +357,17 @@ pub struct ItemWithLocation {
     location: crate::character::Location,
     /// The item on that spot of the map
     item: Item,
+    /// The dummy list of effects
+    effects: HashSet<crate::world::object::Effect>,
 }
 
 impl ObjectTrait for ItemWithLocation {
     fn get_location(&self) -> crate::character::Location {
         self.location
+    }
+
+    fn get_effects(&self) -> &HashSet<crate::world::object::Effect> {
+        &self.effects
     }
 
     fn other_hit_rate_bonus(&self) -> i16 {
