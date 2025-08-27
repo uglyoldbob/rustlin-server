@@ -392,18 +392,29 @@ impl World {
                             if let Some(r) = self.characters.get(&sender) {
                                 if let Some(re) = self.object_ref_table.get(r) {
                                     if let Some(map) = self.map_info.get_mut(&re.map) {
-                                        let amsg =
-                                            format!("[{}] {}", map.get_name(*re).unwrap(), msg);
-                                        let chatter_location = map.get_location(*re).unwrap();
-                                        for (id, o) in map.objects_iter() {
-                                            if o.linear_distance(&chatter_location) < 30.0 {
-                                                if let Some(se) = o.sender() {
-                                                    se.blocking_send(WorldResponse::ServerPacket(
-                                                        ServerPacket::NpcChat {
-                                                            id: 0,
-                                                            message: amsg.clone(),
-                                                        },
-                                                    ));
+                                        let effects = map.get_object(*re).map(|o| o.get_effects());
+                                        if let Some(effects) = effects {
+                                            if !effects.contains(&object::Effect::NoChat) {
+                                                let amsg = format!(
+                                                    "[{}] {}",
+                                                    map.get_name(*re).unwrap(),
+                                                    msg
+                                                );
+                                                let chatter_location =
+                                                    map.get_location(*re).unwrap();
+                                                for (id, o) in map.objects_iter() {
+                                                    if o.linear_distance(&chatter_location) < 30.0 {
+                                                        if let Some(se) = o.sender() {
+                                                            se.blocking_send(
+                                                                WorldResponse::ServerPacket(
+                                                                    ServerPacket::NpcChat {
+                                                                        id: 0,
+                                                                        message: amsg.clone(),
+                                                                    },
+                                                                ),
+                                                            );
+                                                        }
+                                                    }
                                                 }
                                             }
                                         }
@@ -417,18 +428,29 @@ impl World {
                             if let Some(r) = self.characters.get(&sender) {
                                 if let Some(re) = self.object_ref_table.get(r) {
                                     if let Some(map) = self.map_info.get_mut(&re.map) {
-                                        let amsg =
-                                            format!("[{}] {}", map.get_name(*re).unwrap(), msg);
-                                        let chatter_location = map.get_location(*re).unwrap();
-                                        for (id, o) in map.objects_iter() {
-                                            if o.linear_distance(&chatter_location) < 60.0 {
-                                                if let Some(se) = o.sender() {
-                                                    se.blocking_send(WorldResponse::ServerPacket(
-                                                        ServerPacket::NpcShout {
-                                                            id: 0,
-                                                            message: amsg.clone(),
-                                                        },
-                                                    ));
+                                        let effects = map.get_object(*re).map(|o| o.get_effects());
+                                        if let Some(effects) = effects {
+                                            if !effects.contains(&object::Effect::NoChat) {
+                                                let amsg = format!(
+                                                    "[{}] {}",
+                                                    map.get_name(*re).unwrap(),
+                                                    msg
+                                                );
+                                                let chatter_location =
+                                                    map.get_location(*re).unwrap();
+                                                for (id, o) in map.objects_iter() {
+                                                    if o.linear_distance(&chatter_location) < 60.0 {
+                                                        if let Some(se) = o.sender() {
+                                                            se.blocking_send(
+                                                                WorldResponse::ServerPacket(
+                                                                    ServerPacket::NpcShout {
+                                                                        id: 0,
+                                                                        message: amsg.clone(),
+                                                                    },
+                                                                ),
+                                                            );
+                                                        }
+                                                    }
                                                 }
                                             }
                                         }
@@ -442,17 +464,25 @@ impl World {
                             if let Some(r) = self.characters.get(&sender) {
                                 if let Some(re) = self.object_ref_table.get(r) {
                                     if let Some(map) = self.map_info.get_mut(&re.map) {
-                                        let name = map.get_name(*re).unwrap();
-                                        let amsg = format!("[{}] {}", name, msg);
-                                        let chatter_location = map.get_location(*re).unwrap();
-                                        for (oid, o) in map.objects_iter() {
-                                            if let Some(se) = o.sender() {
-                                                se.blocking_send(WorldResponse::ServerPacket(
-                                                    ServerPacket::NpcGlobalChat {
-                                                        id,
-                                                        message: amsg.clone(),
-                                                    },
-                                                ));
+                                        let effects = map.get_object(*re).map(|o| o.get_effects());
+                                        if let Some(effects) = effects {
+                                            if !effects.contains(&object::Effect::NoChat) {
+                                                let name = map.get_name(*re).unwrap();
+                                                let amsg = format!("[{}] {}", name, msg);
+                                                let chatter_location =
+                                                    map.get_location(*re).unwrap();
+                                                for (oid, o) in map.objects_iter() {
+                                                    if let Some(se) = o.sender() {
+                                                        se.blocking_send(
+                                                            WorldResponse::ServerPacket(
+                                                                ServerPacket::NpcGlobalChat {
+                                                                    id,
+                                                                    message: amsg.clone(),
+                                                                },
+                                                            ),
+                                                        );
+                                                    }
+                                                }
                                             }
                                         }
                                     }
@@ -462,15 +492,19 @@ impl World {
                     }
                     ClientPacket::AttackObject { id, x, y } => {
                         if let Some(sender) = m.sender {
-                            if let Some(myid) = self.characters.get(&sender) {
-                                let damage = self.get_object_ref(*myid).map(|o| Damage::new(o));
-                                if let Some(mut dmg) = damage {
-                                    if let Some(re) = self.object_ref_table.get(myid) {
+                            if let Some(myid) = self.characters.get(&sender).cloned() {
+                                let damage = self.get_object_mut(myid).map(|o| Damage::new(o));
+                                if let Some(dmg) = damage {
+                                    if let Some(re) = self.object_ref_table.get(&myid) {
                                         if let Some(map) = self.map_info.get_mut(&re.map) {
                                             let result_dmg = if let Some(o) =
                                                 map.get_object_mut_from_id(WorldObjectId(id))
                                             {
-                                                dmg.run_damage(o)
+                                                if let Some(mut dmg) = dmg {
+                                                    dmg.run_damage(o)
+                                                } else {
+                                                    None
+                                                }
                                             } else {
                                                 None
                                             };
@@ -824,18 +858,29 @@ impl World {
                             if let Some(r) = self.characters.get(&sender) {
                                 if let Some(re) = self.object_ref_table.get(r) {
                                     if let Some(map) = self.map_info.get_mut(&re.map) {
-                                        let amsg =
-                                            format!("[{}] {}", map.get_name(*re).unwrap(), msg);
-                                        let chatter_location = map.get_location(*re).unwrap();
-                                        for (id, o) in map.objects_iter() {
-                                            if o.linear_distance(&chatter_location) < 30.0 {
-                                                if let Some(se) = o.sender() {
-                                                    se.blocking_send(WorldResponse::ServerPacket(
-                                                        ServerPacket::RegularChat {
-                                                            id: 0,
-                                                            msg: amsg.clone(),
-                                                        },
-                                                    ));
+                                        let effects = map.get_object(*re).map(|o| o.get_effects());
+                                        if let Some(effects) = effects {
+                                            if !effects.contains(&object::Effect::NoChat) {
+                                                let amsg = format!(
+                                                    "[{}] {}",
+                                                    map.get_name(*re).unwrap(),
+                                                    msg
+                                                );
+                                                let chatter_location =
+                                                    map.get_location(*re).unwrap();
+                                                for (id, o) in map.objects_iter() {
+                                                    if o.linear_distance(&chatter_location) < 30.0 {
+                                                        if let Some(se) = o.sender() {
+                                                            se.blocking_send(
+                                                                WorldResponse::ServerPacket(
+                                                                    ServerPacket::RegularChat {
+                                                                        id: 0,
+                                                                        msg: amsg.clone(),
+                                                                    },
+                                                                ),
+                                                            );
+                                                        }
+                                                    }
                                                 }
                                             }
                                         }
@@ -849,20 +894,28 @@ impl World {
                             if let Some(r) = self.characters.get(&sender) {
                                 if let Some(re) = self.object_ref_table.get(r) {
                                     if let Some(map) = self.map_info.get_mut(&re.map) {
-                                        let name = map.get_name(*re).unwrap();
-                                        let amsg = format!("[{}] {}", name, msg);
-                                        let chatter_location = map.get_location(*re).unwrap();
-                                        for (id, o) in map.objects_iter() {
-                                            if o.linear_distance(&chatter_location) < 60.0 {
-                                                if let Some(se) = o.sender() {
-                                                    se.blocking_send(WorldResponse::ServerPacket(
-                                                        ServerPacket::YellChat {
-                                                            id: 0,
-                                                            msg: amsg.clone(),
-                                                            x: chatter_location.x,
-                                                            y: chatter_location.y,
-                                                        },
-                                                    ));
+                                        let effects = map.get_object(*re).map(|o| o.get_effects());
+                                        if let Some(effects) = effects {
+                                            if !effects.contains(&object::Effect::NoChat) {
+                                                let name = map.get_name(*re).unwrap();
+                                                let amsg = format!("[{}] {}", name, msg);
+                                                let chatter_location =
+                                                    map.get_location(*re).unwrap();
+                                                for (id, o) in map.objects_iter() {
+                                                    if o.linear_distance(&chatter_location) < 60.0 {
+                                                        if let Some(se) = o.sender() {
+                                                            se.blocking_send(
+                                                                WorldResponse::ServerPacket(
+                                                                    ServerPacket::YellChat {
+                                                                        id: 0,
+                                                                        msg: amsg.clone(),
+                                                                        x: chatter_location.x,
+                                                                        y: chatter_location.y,
+                                                                    },
+                                                                ),
+                                                            );
+                                                        }
+                                                    }
                                                 }
                                             }
                                         }
@@ -876,14 +929,24 @@ impl World {
                             if let Some(r) = self.characters.get(&sender) {
                                 if let Some(re) = self.object_ref_table.get(r) {
                                     if let Some(map) = self.map_info.get_mut(&re.map) {
-                                        let name = map.get_name(*re).unwrap();
-                                        let amsg = format!("[{}] {}", name, msg);
-                                        let chatter_location = map.get_location(*re).unwrap();
-                                        for (id, o) in map.objects_iter() {
-                                            if let Some(se) = o.sender() {
-                                                se.blocking_send(WorldResponse::ServerPacket(
-                                                    ServerPacket::PartyChat(amsg.clone()),
-                                                ));
+                                        let effects = map.get_object(*re).map(|o| o.get_effects());
+                                        if let Some(effects) = effects {
+                                            if !effects.contains(&object::Effect::NoChat) {
+                                                let name = map.get_name(*re).unwrap();
+                                                let amsg = format!("[{}] {}", name, msg);
+                                                let chatter_location =
+                                                    map.get_location(*re).unwrap();
+                                                for (id, o) in map.objects_iter() {
+                                                    if let Some(se) = o.sender() {
+                                                        se.blocking_send(
+                                                            WorldResponse::ServerPacket(
+                                                                ServerPacket::PartyChat(
+                                                                    amsg.clone(),
+                                                                ),
+                                                            ),
+                                                        );
+                                                    }
+                                                }
                                             }
                                         }
                                     }
@@ -896,14 +959,24 @@ impl World {
                             if let Some(r) = self.characters.get(&sender) {
                                 if let Some(re) = self.object_ref_table.get(r) {
                                     if let Some(map) = self.map_info.get_mut(&re.map) {
-                                        let name = map.get_name(*re).unwrap();
-                                        let amsg = format!("[{}] {}", name, msg);
-                                        let chatter_location = map.get_location(*re).unwrap();
-                                        for (id, o) in map.objects_iter() {
-                                            if let Some(se) = o.sender() {
-                                                se.blocking_send(WorldResponse::ServerPacket(
-                                                    ServerPacket::PledgeChat(amsg.clone()),
-                                                ));
+                                        let effects = map.get_object(*re).map(|o| o.get_effects());
+                                        if let Some(effects) = effects {
+                                            if !effects.contains(&object::Effect::NoChat) {
+                                                let name = map.get_name(*re).unwrap();
+                                                let amsg = format!("[{}] {}", name, msg);
+                                                let chatter_location =
+                                                    map.get_location(*re).unwrap();
+                                                for (id, o) in map.objects_iter() {
+                                                    if let Some(se) = o.sender() {
+                                                        se.blocking_send(
+                                                            WorldResponse::ServerPacket(
+                                                                ServerPacket::PledgeChat(
+                                                                    amsg.clone(),
+                                                                ),
+                                                            ),
+                                                        );
+                                                    }
+                                                }
                                             }
                                         }
                                     }
@@ -916,37 +989,47 @@ impl World {
                             if let Some(r) = self.characters.get(&sender) {
                                 if let Some(re) = self.object_ref_table.get(r) {
                                     if let Some(map) = self.map_info.get_mut(&re.map) {
-                                        let sender_name = map.get_name(*re).unwrap();
-                                        let amsg = format!("[{}] {}", sender_name, msg);
-                                        let chatter_location = map.get_location(*re).unwrap();
-                                        let mut found_player = false;
-                                        for (id, o) in map.objects_iter() {
-                                            if let Some(receiver_name) = o.player_name() {
-                                                if receiver_name == n {
-                                                    if let Some(se) = o.sender() {
-                                                        se.blocking_send(
-                                                            WorldResponse::ServerPacket(
-                                                                ServerPacket::WhisperChat {
-                                                                    name: sender_name,
-                                                                    msg: msg.clone(),
-                                                                },
-                                                            ),
-                                                        );
-                                                        found_player = true;
-                                                        break;
+                                        let effects = map.get_object(*re).map(|o| o.get_effects());
+                                        if let Some(effects) = effects {
+                                            if !effects.contains(&object::Effect::NoChat) {
+                                                let sender_name = map.get_name(*re).unwrap();
+                                                let amsg = format!("[{}] {}", sender_name, msg);
+                                                let chatter_location =
+                                                    map.get_location(*re).unwrap();
+                                                let mut found_player = false;
+                                                for (id, o) in map.objects_iter() {
+                                                    if let Some(receiver_name) = o.player_name() {
+                                                        if receiver_name == n {
+                                                            if let Some(se) = o.sender() {
+                                                                se.blocking_send(
+                                                                    WorldResponse::ServerPacket(
+                                                                        ServerPacket::WhisperChat {
+                                                                            name: sender_name,
+                                                                            msg: msg.clone(),
+                                                                        },
+                                                                    ),
+                                                                );
+                                                                found_player = true;
+                                                                break;
+                                                            }
+                                                        }
                                                     }
                                                 }
-                                            }
-                                        }
-                                        if !found_player {
-                                            if let Some(sender) = m.sender {
-                                                if let Some(se) = self.object_senders.get(&sender) {
-                                                    se.blocking_send(WorldResponse::ServerPacket(
-                                                        ServerPacket::Message {
-                                                            ty: 73,
-                                                            msgs: vec![n],
-                                                        },
-                                                    ));
+                                                if !found_player {
+                                                    if let Some(sender) = m.sender {
+                                                        if let Some(se) =
+                                                            self.object_senders.get(&sender)
+                                                        {
+                                                            se.blocking_send(
+                                                                WorldResponse::ServerPacket(
+                                                                    ServerPacket::Message {
+                                                                        ty: 73,
+                                                                        msgs: vec![n],
+                                                                    },
+                                                                ),
+                                                            );
+                                                        }
+                                                    }
                                                 }
                                             }
                                         }
@@ -960,14 +1043,24 @@ impl World {
                             if let Some(r) = self.characters.get(&sender) {
                                 if let Some(re) = self.object_ref_table.get(r) {
                                     if let Some(map) = self.map_info.get_mut(&re.map) {
-                                        let name = map.get_name(*re).unwrap();
-                                        let amsg = format!("[{}] {}", name, msg);
-                                        let chatter_location = map.get_location(*re).unwrap();
-                                        for (id, o) in map.objects_iter() {
-                                            if let Some(se) = o.sender() {
-                                                se.blocking_send(WorldResponse::ServerPacket(
-                                                    ServerPacket::GlobalChat(amsg.clone()),
-                                                ));
+                                        let effects = map.get_object(*re).map(|o| o.get_effects());
+                                        if let Some(effects) = effects {
+                                            if !effects.contains(&object::Effect::NoChat) {
+                                                let name = map.get_name(*re).unwrap();
+                                                let amsg = format!("[{}] {}", name, msg);
+                                                let chatter_location =
+                                                    map.get_location(*re).unwrap();
+                                                for (id, o) in map.objects_iter() {
+                                                    if let Some(se) = o.sender() {
+                                                        se.blocking_send(
+                                                            WorldResponse::ServerPacket(
+                                                                ServerPacket::GlobalChat(
+                                                                    amsg.clone(),
+                                                                ),
+                                                            ),
+                                                        );
+                                                    }
+                                                }
                                             }
                                         }
                                     }

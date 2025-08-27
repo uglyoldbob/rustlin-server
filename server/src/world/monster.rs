@@ -442,13 +442,105 @@ impl Monster {
     }
 }
 
+impl Monster {
+    /// Npc that needs holy water effect to attack them
+    const NEEDS_HOLY_WATER: std::ops::RangeInclusive<u32> = 45912..=45915;
+    /// Monster that needs mithril powder to attack
+    const NEEDS_MITHRIL_POWDER: u32 = 45916;
+    /// Monster that needs holy water of eva to attack
+    const NEEDS_EVA_WATER: u32 = 45941;
+    /// Npc that need barlog status to attack
+    const NEEDS_BARLOG: std::ops::RangeInclusive<u32> = 45752..=45753;
+}
+
+lazy_static::lazy_static! {
+    /// Npc that need yahee status to attack
+    static ref NEEDS_YAHEE: HashSet<u32> = {
+        let mut h = HashSet::new();
+        for v in [45675, 81082, 45625, 45674, 45685] {
+            h.insert(v);
+        }
+        h
+    };
+}
+
 impl super::ObjectTrait for Monster {
     fn get_location(&self) -> crate::character::Location {
         self.location
     }
 
+    fn get_polymorph(&self) -> Option<u32> {
+        None
+    }
+
+    fn apply_required_polymorph(&self, poly: Option<u32>, rate: &mut u8) {
+        if (46068..=46091).contains(&self.spawn.id) {
+            if let Some(6035) = poly {
+            } else {
+                *rate = 0;
+            }
+        }
+        if (46092..=46106).contains(&self.spawn.id) {
+            if let Some(6034) = poly {
+            } else {
+                *rate = 0;
+            }
+        }
+    }
+
+    fn apply_required_status(
+        &self,
+        effects: &HashSet<crate::world::object::Effect>,
+        rate: &mut u8,
+    ) {
+        if Self::NEEDS_HOLY_WATER.contains(&self.spawn.id)
+            && !effects.contains(&super::object::Effect::HolyWater)
+        {
+            *rate = 0;
+        }
+        if self.spawn.id == Self::NEEDS_MITHRIL_POWDER
+            && !effects.contains(&super::object::Effect::HolyMithrilPowder)
+        {
+            *rate = 0;
+        }
+        if self.spawn.id == Self::NEEDS_EVA_WATER
+            && !effects.contains(&super::object::Effect::HolyWaterEva)
+        {
+            *rate = 0;
+        }
+        if Self::NEEDS_BARLOG.contains(&self.spawn.id)
+            && !effects.contains(&super::object::Effect::Barlog)
+        {
+            *rate = 0;
+        }
+        if NEEDS_YAHEE.contains(&self.spawn.id) && !effects.contains(&super::object::Effect::Yahee)
+        {
+            *rate = 0;
+        }
+    }
+
+    fn dex_attack_dmg_bonus(&self) -> i8 {
+        0
+    }
+
+    fn str_attack_dmg_bonus(&self) -> i8 {
+        0
+    }
+
+    fn use_weapon_ammunition(&mut self) -> bool {
+        true
+    }
+
+    fn get_evasive_rating(&self) -> u8 {
+        0
+    }
+
     fn get_effects(&self) -> &HashSet<crate::world::object::Effect> {
         &self.effects
+    }
+
+    fn effects_mut(&mut self) -> &mut HashSet<super::object::Effect> {
+        &mut self.effects
     }
 
     fn other_hit_rate_bonus(&self) -> i16 {

@@ -3,6 +3,59 @@
 use super::{ItemStuff, ItemTrait, ItemUsage};
 use crate::world::WorldObjectId;
 
+/// The type of armor
+#[derive(Copy, Clone, Debug)]
+#[repr(u8)]
+pub enum ArmorType {
+    /// No armor
+    None = 0,
+    /// Helmet
+    Helmet = 1,
+    /// Plain armor
+    Plain = 2,
+    /// ?
+    T = 3,
+    /// A cloak
+    Cloak = 4,
+    /// Gloves
+    Gloves = 5,
+    /// Boots
+    Boots = 6,
+    /// Shield
+    Shield = 7,
+    /// Amulet
+    Amulet = 8,
+    /// Ring
+    Ring = 9,
+    /// Belt
+    Belt = 10,
+    /// Earring
+    Earring = 12,
+    /// Guarder
+    Guarder = 13,
+}
+
+impl From<String> for ArmorType {
+    fn from(value: String) -> Self {
+        match value.as_str() {
+            "none" => Self::None,
+            "helmet" => Self::Helmet,
+            "armor" => Self::Plain,
+            "T" => Self::T,
+            "cloak" => Self::Cloak,
+            "gloves" => Self::Gloves,
+            "boots" => Self::Boots,
+            "shield" => Self::Shield,
+            "amulet" => Self::Amulet,
+            "ring" => Self::Ring,
+            "belt" => Self::Belt,
+            "earring" => Self::Earring,
+            "guarder" => Self::Guarder,
+            _ => panic!(),
+        }
+    }
+}
+
 /// A definition for a piece of armor
 #[derive(Clone, Debug)]
 pub struct Armor {
@@ -20,6 +73,8 @@ pub struct Armor {
     identified: String,
     /// Maximum use time
     max_use_time: u32,
+    /// The armor type
+    atype: ArmorType,
 }
 
 impl Armor {
@@ -37,6 +92,7 @@ impl mysql::prelude::FromRow for Armor {
     where
         Self: Sized,
     {
+        let at: String = row.get("type").ok_or(mysql::FromRowError(row.clone()))?;
         Ok(Self {
             id: row.get(0).ok_or(mysql::FromRowError(row.clone()))?,
             weight: row.get(6).ok_or(mysql::FromRowError(row.clone()))?,
@@ -45,6 +101,7 @@ impl mysql::prelude::FromRow for Armor {
             unidentified: row.get(2).ok_or(mysql::FromRowError(row.clone()))?,
             identified: row.get(3).ok_or(mysql::FromRowError(row.clone()))?,
             max_use_time: row.get(43).ok_or(mysql::FromRowError(row.clone()))?,
+            atype: at.into(),
         })
     }
 }
@@ -61,6 +118,10 @@ pub struct ArmorInstance {
 impl ItemTrait for ArmorInstance {
     fn world_id(&self) -> WorldObjectId {
         self.world_id
+    }
+
+    fn get_type(&self) -> super::ItemType {
+        super::ItemType::Armor(self.definition.atype)
     }
 
     fn weight(&self) -> u32 {

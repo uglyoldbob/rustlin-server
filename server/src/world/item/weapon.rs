@@ -3,6 +3,92 @@
 use super::super::{ItemTrait, WorldObjectId};
 use super::{ElementalEnchantType, ItemStuff, ItemUsage};
 
+/// The types of weapons
+#[derive(Copy, Clone, Debug)]
+#[repr(u8)]
+pub enum WeaponType {
+    /// sword
+    Sword = 1,
+    /// dagger
+    Dagger = 2,
+    /// Two handed sword
+    TwoHandSword = 3,
+    /// bow
+    Bow = 4,
+    /// spear
+    Spear = 5,
+    /// a blunt weapon
+    Blunt = 6,
+    /// A staff
+    Staff = 7,
+    /// gauntlet
+    Gauntlet = 10,
+    /// A claw
+    Claw = 11,
+    /// Edoryu
+    Edoryu = 12,
+    /// Single bow
+    SingleBow = 13,
+    /// Signle spear
+    SingleSpear = 14,
+    /// Two handed blunt weapon
+    TwoHandBlunt = 15,
+    /// Two handed staff
+    TwoHandStaff = 16,
+    /// Kiringku?
+    Kiringku = 17,
+    /// chain sword
+    ChainSword = 18,
+}
+
+impl WeaponType {
+    /// Get the weapon id
+    pub fn get_id(&self) -> u16 {
+        match self {
+            WeaponType::Sword => 4,
+            WeaponType::Dagger => 46,
+            WeaponType::TwoHandSword => 50,
+            WeaponType::Bow => 20,
+            WeaponType::Spear => 24,
+            WeaponType::Blunt => 11,
+            WeaponType::Staff => 40,
+            WeaponType::Gauntlet => 62,
+            WeaponType::Claw => 58,
+            WeaponType::Edoryu => 54,
+            WeaponType::SingleBow => 20,
+            WeaponType::SingleSpear => 24,
+            WeaponType::TwoHandBlunt => 1,
+            WeaponType::TwoHandStaff => 40,
+            WeaponType::Kiringku => 58,
+            WeaponType::ChainSword => 24,
+        }
+    }
+}
+
+impl From<String> for WeaponType {
+    fn from(value: String) -> Self {
+        match value.as_str() {
+            "sword" => Self::Sword,
+            "dagger" => Self::Dagger,
+            "tohandsword" => Self::TwoHandSword,
+            "bow" => Self::Bow,
+            "spear" => Self::Spear,
+            "blunt" => Self::Blunt,
+            "staff" => Self::Staff,
+            "gauntlet" => Self::Gauntlet,
+            "claw" => Self::Claw,
+            "edoryu" => Self::Edoryu,
+            "singlebow" => Self::SingleBow,
+            "singlespear" => Self::SingleSpear,
+            "tohandblunt" => Self::TwoHandBlunt,
+            "tohandstaff" => Self::TwoHandStaff,
+            "kiringku" => Self::Kiringku,
+            "chainsword" => Self::ChainSword,
+            _ => panic!(),
+        }
+    }
+}
+
 /// A weapon definition
 #[derive(Clone, Debug)]
 pub struct Weapon {
@@ -22,6 +108,8 @@ pub struct Weapon {
     max_use_time: u32,
     /// hit rate bonus
     hit_rate_bonus: i16,
+    /// The weapon type
+    wtype: WeaponType,
 }
 
 impl Weapon {
@@ -42,6 +130,7 @@ impl mysql::prelude::FromRow for Weapon {
     where
         Self: Sized,
     {
+        let wt: String = row.get("type").ok_or(mysql::FromRowError(row.clone()))?;
         Ok(Self {
             id: row.get(0).ok_or(mysql::FromRowError(row.clone()))?,
             weight: row.get(6).ok_or(mysql::FromRowError(row.clone()))?,
@@ -53,6 +142,7 @@ impl mysql::prelude::FromRow for Weapon {
             hit_rate_bonus: row
                 .get("hitmodifier")
                 .ok_or(mysql::FromRowError(row.clone()))?,
+            wtype: wt.into(),
         })
     }
 }
@@ -129,11 +219,21 @@ impl WeaponInstance {
         /// TODO
         false
     }
+
+    /// What is the range of this weapon in map units?
+    pub fn range(&self) -> u8 {
+        ///TODO
+        1
+    }
 }
 
 impl ItemTrait for WeaponInstance {
     fn world_id(&self) -> WorldObjectId {
         self.world_id
+    }
+
+    fn get_type(&self) -> super::ItemType {
+        super::ItemType::Weapon(self.definition.wtype)
     }
 
     fn weight(&self) -> u32 {

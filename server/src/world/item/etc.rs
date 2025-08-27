@@ -175,6 +175,10 @@ impl ItemTrait for EtcItemInstance {
         self.world_id
     }
 
+    fn get_type(&self) -> super::ItemType {
+        super::ItemType::Etc(self.definition.itype)
+    }
+
     fn weight(&self) -> u32 {
         self.definition.weight
     }

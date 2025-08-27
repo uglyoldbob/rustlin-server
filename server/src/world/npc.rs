@@ -146,8 +146,41 @@ impl super::object::ObjectTrait for Npc {
         self.location
     }
 
+    fn get_polymorph(&self) -> Option<u32> {
+        None
+    }
+
+    fn apply_required_polymorph(&self, poly: Option<u32>, rate: &mut u8) {}
+
+    fn apply_required_status(
+        &self,
+        _effects: &HashSet<crate::world::object::Effect>,
+        _rate: &mut u8,
+    ) {
+    }
+
+    fn dex_attack_dmg_bonus(&self) -> i8 {
+        0
+    }
+
+    fn str_attack_dmg_bonus(&self) -> i8 {
+        0
+    }
+
+    fn use_weapon_ammunition(&mut self) -> bool {
+        true
+    }
+
+    fn get_evasive_rating(&self) -> u8 {
+        0
+    }
+
     fn get_effects(&self) -> &HashSet<crate::world::object::Effect> {
         &self.effects
+    }
+
+    fn effects_mut(&mut self) -> &mut HashSet<super::object::Effect> {
+        &mut self.effects
     }
 
     fn other_hit_rate_bonus(&self) -> i16 {

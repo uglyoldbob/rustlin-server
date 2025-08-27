@@ -165,8 +165,57 @@ impl crate::world::object::ObjectTrait for FullCharacter {
         self.location
     }
 
+    fn get_polymorph(&self) -> Option<u32> {
+        /// TODO
+        None
+    }
+
+    fn apply_required_status(
+        &self,
+        _effects: &HashSet<crate::world::object::Effect>,
+        _rate: &mut u8,
+    ) {
+    }
+
+    fn apply_required_polymorph(&self, poly: Option<u32>, rate: &mut u8) {}
+
+    fn dex_attack_dmg_bonus(&self) -> i8 {
+        match self.dexterity {
+            0..=14 => 0,
+            15 => 1,
+            16 => 2,
+            17 => 3,
+            18..=20 => 4,
+            21..=23 => 5,
+            24..=35 => (6 + ((self.dexterity - 24) / 3)) as i8,
+            _ => (10 + ((self.dexterity - 36) / 4)) as i8,
+        }
+    }
+
+    fn str_attack_dmg_bonus(&self) -> i8 {
+        match self.strength {
+            0..=22 => -6 + (self.strength as i8 / 2),
+            23..=28 => (5 + ((self.strength - 23) / 3)) as i8,
+            29..=32 => (7 + ((self.strength - 29) / 2)) as i8,
+            33..=34 => (9 + (self.strength - 33)) as i8,
+            _ => (11 + ((self.strength - 35) / 4)) as i8,
+        }
+    }
+
+    fn use_weapon_ammunition(&mut self) -> bool {
+        true
+    }
+
+    fn get_evasive_rating(&self) -> u8 {
+        0
+    }
+
     fn get_effects(&self) -> &HashSet<crate::world::object::Effect> {
         &self.effects
+    }
+
+    fn effects_mut(&mut self) -> &mut HashSet<crate::world::object::Effect> {
+        &mut self.effects
     }
 
     fn other_hit_rate_bonus(&self) -> i16 {

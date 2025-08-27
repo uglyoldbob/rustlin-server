@@ -1843,6 +1843,7 @@ dependencies = [
  "console-subscriber",
  "enum_dispatch",
  "futures",
+ "lazy_static",
  "log",
  "mysql",
  "parking_lot",

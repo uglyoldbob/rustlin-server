@@ -13,6 +13,16 @@ use std::collections::{HashMap, HashSet};
 
 use crate::world::{object::ObjectTrait, WorldObjectId};
 
+/// Represents what type the item is
+pub enum ItemType {
+    /// A weapon
+    Weapon(WeaponType),
+    /// An etc item
+    Etc(EtcItemType),
+    /// A piece of armor
+    Armor(ArmorType),
+}
+
 /// The trait for every item in the game
 #[enum_dispatch::enum_dispatch]
 pub trait ItemTrait {
@@ -32,6 +42,8 @@ pub trait ItemTrait {
     fn ground_icon(&self) -> u16;
     /// Get the weight of the item
     fn weight(&self) -> u32;
+    /// Get the item type
+    fn get_type(&self) -> ItemType;
 }
 
 /// The elemental types that an item can be enchanted with
@@ -366,8 +378,41 @@ impl ObjectTrait for ItemWithLocation {
         self.location
     }
 
+    fn get_polymorph(&self) -> Option<u32> {
+        None
+    }
+
+    fn apply_required_polymorph(&self, _poly: Option<u32>, _rate: &mut u8) {}
+
+    fn apply_required_status(
+        &self,
+        _effects: &HashSet<crate::world::object::Effect>,
+        _rate: &mut u8,
+    ) {
+    }
+
+    fn dex_attack_dmg_bonus(&self) -> i8 {
+        0
+    }
+
+    fn str_attack_dmg_bonus(&self) -> i8 {
+        0
+    }
+
+    fn use_weapon_ammunition(&mut self) -> bool {
+        false
+    }
+
+    fn get_evasive_rating(&self) -> u8 {
+        0
+    }
+
     fn get_effects(&self) -> &HashSet<crate::world::object::Effect> {
         &self.effects
+    }
+
+    fn effects_mut(&mut self) -> &mut HashSet<super::object::Effect> {
+        &mut self.effects
     }
 
     fn other_hit_rate_bonus(&self) -> i16 {
