@@ -172,6 +172,9 @@ impl MonsterSpawn {
             send: chan.0,
             recv: Some(chan.1),
             effects: HashSet::new(),
+            curr_hp: npc.max_hp,
+            curr_mp: npc.max_mp,
+            definition: npc.to_owned(),
         }
     }
 }
@@ -386,7 +389,7 @@ impl MonsterRef {
 
 use crate::{
     character::Location,
-    world::{ObjectRef, WorldMessage, WorldObjectId, WorldResponse},
+    world::{npc::NpcDefinition, ObjectRef, WorldMessage, WorldObjectId, WorldResponse},
 };
 
 /// A monster on the world
@@ -412,6 +415,12 @@ pub struct Monster {
     recv: Option<tokio::sync::mpsc::Receiver<WorldResponse>>,
     /// The list of current effects
     effects: HashSet<crate::world::object::Effect>,
+    /// The npc definition
+    definition: NpcDefinition,
+    /// Current hp
+    curr_hp: u16,
+    /// Current mp
+    curr_mp: u16,
 }
 
 impl Monster {
@@ -460,7 +469,12 @@ impl super::ObjectTrait for Monster {
     }
 
     fn apply_damage(&mut self, dmg: u16) {
-        log::info!("Taking {} damage", dmg);
+        if self.curr_hp > dmg {
+            self.curr_hp -= dmg;
+        } else {
+            self.curr_hp = 0;
+        }
+        log::info!("My health is {}/{}", self.curr_hp, self.definition.max_hp);
     }
 
     fn get_polymorph(&self) -> Option<u32> {

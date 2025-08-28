@@ -5,7 +5,7 @@ use std::collections::{HashMap, HashSet};
 use crate::character::Location;
 
 /// A definition for an npc
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct NpcDefinition {
     /// The definition id of the npc from the database
     pub id: u32,
@@ -17,6 +17,10 @@ pub struct NpcDefinition {
     pub light_size: u8,
     /// The alignment of the npc
     pub alignment: i16,
+    /// The max hp
+    pub max_hp: u16,
+    /// The max mp
+    pub max_mp: u16,
 }
 
 impl NpcDefinition {
@@ -46,6 +50,8 @@ impl mysql::prelude::FromRow for NpcDefinition {
             graphics_id: row.get(5).ok_or(mysql::FromRowError(row.clone()))?,
             light_size: row.get(60).ok_or(mysql::FromRowError(row.clone()))?,
             alignment: row.get(17).ok_or(mysql::FromRowError(row.clone()))?,
+            max_hp: row.get("hp").ok_or(mysql::FromRowError(row.clone()))?,
+            max_mp: row.get("mp").ok_or(mysql::FromRowError(row.clone()))?,
         })
     }
 }
