@@ -648,7 +648,7 @@ impl Damage {
                 } else if attacker_roll <= defender_roll {
                     0
                 } else {
-                    todo!()
+                    self.attack_roll_bonus.max(1).min(100) as u8
                 }
             }
             SpecialAttack::CriticalMiss => 0,
